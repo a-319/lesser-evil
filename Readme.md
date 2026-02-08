@@ -1,4 +1,6 @@
+<div dir="rtl">
 [עברית](Readme-iw.md) |[简体中文](Readme-zh_CN.md) | [日本語](Readme-ja.md)
+</div>
 
 # lesser evil
 

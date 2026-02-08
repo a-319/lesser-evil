@@ -1,4 +1,4 @@
-<div dir="rtl">
+<div dir="ltr">
   <a href="Readme-iw.md">עברית</a> |
   <a href="Readme-zh_CN.md">简体中文</a> |
   <a href="Readme-ja.md">日本語</a>

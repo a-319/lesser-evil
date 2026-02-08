@@ -1,6 +1,6 @@
-[简体中文](Readme-zh_CN.md) | [日本語](Readme-ja.md)
+[עברית](Readme-iw.md) |[简体中文](Readme-zh_CN.md) | [日本語](Readme-ja.md)
 
-# OwnDroid
+# lesser evil
 
 Use Android's DevicePolicyManager API to manage your device.
 

@@ -1,5 +1,7 @@
 <div dir="rtl">
-[עברית](Readme-iw.md) |[简体中文](Readme-zh_CN.md) | [日本語](Readme-ja.md)
+  <a href="Readme-iw.md">עברית</a> |
+  <a href="Readme-zh_CN.md">简体中文</a> |
+  <a href="Readme-ja.md">日本語</a>
 </div>
 
 # lesser evil

@@ -31,20 +31,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
+@@ -46,6 +48,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -54,9 +41,7 @@ import kotlin.math.min
 
 @Composable
 fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismiss, DialogProperties(true, false)) {
-    val context = LocalContext.current
-    val fm = LocalFocusManager.current
-    val fr = remember { FocusRequester() }
+@@ -55,12 +60,29 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
     var input by rememberSaveable { mutableStateOf("") }
     var isError by rememberSaveable { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
@@ -80,30 +65,37 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
             if (failedAttempts >= 3) {
                 val extraFailures = failedAttempts - 3
                 val delayMillis = min(30_000L * (1L shl extraFailures), 10 * 60_000L)
+The lockout duration calculation can overflow before the `min` cap is applied: once `failedAttempts` gets high enough (about 52+, i.e. `extraFailures >= 49`), `30_000L * (1L shl extraFailures)` wraps to a negative/zero `Long`, so `lockoutUntil` may be set to the past and the password input re-enables immediately. This breaks the intended brute-force throttling for repeated failures; clamp `extraFailures` (or the shifted value) before multiplying to keep the arithmetic in range.
                 lockoutUntil = System.currentTimeMillis() + delayMillis
                 SP.lockPasswordLockoutUntil = lockoutUntil
             }
         }
     }
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= 28 && SP.biometricsUnlock) {
-            startBiometricsUnlock(context, onSucceed)
-        } else {
+@@ -70,6 +92,22 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
             fr.requestFocus()
         }
     }
     LaunchedEffect(lockoutUntil) {
+        if (lockoutUntil == 0L) {
+            remainingSeconds = 0
+            return@LaunchedEffect
+        }
         while (true) {
             val remaining = max(0L, lockoutUntil - System.currentTimeMillis())
             remainingSeconds = (remaining / 1000L).toInt()
-            if (remainingSeconds == 0) break
+            if (remaining == 0L) {
+                lockoutUntil = 0L
+                SP.lockPasswordLockoutUntil = 0L
+                break
+            }
             delay(1_000L)
         }
     }
     BackHandler(onBack = onDismiss)
     Card(Modifier.pointerInput(Unit) { detectTapGestures(onTap = { fm.clearFocus() }) }, shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+@@ -77,6 +115,7 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
                 OutlinedTextField(
                     input, { input = it; isError = false }, Modifier.width(200.dp).focusRequester(fr),
                     label = { Text(stringResource(R.string.password)) }, isError = isError,
@@ -111,22 +103,7 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password, imeAction = if(input.length >= 4) ImeAction.Go else ImeAction.Done
                     ),
-                    keyboardActions = KeyboardActions({ fm.clearFocus() }, { unlock() }),
-                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { showPassword = !showPassword }) {
-                            Icon(
-                                painter = painterResource(
-                                    id = if (showPassword) R.drawable.visibility_fill0 else R.drawable.visibility_off_fill0
-                                ),
-                                contentDescription = if (showPassword) "Hide password" else "Show password"
-                            )
-                        }
-                    }
-                )
-                if(Build.VERSION.SDK_INT >= 28 && SP.biometricsUnlock) {
-                    FilledTonalIconButton({ startBiometricsUnlock(context, onSucceed) }, Modifier.padding(start = 4.dp)) {
-                        Icon(painterResource(R.drawable.fingerprint_fill0), null)
+@@ -99,9 +138,15 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
                     }
                 }
             }
@@ -141,25 +118,4 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
             }
         }
     }
-}
-
-@RequiresApi(28)
-fun startBiometricsUnlock(context: Context, onSucceed: () -> Unit) {
-    context.getSystemService(FingerprintManager::class.java) ?: return
-    val callback = object : AuthenticationCallback() {
-        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
-            super.onAuthenticationSucceeded(result)
-            onSucceed()
-        }
-        override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
-            super.onAuthenticationError(errorCode, errString)
-            if(errorCode != BiometricPrompt.BIOMETRIC_ERROR_CANCELED) context.showOperationResultToast(false)
-        }
-    }
-    val cancel = CancellationSignal()
-    BiometricPrompt.Builder(context)
-        .setTitle(context.getText(R.string.unlock))
-        .setNegativeButton(context.getString(R.string.cancel), context.mainExecutor) { _, _ -> cancel.cancel() }
-        .build()
-        .authenticate(cancel, context.mainExecutor, callback)
 }

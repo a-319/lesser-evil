@@ -80,6 +80,20 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        
+        <!-- Activity placeholder for DEVICE_POLICY_MANAGEMENT role support -->
+        <activity 
+            android:name="android.app.Activity" 
+            android:exported="true" 
+            android:permission="android.permission.LAUNCH_DEVICE_MANAGER_SETUP">
+            <intent-filter>
+                <action android:name="android.app.action.ROLE_HOLDER_PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE" />
+                <action android:name="android.app.action.ROLE_HOLDER_PROVISION_MANAGED_PROFILE" />
+                <action android:name="android.app.action.ROLE_HOLDER_PROVISION_FINALIZATION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        
         <receiver
             android:name=".Receiver"
             android:description="@string/app_name"

@@ -1,0 +1,107 @@
+<resources>
+    <!-- App / navigation -->
+    <string name="app_name" translatable="false">OwnDroid</string>
+    <string name="overview">סקירה</string>
+    <string name="features">יכולות</string>
+    <string name="settings">הגדרות</string>
+    <string name="options">אפשרויות</string>
+    <string name="appearance">מראה</string>
+    <string name="about">אודות</string>
+    <string name="notifications">התראות</string>
+    <string name="api" translatable="false">API</string>
+    <string name="exit">יציאה</string>
+
+    <!-- Home menu -->
+    <string name="system">מערכת</string>
+    <string name="network">רשת</string>
+    <string name="applications">אפליקציות</string>
+    <string name="user_restriction">הגבלות משתמש</string>
+    <string name="users">משתמשים</string>
+    <string name="password_and_keyguard">סיסמה ומסך נעילה</string>
+    <string name="work_profile">פרופיל עבודה</string>
+
+    <!-- Common actions / states -->
+    <string name="enabled">מופעל</string>
+    <string name="disabled">מושבת</string>
+    <string name="enable">הפעלה</string>
+    <string name="disable">השבתה</string>
+    <string name="on">פועל</string>
+    <string name="off">כבוי</string>
+    <string name="status">מצב</string>
+    <string name="unknown">לא ידוע</string>
+    <string name="success">הצלחה</string>
+    <string name="failure">כישלון</string>
+    <string name="succeeded">בוצע בהצלחה</string>
+    <string name="failed">נכשל</string>
+    <string name="warning">אזהרה</string>
+    <string name="error">שגיאה</string>
+    <string name="yes">כן</string>
+    <string name="no">לא</string>
+    <string name="none">ללא</string>
+    <string name="default_stringres">ברירת מחדל</string>
+    <string name="default_str">ברירת מחדל</string>
+    <string name="auto">אוטומטי</string>
+    <string name="custom">מותאם אישית</string>
+    <string name="current_state">מצב נוכחי: %1$s</string>
+
+    <string name="add">הוספה</string>
+    <string name="remove">הסרה</string>
+    <string name="edit">עריכה</string>
+    <string name="delete">מחיקה</string>
+    <string name="copy">העתקה</string>
+    <string name="reset">איפוס</string>
+    <string name="apply">החלה</string>
+    <string name="start">התחלה</string>
+    <string name="stop">עצירה</string>
+    <string name="cancel">ביטול</string>
+    <string name="confirm">אישור</string>
+    <string name="continue_str">המשך</string>
+    <string name="next">הבא</string>
+    <string name="previous">הקודם</string>
+    <string name="undo">ביטול פעולה</string>
+
+    <!-- App management -->
+    <string name="install">התקנה</string>
+    <string name="uninstall">הסרה מהתקנה</string>
+    <string name="suspend">השעיה</string>
+    <string name="hide">הסתרה</string>
+    <string name="block_uninstall">חסימת הסרה</string>
+    <string name="disable_user_control">ביטול שליטת משתמש</string>
+    <string name="disable_metered_data">השבתת נתונים מדודים</string>
+    <string name="keep_uninstalled_packages">שמירת אפליקציות שהוסרו</string>
+    <string name="cross_profile_apps">אפליקציות בין פרופילים</string>
+    <string name="cross_profile_widget">וידג׳טים בין פרופילים</string>
+
+    <!-- Security / account -->
+    <string name="password">סיסמה</string>
+    <string name="confirm_password">אימות סיסמה</string>
+    <string name="app_lock">נעילת אפליקציה</string>
+    <string name="allow_biometrics">אפשר ביומטריה</string>
+    <string name="account">חשבון</string>
+    <string name="account_name">שם חשבון</string>
+    <string name="account_type">סוג חשבון</string>
+
+    <!-- Settings labels -->
+    <string name="show_dangerous_features">הצגת פעולות מסוכנות</string>
+    <string name="shortcuts">קיצורי דרך</string>
+    <string name="dark_theme">ערכת נושא כהה</string>
+    <string name="follow_system">לפי המערכת</string>
+    <string name="black_theme">ערכת נושא שחורה</string>
+    <string name="material_you_color">צבעי Material You</string>
+    <string name="export_logs">ייצוא יומנים</string>
+
+    <!-- Dhizuku/Shizuku -->
+    <string name="dhizuku" translatable="false">Dhizuku</string>
+    <string name="shizuku" translatable="false">Shizuku</string>
+    <string name="failed_to_init_dhizuku">נכשל אתחול Dhizuku</string>
+    <string name="dhizuku_permission_not_granted">הרשאת Dhizuku לא ניתנה</string>
+
+    <!-- Misc frequently shown -->
+    <string name="reason">סיבה</string>
+    <string name="time">שעה</string>
+    <string name="date">תאריך</string>
+    <string name="package_name">שם חבילה</string>
+    <string name="permission_denied">הגישה נדחתה</string>
+    <string name="unsupported">לא נתמך</string>
+    <string name="timeout">פסק זמן</string>
+</resources>

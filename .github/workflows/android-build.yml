@@ -3,6 +3,8 @@ name: Android Build & Sign APK
 on:
   push:
     branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
 
 jobs:
   build:
@@ -19,6 +21,13 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
+    - name: Install Android Build Tools
+      run: |
+        sdkmanager "build-tools;29.0.3" "platform-tools" "platforms;android-29"
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
     - name: Build Release APK
       run: ./gradlew assembleRelease
 
@@ -31,6 +40,8 @@ jobs:
         alias: ${{ secrets.KEY_ALIAS }}
         keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
         keyPassword: ${{ secrets.KEY_PASSWORD }}
+      env:
+        BUILD_TOOLS_VERSION: "29.0.3"
 
     - name: Upload Signed APK
       uses: actions/upload-artifact@v4

@@ -134,6 +134,8 @@ import java.time.ZonedDateTime
 import java.util.concurrent.Executors
 import kotlin.reflect.jvm.jvmErasure
 
+private const val DHIZUKU_PERMISSION = "com.rosan.dhizuku.permission.API"
+
 class MyViewModel(application: Application): AndroidViewModel(application) {
     val myRepo = getApplication<MyApplication>().myRepo
     val PM = application.packageManager
@@ -1215,15 +1217,48 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     val dhizukuClients = MutableStateFlow(emptyList<Pair<DhizukuClientInfo, AppInfo>>())
     fun getDhizukuClients() {
         viewModelScope.launch(Dispatchers.IO) {
-            dhizukuClients.value = myRepo.getDhizukuClients().mapNotNull {
-                val packageName = PM.getNameForUid(it.uid)
+            val storedClients = myRepo.getDhizukuClients()
+            val storedByPackage = storedClients.mapNotNull { client ->
+                val packageName = PM.getNameForUid(client.uid)
                 if (packageName == null) {
-                    myRepo.deleteDhizukuClient(it)
+                    myRepo.deleteDhizukuClient(client)
                     null
                 } else {
-                    it to getAppInfo(packageName)
+                    packageName to client
                 }
+            }.toMap()
+            val dhizukuPackages = PM.getInstalledPackages(
+                PackageManager.GET_PERMISSIONS or getInstalledAppsFlags
+            ).filter { info ->
+                info.requestedPermissions?.contains(DHIZUKU_PERMISSION) == true
             }
+            val signatureFlags = if (VERSION.SDK_INT >= 28) {
+                PackageManager.GET_SIGNING_CERTIFICATES
+            } else {
+                PackageManager.GET_SIGNATURES
+            }
+            val packageInfoFlags = signatureFlags or getInstalledAppsFlags
+            val dhizukuPackageNames = dhizukuPackages.map { it.packageName }.toSet()
+            val supportedClients = dhizukuPackages.mapNotNull { info ->
+                val packageName = info.packageName
+                val uid = info.applicationInfo?.uid ?: return@mapNotNull null
+                val packageInfo = try {
+                    PM.getPackageInfo(packageName, packageInfoFlags)
+                } catch (_: PackageManager.NameNotFoundException) {
+                    return@mapNotNull null
+                }
+                val clientInfo = storedByPackage[packageName] ?: DhizukuClientInfo(
+                    uid,
+                    getPackageSignature(packageInfo),
+                    emptyList()
+                )
+                clientInfo to getAppInfo(packageName)
+            }
+            val storedExtras = storedByPackage.filterKeys { it !in dhizukuPackageNames }
+                .mapNotNull { (packageName, clientInfo) ->
+                    clientInfo to getAppInfo(packageName)
+                }
+            dhizukuClients.value = (supportedClients + storedExtras).sortedBy { it.second.label.lowercase() }
         }
     }
     fun getDhizukuServerEnabled(): Boolean {
@@ -1237,7 +1272,14 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         dhizukuClients.update { list ->
             val ml = list.toMutableList()
             val index = ml.indexOfFirst { it.first.uid == info.uid }
-            ml[index] = info to ml[index].second
+            if (index == -1) {
+                val packageName = PM.getNameForUid(info.uid)
+                if (packageName != null) {
+                    ml.add(info to getAppInfo(packageName))
+                }
+            } else {
+                ml[index] = info to ml[index].second
+            }
             ml
         }
     }

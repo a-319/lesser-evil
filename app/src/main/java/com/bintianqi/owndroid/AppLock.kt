@@ -71,9 +71,10 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
     var lockoutUntil by rememberSaveable { mutableLongStateOf(SP.lockPasswordLockoutUntil) }
     var remainingSeconds by rememberSaveable { mutableIntStateOf(calculateRemainingSeconds(lockoutUntil)) }
     val isLocked = remainingSeconds > 0
+
     fun unlock() {
         if (isLocked) return
-        if(input.hash() == SP.lockPasswordHash) {
+        if (input.hash() == SP.lockPasswordHash) {
             fm.clearFocus()
             failedAttempts = 0
             lockoutUntil = 0L
@@ -93,6 +94,7 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
             }
         }
     }
+
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 28 && SP.biometricsUnlock) {
             startBiometricsUnlock(context, onSucceed)
@@ -100,6 +102,7 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
             fr.requestFocus()
         }
     }
+
     LaunchedEffect(lockoutUntil) {
         if (lockoutUntil == 0L) {
             remainingSeconds = 0
@@ -115,6 +118,7 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
             delay(1_000L)
         }
     }
+
     BackHandler(onBack = onDismiss)
     Card(Modifier.pointerInput(Unit) { detectTapGestures(onTap = { fm.clearFocus() }) }, shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(12.dp)) {
@@ -124,7 +128,8 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
                     label = { Text(stringResource(R.string.password)) }, isError = isError,
                     enabled = !isLocked,
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password, imeAction = if(input.length >= 4) ImeAction.Go else ImeAction.Done
+                        keyboardType = KeyboardType.Password,
+                        imeAction = if (input.length >= 4) ImeAction.Go else ImeAction.Done
                     ),
                     keyboardActions = KeyboardActions({ fm.clearFocus() }, { unlock() }),
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -139,7 +144,7 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
                         }
                     }
                 )
-                if(Build.VERSION.SDK_INT >= 28 && SP.biometricsUnlock) {
+                if (Build.VERSION.SDK_INT >= 28 && SP.biometricsUnlock) {
                     FilledTonalIconButton({ startBiometricsUnlock(context, onSucceed) }, Modifier.padding(start = 4.dp)) {
                         Icon(painterResource(R.drawable.fingerprint_fill0), null)
                     }
@@ -166,9 +171,10 @@ fun startBiometricsUnlock(context: Context, onSucceed: () -> Unit) {
             super.onAuthenticationSucceeded(result)
             onSucceed()
         }
+
         override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
             super.onAuthenticationError(errorCode, errString)
-            if(errorCode != BiometricPrompt.BIOMETRIC_ERROR_CANCELED) context.showOperationResultToast(false)
+            if (errorCode != BiometricPrompt.BIOMETRIC_ERROR_CANCELED) context.showOperationResultToast(false)
         }
     }
     val cancel = CancellationSignal()

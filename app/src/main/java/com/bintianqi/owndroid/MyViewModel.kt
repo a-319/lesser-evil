@@ -1237,13 +1237,19 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             } else {
                 PackageManager.GET_SIGNATURES
             }
+            val packageInfoFlags = signatureFlags or getInstalledAppsFlags
             val dhizukuPackageNames = dhizukuPackages.map { it.packageName }.toSet()
             val supportedClients = dhizukuPackages.mapNotNull { info ->
                 val packageName = info.packageName
                 val uid = info.applicationInfo?.uid ?: return@mapNotNull null
+                val packageInfo = try {
+                    PM.getPackageInfo(packageName, packageInfoFlags)
+                } catch (_: PackageManager.NameNotFoundException) {
+                    return@mapNotNull null
+                }
                 val clientInfo = storedByPackage[packageName] ?: DhizukuClientInfo(
                     uid,
-                    getPackageSignature(PM.getPackageInfo(packageName, signatureFlags)),
+                    getPackageSignature(packageInfo),
                     emptyList()
                 )
                 clientInfo to getAppInfo(packageName)

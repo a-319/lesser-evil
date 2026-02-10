@@ -37,6 +37,18 @@ jobs:
         keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
         keyPassword: ${{ secrets.KEY_PASSWORD }}
       env:
+        # כאן אנחנו מכריחים אותו להסתכל על המיקום האמיתי של ה-SDK בשרת
+        ANDROID_HOME: /usr/local/lib/android/sdk
+        BUILD_TOOLS_VERSION: "34.0.0"
+
+    - name: Upload Signed APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-signed
+        path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+        keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+        keyPassword: ${{ secrets.KEY_PASSWORD }}
+      env:
         # שימוש בנתיבים הסטנדרטיים של GitHub Actions
         ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
         # הגדרה להשתמש בגרסה 30.0.3 ומעלה שקיימת תמיד בשרתי GitHub

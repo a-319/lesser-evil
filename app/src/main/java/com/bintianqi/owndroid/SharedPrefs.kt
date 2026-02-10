@@ -21,6 +21,8 @@ class SharedPrefs(context: Context) {
     var lockPasswordHash by StringSharedPref("lock.password.sha256")
     var biometricsUnlock by BooleanSharedPref("lock.biometrics")
     var lockWhenLeaving by BooleanSharedPref("lock.onleave")
+    var lockPasswordFailedAttempts by IntSharedPref("lock.password.failed_attempts")
+    var lockPasswordLockoutUntil by LongSharedPref("lock.password.lockout_until")
     var applicationsListView by BooleanSharedPref("applications.list_view", true)
     var shortcuts by BooleanSharedPref("shortcuts")
     var dhizukuServer by BooleanSharedPref("dhizuku_server")
@@ -47,4 +49,11 @@ private class IntSharedPref(val key: String, val defValue: Int = 0): ReadWritePr
         thisRef.sharedPrefs.getInt(key, defValue)
     override fun setValue(thisRef: SharedPrefs, property: KProperty<*>, value: Int) =
         thisRef.sharedPrefs.edit(true) { putInt(key, value) }
+}
+
+private class LongSharedPref(val key: String, val defValue: Long = 0L): ReadWriteProperty<SharedPrefs, Long> {
+    override fun getValue(thisRef: SharedPrefs, property: KProperty<*>): Long =
+        thisRef.sharedPrefs.getLong(key, defValue)
+    override fun setValue(thisRef: SharedPrefs, property: KProperty<*>, value: Long) =
+        thisRef.sharedPrefs.edit(true) { putLong(key, value) }
 }

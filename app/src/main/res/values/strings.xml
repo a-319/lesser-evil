@@ -608,6 +608,7 @@
     <string name="allow_biometrics">Allow biometrics</string>
     <string name="lock_when_leaving">Lock when leaving</string>
     <string name="unlock">Unlock</string>
+    <string name="unlock_wait_seconds">Try again in %1$d seconds.</string>
     <string name="security">Security</string>
     <string name="clear_storage">Clear storage</string>
     

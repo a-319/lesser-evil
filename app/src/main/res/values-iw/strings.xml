@@ -137,7 +137,7 @@
     <string name="lock_task_mode">מצב נעילת משימה</string>
     <string name="logout">התנתקות</string>
     <string name="managed_configuration">תצורה מנוהלת</string>
-    <string name="max_pwd_fail">מספר כישלונות סיסמה מרבי</string>
+    <string name="max_pwd_fail">מספר כישלונות יסמה מרבי</string>
     <string name="max_time_to_lock">זמן עד נעילת המסך</string>
     <string name="min_wifi_security_level">רמת אבטחת Wi-Fi מינימלית</string>
     <string name="mte_policy">מדיניות MTE</string>

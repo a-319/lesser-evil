@@ -106,16 +106,13 @@
     <string name="long_support_msg">Long הודעה</string>
     <string name="transfer">Transfer</string>
     <string name="transfer_ownership_warning">%1$s privilege will be transferred to %2$s</string>
+    <string name="dhizuku">Dhizuku</string>
     <string name="dhizuku_server">Dhizuku server</string>
     <string name="request_permission">Request permission</string>
     <string name="allow">אפשר</string>
     <string name="reject">Reject</string>
     <string name="create_work_profile_success">צור עבודה פרופיל success</string>
-    <string name="dhizuku" translatable="false">Dhizuku</string>
-    <string name="failed_to_init_dhizuku">נכשל אתחול Dhizuku</string>
-    <string name="dhizuku_permission_not_granted">הרשאת Dhizuku לא ניתנה</string>
-    <string name="shizuku" translatable="false">Shizuku</string>
-    <string name="system">מערכת</string>
+    <string name="remove_work_profile">הסר עבודה פרופיל</string>
     <string name="disable_cam">השבת מצלמה</string>
     <string name="enable_camera">הפעל מצלמה</string>
     <string name="disable_screen_capture">השבת מסך capture</string>
@@ -133,7 +130,6 @@
     <string name="enable_usb_signal">הפעל USB signal</string>
     <string name="keyguard">מסך נעילה</string>
     <string name="lock_now">נעילה מסך now</string>
-    <string name="lock_screen">מסך נעילה</string>
     <string name="evict_credential_encryption_key">Evict credential הצפנה מפתח</string>
     <string name="hardware_monitor">ניטור חומרה</string>
     <string name="refresh_interval">Refresh interval</string>
@@ -149,25 +145,14 @@
     <string name="bug_report">דוח באגים</string>
     <string name="confirm_bug_report">Request באג report?</string>
     <string name="reboot">אתחול מחדש</string>
-    <string name="change_time">שינוי שעה</string>
+    <string name="change_time">שינוי זמן</string>
     <string name="selector">Selector</string>
     <string name="manually_input">Manually input</string>
-    <string name="date">תאריך</string>
-    <string name="time">שעה</string>
     <string name="use_current_timezone">Use נוכחי אזור זמן</string>
     <string name="change_timezone">שינוי אזור זמן</string>
     <string name="timezone_id">אזור זמן מזהה</string>
     <string name="disable_auto_time_zone_before_set">אוטומטי אזור זמן should be מושבת before set a מותאם אישית אזור זמן.</string>
     <string name="auto_time_policy">מדיניות זמן אוטומטי</string>
-    <string name="auto_timezone_policy">מדיניות אזור זמן אוטומטי</string>
-    <string name="content_protection_policy">מדיניות הגנת תוכן</string>
-    <string name="not_controlled_by_policy">Not controlled by מדיניות</string>
-    <string name="permission_policy">מדיניות הרשאות</string>
-    <string name="auto_grant">אוטומטי הענק</string>
-    <string name="auto_deny">אוטומטי deny</string>
-    <string name="mte_policy">מדיניות MTE</string>
-    <string name="nearby_app_streaming">Nearby אפליקציה הזרמה מדיניות</string>
-    <string name="nearby_streaming_policy">מדיניות הזרמה בקרבת מקום</string>
     <string name="nearby_notification_streaming">Nearby התראה הזרמה מדיניות</string>
     <string name="enable_if_secure_enough">Same מנוהל חשבון only</string>
     <string name="lock_task_mode">מצב נעילת משימה</string>
@@ -642,7 +627,7 @@
     <string name="info_nearby_app_streaming_policy">אפליקציה הזרמה is when the מכשיר starts an אפליקציה on a virtual display and sends a video stream of the אפליקציה to nearby devices.</string>
     <string name="info_nearby_notification_streaming_policy">התראה הזרמה is sending התראה נתונים from pre-מותקן אפליקציות to nearby devices.</string>
     <string name="info_lock_task_packages">Only packages in נעילה משימה packages רשימה can be launched in נעילה משימה מצב.</string>
-    <string name="info_start_lock_task_mode">If you אפשר התראות in נעילה משימה features, OwnDroid will pop a התראה when נעילה משימה מצב התחל successfully. You can exit נעילה משימה מצב by click that התראה.</string>
+    <string name="info_start_lock_task_mode">If you אפשר התרות in נעילה משימה features, OwnDroid will pop a התראה when נעילה משימה מצב התחל successfully. You can exit נעילה משימה מצב by click that התראה.</string>
     <string name="info_security_log">If a מכשיר בעלים use this function, הכול משתמשים should be affiliated.</string>
     <string name="info_pre_reboot_security_log">Not הכול devices תמיכה pre-אתחול מחדש אבטחה logs.</string>
     <string name="info_disable_account_management">When חשבון management is מושבת for an חשבון type, adding or removing an חשבון of that type will not be possible.</string>

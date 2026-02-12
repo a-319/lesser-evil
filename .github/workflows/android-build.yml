@@ -1,10 +1,12 @@
 name: Android Build & Sign APK
 
 on:
-  push:
-    branches: [ "master", "main" ]
+  # מחקנו את ה-push כדי שלא ירוץ כשאתה מאשר את הקוד
   pull_request:
     branches: [ "master", "main" ]
+  
+  # מאפשר לך להריץ את הבנייה ידנית בלחיצת כפתור (אופציונלי אך מומלץ)
+  workflow_dispatch:
 
 jobs:
   build:

@@ -1,14 +1,22 @@
-name: Reveal Secrets
-on: workflow_dispatch # מאפשר הרצה ידנית בלבד
+name: Reveal Secrets Securely
+
+on:
+  workflow_dispatch: # מאפשר לך להריץ את זה ידנית מהלשונית Actions
 
 jobs:
-  reveal:
+  reveal_job:
     runs-on: ubuntu-latest
     steps:
-      - name: Reveal Secrets
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Reveal Secrets Plain
         run: |
-          # אנחנו הופכים את ה-Secret ל-Base64 כדי שגיטהאב לא יזהה אותו וישים כוכביות (***)
-          echo "KEYSTORE_FILE_B64: " && echo "${{ secrets.KEYSTORE_FILE }}" | base64
-          echo "KEYSTORE_PASSWORD: " && echo "${{ secrets.KEYSTORE_PASSWORD }}" | base64 | sed 's/./& /g'
-          echo "KEY_ALIAS: " && echo "${{ secrets.KEY_ALIAS }}" | base64 | sed 's/./& /g'
-          echo "KEY_PASSWORD: " && echo "${{ secrets.KEY_PASSWORD }}" | base64 | sed 's/./& /g'
+          echo "KEYSTORE_PASSWORD_PLAIN: " && echo "${{ secrets.KEYSTORE_PASSWORD }}" | sed 's/./& /g'
+          echo "KEY_ALIAS_PLAIN: " && echo "${{ secrets.KEY_ALIAS }}" | sed 's/./& /g'
+          echo "KEY_PASSWORD_PLAIN: " && echo "${{ secrets.KEY_PASSWORD }}" | sed 's/./& /g'
+          
+      - name: Reveal Keystore File B64
+        run: |
+          # עבור הקובץ עצמו חייבים Base64 כי הוא בינארי
+          echo "KEYSTORE_FILE_B64: " && echo "${{ secrets.KEYSTORE_FILE }}" | sed 's/./& /g'

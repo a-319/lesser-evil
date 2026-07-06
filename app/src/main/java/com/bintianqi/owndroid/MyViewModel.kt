@@ -1630,7 +1630,9 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         conf.SSID = "\"" + info.ssid + "\""
         info.hiddenSsid?.let { conf.hiddenSSID = it }
         if (VERSION.SDK_INT >= 30) info.security?.let { conf.setSecurityParams(it.id) }
-        if (info.security == WifiSecurity.Psk) conf.preSharedKey = info.password
+        if (info.security == WifiSecurity.Psk && info.password.isNotEmpty()) {
+            conf.preSharedKey = '"' + info.password + '"'
+        }
         if (VERSION.SDK_INT >= 33) info.macRandomization?.let { conf.macRandomizationSetting = it.id }
         if (VERSION.SDK_INT >= 33 && info.ipMode != null) {
             val ipConf = if (info.ipMode == IpMode.Static && info.ipConf != null) {
@@ -1864,7 +1866,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         val configs = pnsConfigs.value.run {
             if (state) plus(info) else minus(info)
         }.map { buildPnsConfig(it) }
-        DPM.preferentialNetworkServiceConfigs = configs
+        try {
+            DPM.preferentialNetworkServiceConfigs = configs
+        } catch (e: IllegalArgumentException) {
+            e.printStackTrace()
+            getApplication<MyApplication>().showOperationResultToast(false)
+        }
     }
     val apnConfigs = MutableStateFlow(listOf<ApnConfig>())
     @RequiresApi(28)

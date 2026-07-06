@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         applicationId = "com.bintianqi.owndroid"
-        minSdk = 23
+        minSdk = 21
         targetSdk = 36
         versionCode = 42
         versionName = "7.3"

@@ -214,6 +214,15 @@
     <string name="ltf_global_actions">Allow global actions</string>
     <string name="ltf_keyguard">Allow keyguard</string>
     <string name="ltf_block_activity_start_in_task">Block activity start in task</string>
+    <string name="ltf_keep_navigation_buttons">Keep system navigation buttons available</string>
+    <string name="info_ltf_keep_navigation_buttons">When checked, the home, recents and back buttons of the system navigation bar will keep working normally in lock task mode.</string>
+    <string name="profiles">Profiles</string>
+    <string name="profile_name">Profile name</string>
+    <string name="lock_task_create_shortcut">Save profile &amp; create shortcut</string>
+    <string name="no_lock_task_profiles">No saved profiles</string>
+    <string name="info_lock_task_profiles">A profile saves a lock task configuration: the app to launch, the allowed apps and the lock task features. Starting a profile or tapping its shortcut applies the saved configuration and launches its main app in lock task mode.</string>
+    <string name="info_lock_task_profile_shortcut">Saves the current selection (including the current allowed apps and features) as a profile and creates a home screen shortcut that starts it in lock task mode.</string>
+    <string name="info_lock_task_suspended_hidden">Apps that were suspended or hidden by OwnDroid can also be added. They will be temporarily unsuspended / unhidden while lock task mode is running, and their previous state will be restored as soon as it exits.</string>
     <string name="ca_cert">CA certificate</string>
     <string name="no_ca_cert">No user CA certificate installed</string>
     <string name="parse_cert_failed">Failed to parse certificate</string>

@@ -1,6 +1,7 @@
 package com.bintianqi.owndroid
 
 import android.app.Activity
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import com.bintianqi.owndroid.dpm.UserOperationType
@@ -14,6 +15,7 @@ class ShortcutsReceiverActivity : Activity() {
             val key = SP.shortcutKey
             val requestKey = intent?.getStringExtra("key")
             if (action != null && key != null && requestKey == key) {
+                var success = true
                 when (action) {
                     "LOCK" -> Privilege.DPM.lockNow()
                     "DISABLE_CAMERA" -> {
@@ -44,9 +46,16 @@ class ShortcutsReceiverActivity : Activity() {
                         if (serial == -1) return
                         doUserOperationWithContext(this, type, serial, false)
                     }
+                    "LOCK_TASK_PROFILE" -> {
+                        success = if (Build.VERSION.SDK_INT >= 28) {
+                            val id = intent.getIntExtra("profile", -1)
+                            val profile = LockTaskUtils.getProfiles().find { it.id == id }
+                            profile != null && LockTaskUtils.startProfile(this, profile)
+                        } else false
+                    }
                 }
                 Log.d(TAG, "Received intent: $action")
-                showOperationResultToast(true)
+                showOperationResultToast(success)
             } else {
                 showOperationResultToast(false)
             }

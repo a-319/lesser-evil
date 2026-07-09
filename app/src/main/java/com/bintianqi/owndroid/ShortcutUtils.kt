@@ -119,6 +119,23 @@ object ShortcutUtils {
             context, shortcuts, context.getString(R.string.user_removed)
         )
     }
+    fun buildLockTaskProfileShortcut(context: Context, profile: LockTaskProfile): ShortcutInfoCompat {
+        setShortcutKey()
+        return ShortcutInfoCompat.Builder(context, "LOCK_TASK_PROFILE-${profile.id}")
+            .setIcon(IconCompat.createWithResource(context, R.drawable.lock_fill0))
+            .setShortLabel(profile.name.ifBlank { context.getString(R.string.lock_task_mode) })
+            .setIntent(
+                Intent(context, ShortcutsReceiverActivity::class.java)
+                    .setAction("com.bintianqi.owndroid.action.LOCK_TASK_PROFILE")
+                    .putExtra("profile", profile.id)
+                    .putExtra("key", SP.shortcutKey)
+            )
+            .build()
+    }
+    fun setLockTaskProfileShortcut(context: Context, profile: LockTaskProfile): Boolean {
+        val shortcut = buildLockTaskProfileShortcut(context, profile)
+        return ShortcutManagerCompat.requestPinShortcut(context, shortcut, null)
+    }
     fun setShortcutKey() {
         if (SP.shortcutKey.isNullOrEmpty()) {
             SP.shortcutKey = generateBase64Key(10)

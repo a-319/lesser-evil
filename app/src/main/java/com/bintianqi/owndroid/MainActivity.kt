@@ -257,6 +257,9 @@ class MainActivity : FragmentActivity() {
         registerPackageRemovedReceiver(this) {
             vm.onPackageRemoved(it)
         }
+        if (Privilege.status.value.activated) {
+            LockTaskUtils.restoreStaleTemporaryAppStates(this)
+        }
         setContent {
             var appLockDialog by rememberSaveable { mutableStateOf(false) }
             val theme by vm.theme.collectAsStateWithLifecycle()
@@ -391,7 +394,10 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             LockTaskModeScreen(
                 vm.chosenPackage, ::chooseSinglePackage, ::choosePackage, vm.lockTaskPackages,
                 vm::getLockTaskPackages, vm::setLockTaskPackage, vm::startLockTaskMode,
-                vm:: getLockTaskFeatures, vm::setLockTaskFeatures, ::navigateUp
+                vm:: getLockTaskFeatures, vm::setLockTaskFeatures,
+                vm.lockTaskProfiles, vm::getLockTaskProfiles, vm::buildLockTaskProfile,
+                vm::addLockTaskProfile, vm::deleteLockTaskProfile, vm::startLockTaskProfile,
+                { ShortcutUtils.setLockTaskProfileShortcut(context, it) }, ::navigateUp
             )
         }
         composable<CaCert> {

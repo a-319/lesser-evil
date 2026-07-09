@@ -185,6 +185,15 @@
     <string name="ltf_global_actions">允许全局行为(比如长按电源键对话框)</string>
     <string name="ltf_keyguard">允许锁屏</string>
     <string name="ltf_block_activity_start_in_task">阻止启动未允许的应用</string>
+    <string name="ltf_keep_navigation_buttons">保持系统导航按键可用</string>
+    <string name="info_ltf_keep_navigation_buttons">勾选后，系统导航栏的主屏幕、概览和返回按键在锁定任务模式下将保持正常可用。</string>
+    <string name="profiles">配置</string>
+    <string name="profile_name">配置名称</string>
+    <string name="lock_task_create_shortcut">保存配置并创建快捷方式</string>
+    <string name="no_lock_task_profiles">没有已保存的配置</string>
+    <string name="info_lock_task_profiles">配置会保存锁定任务的设置：要启动的应用、允许的应用和锁定任务功能。启动配置或点击其快捷方式会应用保存的设置，并在锁定任务模式下启动其主应用。</string>
+    <string name="info_lock_task_profile_shortcut">将当前选择（包括当前允许的应用和功能）保存为配置，并创建一个主屏幕快捷方式，点击即可以锁定任务模式启动。</string>
+    <string name="info_lock_task_suspended_hidden">也可以添加被OwnDroid挂起或隐藏的应用。它们会在锁定任务模式运行期间被临时解除挂起/取消隐藏，并在退出后立即恢复原状态。</string>
     <string name="package_name">包名</string>
     <string name="not_exist">不存在</string>
     <string name="ca_cert">CA证书</string>

@@ -66,6 +66,7 @@ class LockTaskService: Service() {
     }
 
     fun stop() {
+        LockTaskUtils.restoreTemporaryAppStates()
         unregisterReceiver(stopReceiver)
         stopSelf()
     }

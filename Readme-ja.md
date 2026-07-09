@@ -58,7 +58,7 @@ AndroidのDevice owner特権を使用してデバイスを管理します。
 - Shizuku (推奨)
 - Dhizuku
 - Root
-- adbシェルでコマンドを実行: `dpm set-device-owner com.bintianqi.owndroid/.Receiver`
+- adbシェルでコマンドを実行: `dpm set-device-owner lesser.evil/.Receiver`
 
 ## FAQ
 
@@ -119,13 +119,13 @@ java.lang.IllegalStateException: Unexpected @ProvisioningPreCondition
 
 ```shell
 # ADBシェルでアプリを非表示にする例
-am broadcast -a com.bintianqi.owndroid.action.HIDE -n com.bintianqi.owndroid/.ApiReceiver --es key abcdefg --es package com.example.app
+am broadcast -a lesser.evil.action.HIDE -n lesser.evil/.ApiReceiver --es key abcdefg --es package com.example.app
 ```
 
 ```kotlin
 // Kotlinでアプリを非表示にする例
-val intent = Intent("com.bintianqi.owndroid.action.HIDE")
-    .setComponent(ComponentName("com.bintianqi.owndroid", "com.bintianqi.owndroid.ApiReceiver"))
+val intent = Intent("lesser.evil.action.HIDE")
+    .setComponent(ComponentName("lesser.evil", "lesser.evil.ApiReceiver"))
     .putExtra("key", "abcdefg")
     .putExtra("package", "com.example.app")
 context.sendBroadcast(intent)

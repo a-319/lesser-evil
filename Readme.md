@@ -29,7 +29,7 @@ Use Android's DevicePolicyManager API to manage your device.
   - Shizuku
   - Dhizuku
   - Root
-  - ADB shell command `dpm set-device-owner com.bintianqi.owndroid/.Receiver`
+  - ADB shell command `dpm set-device-owner lesser.evil/.Receiver`
 - [Dhizuku](https://github.com/iamr0s/Dhizuku)
 - Work profile
 
@@ -60,7 +60,7 @@ Solutions:
 ### Device owner is already set
 
 ```text
-java.lang.IllegalStateException: Trying to set the device owner (com.bintianqi.owndroid/.Receiver), but device owner (xxx) is already set.
+java.lang.IllegalStateException: Trying to set the device owner (lesser.evil/.Receiver), but device owner (xxx) is already set.
 ```
 
 Only 1 device owner can exist on a device. Please deactivate the existing device owner first.
@@ -115,13 +115,13 @@ OwnDroid provides an Intent-based API. You need to set the API key in settings a
 
 ```shell
 # An example of hiding app in ADB shell
-am broadcast -a com.bintianqi.owndroid.action.HIDE -n com.bintianqi.owndroid/.ApiReceiver --es key abcdefg --es package com.example.app
+am broadcast -a lesser.evil.action.HIDE -n lesser.evil/.ApiReceiver --es key abcdefg --es package com.example.app
 ```
 
 ```kotlin
 // An example of hiding app in Kotlin
-val intent = Intent("com.bintianqi.owndroid.action.HIDE")
-    .setComponent(ComponentName("com.bintianqi.owndroid", "com.bintianqi.owndroid.ApiReceiver"))
+val intent = Intent("lesser.evil.action.HIDE")
+    .setComponent(ComponentName("lesser.evil", "lesser.evil.ApiReceiver"))
     .putExtra("key", "abcdefg")
     .putExtra("package", "com.example.app")
 context.sendBroadcast(intent)

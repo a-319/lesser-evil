@@ -214,8 +214,10 @@
     <string name="ltf_global_actions">Allow global actions</string>
     <string name="ltf_keyguard">Allow keyguard</string>
     <string name="ltf_block_activity_start_in_task">Block activity start in task</string>
-    <string name="ltf_keep_navigation_buttons">Keep system navigation buttons available</string>
-    <string name="info_ltf_keep_navigation_buttons">When checked, the home, recents and back buttons of the system navigation bar will keep working normally in lock task mode.</string>
+    <string name="lock_task_mode_nav_buttons">Show navigation buttons</string>
+    <string name="info_lock_task_nav_buttons">Displays system-like navigation buttons at the bottom of the screen while lock task mode is running. The back button works inside the locked app; the home and recents buttons exit lock task mode and then perform their normal function. Requires enabling the OwnDroid accessibility service.</string>
+    <string name="accessibility_service_not_enabled">Please enable the OwnDroid accessibility service</string>
+    <string name="accessibility_service_description">Displays working navigation buttons at the bottom of the screen while lock task mode is running.</string>
     <string name="profiles">Profiles</string>
     <string name="profile_name">Profile name</string>
     <string name="lock_task_create_shortcut">Save profile &amp; create shortcut</string>

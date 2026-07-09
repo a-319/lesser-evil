@@ -20,10 +20,12 @@ import android.app.admin.SystemUpdatePolicy.TYPE_INSTALL_AUTOMATIC
 import android.app.admin.SystemUpdatePolicy.TYPE_INSTALL_WINDOWED
 import android.app.admin.SystemUpdatePolicy.TYPE_POSTPONE
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build.VERSION
 import android.os.HardwarePropertiesManager
 import android.os.UserManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -108,6 +110,7 @@ import com.bintianqi.owndroid.BottomPadding
 import com.bintianqi.owndroid.HorizontalPadding
 import com.bintianqi.owndroid.LockTaskProfile
 import com.bintianqi.owndroid.MyViewModel
+import com.bintianqi.owndroid.NavigationAccessibilityService
 import com.bintianqi.owndroid.Privilege
 import com.bintianqi.owndroid.R
 import com.bintianqi.owndroid.SP
@@ -1150,10 +1153,10 @@ fun LockTaskModeScreen(
     chosenPackage: Channel<String>, chooseSinglePackage: () -> Unit, choosePackage: () -> Unit,
     lockTaskPackages: StateFlow<List<AppInfo>>, getLockTaskPackages: () -> Unit,
     setLockTaskPackage: (String, Boolean) -> Unit,
-    startLockTaskMode: (String, String, Boolean, Boolean) -> Boolean,
+    startLockTaskMode: (String, String, Boolean, Boolean, Boolean) -> Boolean,
     getLockTaskFeatures: () -> Int, setLockTaskFeature: (Int) -> String?,
     lockTaskProfiles: StateFlow<List<LockTaskProfile>>, getLockTaskProfiles: () -> Unit,
-    buildLockTaskProfile: (String, String, String, Boolean, Boolean) -> LockTaskProfile,
+    buildLockTaskProfile: (String, String, String, Boolean, Boolean, Boolean) -> LockTaskProfile,
     addLockTaskProfile: (LockTaskProfile) -> LockTaskProfile,
     deleteLockTaskProfile: (Int) -> Unit,
     startLockTaskProfile: (LockTaskProfile) -> Boolean,
@@ -1220,9 +1223,9 @@ fun LockTaskModeScreen(
 @RequiresApi(28)
 @Composable
 private fun StartLockTaskMode(
-    startLockTaskMode: (String, String, Boolean, Boolean) -> Boolean,
+    startLockTaskMode: (String, String, Boolean, Boolean, Boolean) -> Boolean,
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    buildLockTaskProfile: (String, String, String, Boolean, Boolean) -> LockTaskProfile,
+    buildLockTaskProfile: (String, String, String, Boolean, Boolean, Boolean) -> LockTaskProfile,
     addLockTaskProfile: (LockTaskProfile) -> LockTaskProfile,
     createLockTaskProfileShortcut: (LockTaskProfile) -> Boolean
 ) {
@@ -1234,6 +1237,7 @@ private fun StartLockTaskMode(
     var specifyActivity by rememberSaveable { mutableStateOf(false) }
     var clearTask by rememberSaveable { mutableStateOf(true) }
     var showNotification by rememberSaveable { mutableStateOf(true) }
+    var showNavigationButtons by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         packageName = chosenPackage.receive()
     }
@@ -1251,6 +1255,22 @@ private fun StartLockTaskMode(
         FullWidthCheckBoxItem(
             R.string.lock_task_mode_show_notification, showNotification
         ) { showNotification = it }
+        FullWidthCheckBoxItem(
+            R.string.lock_task_mode_nav_buttons, showNavigationButtons
+        ) {
+            showNavigationButtons = it
+            if (it) {
+                showNotification = false
+                if (NavigationAccessibilityService.instance == null) {
+                    context.popToast(R.string.accessibility_service_not_enabled)
+                    try {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -1276,7 +1296,9 @@ private fun StartLockTaskMode(
                 .fillMaxWidth()
                 .padding(horizontal = HorizontalPadding),
             onClick = {
-                val result = startLockTaskMode(packageName, activity, clearTask, showNotification)
+                val result = startLockTaskMode(
+                    packageName, activity, clearTask, showNotification, showNavigationButtons
+                )
                 if (!result) context.showOperationResultToast(false)
             },
             enabled = packageName.isNotBlank() && (!specifyActivity || activity.isNotBlank())
@@ -1295,6 +1317,7 @@ private fun StartLockTaskMode(
         }
         Spacer(Modifier.height(5.dp))
         if (!privilege.dhizuku) Notes(R.string.info_start_lock_task_mode)
+        Notes(R.string.info_lock_task_nav_buttons)
         Notes(R.string.info_lock_task_profile_shortcut)
         Spacer(Modifier.height(BottomPadding))
         if (profileDialog) {
@@ -1316,7 +1339,8 @@ private fun StartLockTaskMode(
                     TextButton(
                         onClick = {
                             val profile = addLockTaskProfile(buildLockTaskProfile(
-                                profileName, packageName, activity, clearTask, showNotification
+                                profileName, packageName, activity, clearTask, showNotification,
+                                showNavigationButtons
                             ))
                             context.showOperationResultToast(createLockTaskProfileShortcut(profile))
                             profileDialog = false
@@ -1388,17 +1412,6 @@ private fun LockTaskFeatures(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
     ) {
-        Spacer(Modifier.padding(vertical = 5.dp))
-        val navigationButtonsFlags = DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
-                DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW
-        FullWidthCheckBoxItem(
-            R.string.ltf_keep_navigation_buttons,
-            flags and navigationButtonsFlags == navigationButtonsFlags
-        ) { checked ->
-            flags = if (checked) flags or navigationButtonsFlags
-                else flags and navigationButtonsFlags.inv()
-        }
-        Notes(R.string.info_ltf_keep_navigation_buttons, HorizontalPadding)
         Spacer(Modifier.padding(vertical = 5.dp))
         listOf(
             DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO to R.string.ltf_sys_info,

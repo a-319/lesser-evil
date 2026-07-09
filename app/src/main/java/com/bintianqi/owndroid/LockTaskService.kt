@@ -36,6 +36,14 @@ class LockTaskService: Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        if (intent?.getBooleanExtra(EXTRA_NAVIGATION_BUTTONS, false) == true) {
+            val navigationService = NavigationAccessibilityService.instance
+            if (navigationService != null) {
+                navigationService.showNavigationBar()
+            } else {
+                popToast(R.string.accessibility_service_not_enabled)
+            }
+        }
         val filter = IntentFilter(STOP_ACTION)
         ContextCompat.registerReceiver(
             this, stopReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED
@@ -66,20 +74,23 @@ class LockTaskService: Service() {
     }
 
     fun stop() {
+        NavigationAccessibilityService.instance?.hideNavigationBar()
         LockTaskUtils.restoreTemporaryAppStates()
         unregisterReceiver(stopReceiver)
         stopSelf()
     }
 
     fun stopLockTask() {
-        val features = Privilege.DPM.getLockTaskFeatures(Privilege.DAR)
-        val packages = Privilege.DPM.getLockTaskPackages(Privilege.DAR)
-        Privilege.DPM.setLockTaskPackages(Privilege.DAR, arrayOf())
-        Privilege.DPM.setLockTaskPackages(Privilege.DAR, packages)
-        Privilege.DPM.setLockTaskFeatures(Privilege.DAR, features)
+        LockTaskUtils.forceStopLockTask()
+    }
+
+    override fun onDestroy() {
+        NavigationAccessibilityService.instance?.hideNavigationBar()
+        super.onDestroy()
     }
 
     companion object {
         const val STOP_ACTION = "com.bintianqi.owndroid.action.STOP_LOCK_TASK_MODE"
+        const val EXTRA_NAVIGATION_BUTTONS = "show_navigation_buttons"
     }
 }

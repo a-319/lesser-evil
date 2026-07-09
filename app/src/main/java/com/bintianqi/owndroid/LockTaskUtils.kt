@@ -20,7 +20,8 @@ data class LockTaskProfile(
     val clearTask: Boolean = true,
     val showNotification: Boolean = true,
     val packages: List<String> = emptyList(),
-    val features: Int = 0
+    val features: Int = 0,
+    val showNavigationButtons: Boolean = false
 )
 
 object LockTaskUtils {
@@ -61,14 +62,15 @@ object LockTaskUtils {
             e.printStackTrace()
         }
         return start(
-            context, profile.packageName, profile.activity, profile.clearTask, profile.showNotification
+            context, profile.packageName, profile.activity, profile.clearTask,
+            profile.showNotification, profile.showNavigationButtons
         )
     }
 
     @RequiresApi(28)
     fun start(
         context: Context, packageName: String, activity: String,
-        clearTask: Boolean, showNotification: Boolean
+        clearTask: Boolean, showNotification: Boolean, showNavigationButtons: Boolean
     ): Boolean {
         val dpm = Privilege.DPM
         val dar = Privilege.DAR
@@ -97,14 +99,25 @@ object LockTaskUtils {
         )
         val options = ActivityOptions.makeBasic().setLockTaskEnabled(true)
         context.startActivity(intent, options.toBundle())
-        // The service monitors lock task mode and restores the lifted app states when it exits,
-        // so it must also run when there is something to restore.
-        if (showNotification || hasTemporaryAppStates()) {
+        // The service monitors lock task mode, restores the lifted app states when it exits and
+        // manages the navigation buttons, so it must also run when either of those is needed.
+        if (showNotification || showNavigationButtons || hasTemporaryAppStates()) {
             context.applicationContext.startForegroundService(
                 Intent(context.applicationContext, LockTaskService::class.java)
+                    .putExtra(LockTaskService.EXTRA_NAVIGATION_BUTTONS, showNavigationButtons)
             )
         }
         return true
+    }
+
+    /** Force the device out of lock task mode by resetting the lock task packages. */
+    @RequiresApi(28)
+    fun forceStopLockTask() {
+        val features = Privilege.DPM.getLockTaskFeatures(Privilege.DAR)
+        val packages = Privilege.DPM.getLockTaskPackages(Privilege.DAR)
+        Privilege.DPM.setLockTaskPackages(Privilege.DAR, arrayOf())
+        Privilege.DPM.setLockTaskPackages(Privilege.DAR, packages)
+        Privilege.DPM.setLockTaskFeatures(Privilege.DAR, features)
     }
 
     /**

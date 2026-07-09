@@ -47,8 +47,8 @@ jobs:
 
       - name: Build APK
         run: |
-          echo "${{ secrets.KEY_BASE64 }}" | base64 --decode - > app/release.jks
-          ./gradlew build -PStoreFile="$(pwd)/app/release.jks" -PStorePassword="${{ secrets.KEYSTORE_PASSWORD }}" -PKeyPassword="${{ secrets.KEY_PASSWORD }}" -PKeyAlias="${{ secrets.KEY_ALIAS }}"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode - > app/release.jks
+          ./gradlew build -PStoreFile="$(pwd)/app/release.jks" -PStorePassword="${{ secrets.STORE_PASSWORD }}" -PKeyPassword="${{ secrets.KEY_PASSWORD }}" -PKeyAlias="${{ secrets.KEY_ALIAS }}"
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4

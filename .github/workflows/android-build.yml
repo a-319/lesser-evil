@@ -34,9 +34,9 @@ jobs:
       id: sign_app
       with:
         releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.KEYSTORE_FILE }}
+        signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
         alias: ${{ secrets.KEY_ALIAS }}
-        keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+        keyStorePassword: ${{ secrets.STORE_PASSWORD }}
         keyPassword: ${{ secrets.KEY_PASSWORD }}
       env:
         ANDROID_HOME: /usr/local/lib/android/sdk

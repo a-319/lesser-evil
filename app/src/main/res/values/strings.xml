@@ -214,10 +214,11 @@
     <string name="ltf_global_actions">Allow global actions</string>
     <string name="ltf_keyguard">Allow keyguard</string>
     <string name="ltf_block_activity_start_in_task">Block activity start in task</string>
-    <string name="lock_task_mode_nav_buttons">Show navigation buttons</string>
-    <string name="info_lock_task_nav_buttons">Displays system-like navigation buttons at the bottom of the screen while lock task mode is running. The back button works inside the locked app; the home and recents buttons exit lock task mode and then perform their normal function. Requires enabling the OwnDroid accessibility service.</string>
+    <string name="lock_task_mode_nav_buttons">Navigation buttons exit lock task mode</string>
+    <string name="info_lock_task_nav_buttons">Makes the navigation buttons able to leave lock task mode. The Home button always exits lock task mode and returns to the launcher — no accessibility needed. If the OwnDroid accessibility service is enabled, Back and Overview work too: with 3-button navigation the touch zones stay invisible and sit on top of the real system buttons; with gesture navigation a visible button bar is shown at the bottom.</string>
+    <string name="lock_task_nav_accessibility_hint">The Home button will work without accessibility. Enable the OwnDroid accessibility service to also make Back and Overview work.</string>
     <string name="accessibility_service_not_enabled">Please enable the OwnDroid accessibility service</string>
-    <string name="accessibility_service_description">Displays working navigation buttons at the bottom of the screen while lock task mode is running.</string>
+    <string name="accessibility_service_description">Adds working Back and Overview controls while lock task mode is running.</string>
     <string name="profiles">Profiles</string>
     <string name="profile_name">Profile name</string>
     <string name="lock_task_create_shortcut">Save profile &amp; create shortcut</string>

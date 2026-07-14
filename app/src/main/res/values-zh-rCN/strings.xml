@@ -185,10 +185,11 @@
     <string name="ltf_global_actions">允许全局行为(比如长按电源键对话框)</string>
     <string name="ltf_keyguard">允许锁屏</string>
     <string name="ltf_block_activity_start_in_task">阻止启动未允许的应用</string>
-    <string name="lock_task_mode_nav_buttons">显示导航按键</string>
-    <string name="info_lock_task_nav_buttons">在锁定任务模式运行期间，在屏幕底部显示类似系统的导航按键。返回按键在锁定的应用内生效；主屏幕和概览按键会先退出锁定任务模式，再执行其正常功能。需要启用OwnDroid的无障碍服务。</string>
+    <string name="lock_task_mode_nav_buttons">导航按键可退出锁定任务模式</string>
+    <string name="info_lock_task_nav_buttons">让导航按键能够退出锁定任务模式。主屏幕按键始终会退出锁定任务模式并返回启动器——无需无障碍服务。若启用了OwnDroid的无障碍服务，返回和概览按键也可用：三按键导航时，触摸区域保持透明并覆盖在真实的系统按键之上；手势导航时，会在底部显示可见的按键栏。</string>
+    <string name="lock_task_nav_accessibility_hint">主屏幕按键无需无障碍服务即可使用。启用OwnDroid的无障碍服务可让返回和概览按键也生效。</string>
     <string name="accessibility_service_not_enabled">请启用OwnDroid的无障碍服务</string>
-    <string name="accessibility_service_description">在锁定任务模式运行期间，在屏幕底部显示可用的导航按键。</string>
+    <string name="accessibility_service_description">在锁定任务模式运行期间，提供可用的返回和概览控制。</string>
     <string name="profiles">配置</string>
     <string name="profile_name">配置名称</string>
     <string name="lock_task_create_shortcut">保存配置并创建快捷方式</string>

@@ -37,12 +37,10 @@ class LockTaskService: Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         if (intent?.getBooleanExtra(EXTRA_NAVIGATION_BUTTONS, false) == true) {
-            val navigationService = NavigationAccessibilityService.instance
-            if (navigationService != null) {
-                navigationService.showNavigationBar()
-            } else {
-                popToast(R.string.accessibility_service_not_enabled)
-            }
+            // Home always works via the Device-Owner home interception. Back / Overview need the
+            // accessibility service; if it is off we silently run in "Home only" mode.
+            val gestureNavigation = intent.getBooleanExtra(EXTRA_GESTURE_NAV, false)
+            NavigationAccessibilityService.instance?.showNavigationBar(gestureNavigation)
         }
         val filter = IntentFilter(STOP_ACTION)
         ContextCompat.registerReceiver(
@@ -75,6 +73,7 @@ class LockTaskService: Service() {
 
     fun stop() {
         NavigationAccessibilityService.instance?.hideNavigationBar()
+        if (SP.lockTaskHomeInterception) LockTaskUtils.disableHomeInterception(this)
         LockTaskUtils.restoreTemporaryAppStates()
         unregisterReceiver(stopReceiver)
         stopSelf()
@@ -92,5 +91,6 @@ class LockTaskService: Service() {
     companion object {
         const val STOP_ACTION = "com.bintianqi.owndroid.action.STOP_LOCK_TASK_MODE"
         const val EXTRA_NAVIGATION_BUTTONS = "show_navigation_buttons"
+        const val EXTRA_GESTURE_NAV = "gesture_navigation"
     }
 }

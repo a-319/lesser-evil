@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<string name="about">אודות</string>
-	<string name="accessibility_service_description">מציג לחצני ניווט פעילים בתחתית המסך בזמן שמצב נעילת המשימה פעיל.</string>
+	<string name="accessibility_service_description">מוסיף לחצני חזרה ואחרונים פעילים בזמן שמצב נעילת המשימה פעיל.</string>
 	<string name="accessibility_service_not_enabled">יש להפעיל את שירות הנגישות של OwnDroid</string>
 	<string name="account">חשבון</string>
 	<string name="account_list_is">רשימת חשבונות:</string>
@@ -280,7 +280,8 @@
 	<string name="info_install_existing_app">התקן חבילה קיימת שהותקנה במשתמש אחר, או נשמרה לאחר הסרת ההתקנה.</string>
 	<string name="info_keep_uninstalled_apps">הגדר רשימה של אפליקציות לשמירה כחבילות APK גם אם אף משתמש לא התקין אותה כעת.</string>
 	<string name="info_lock_screen_info">הצג הודעה קצרה על מסך הנעילה שלך.\nעוקף כל מידע בעלים שהוגדר ידנית על ידי המשתמש ומונע מהמשתמש לשנות אותו.</string>
-	<string name="info_lock_task_nav_buttons">מציג לחצני ניווט בסגנון המערכת בתחתית המסך בזמן שמצב נעילת המשימה פעיל. לחצן החזרה פועל בתוך האפליקציה הנעולה; לחצני הבית והאחרונים יוצאים ממצב נעילת המשימה ואז מפעילים את הפונקציה הרגילה שלהם. נדרש להפעיל את שירות הנגישות של OwnDroid.</string>
+	<string name="info_lock_task_nav_buttons">מאפשר ללחצני הניווט לצאת ממצב נעילת המשימה. לחצן הבית תמיד יוצא ממצב נעילת המשימה וחוזר למשגר — ללא צורך בנגישות. אם שירות הנגישות של OwnDroid מופעל, גם חזרה ואחרונים יעבדו: בניווט שלושה-לחצנים אזורי המגע נשארים שקופים ומונחים מעל לחצני המערכת האמיתיים; בניווט מחוות מוצג סרגל לחצנים גלוי בתחתית.</string>
+	<string name="lock_task_nav_accessibility_hint">לחצן הבית יעבוד גם בלי נגישות. הפעל את שירות הנגישות של OwnDroid כדי שגם חזרה ואחרונים יעבדו.</string>
 	<string name="info_lock_task_packages">ניתן להפעיל רק חבילות ברשימת חבילות משימות נעילה במצב משימות נעילה.</string>
 	<string name="info_lock_task_profile_shortcut">שומר את הבחירה הנוכחית (כולל האפליקציות המורשות והתכונות הנוכחיות) כפרופיל ויוצר קיצור דרך במסך הבית שמפעיל אותה במצב נעילת משימה.</string>
 	<string name="info_lock_task_profiles">פרופיל שומר תצורת נעילת משימה: האפליקציה שתופעל, האפליקציות המורשות ותכונות נעילת המשימה. הפעלת פרופיל או לחיצה על קיצור הדרך שלו מחילה את התצורה השמורה ומפעילה את האפליקציה הראשית שלו במצב נעילת משימה.</string>
@@ -346,7 +347,7 @@
 	<string name="lock_screen_info">מידע על מסך נעילה</string>
 	<string name="lock_task_create_shortcut">שמור פרופיל וצור קיצור דרך</string>
 	<string name="lock_task_mode">נעילת מצב משימה</string>
-	<string name="lock_task_mode_nav_buttons">הצג לחצני ניווט</string>
+	<string name="lock_task_mode_nav_buttons">לחצני הניווט יוצאים ממצב הנעילה</string>
 	<string name="lock_task_mode_show_notification">הצג התראה ליציאה</string>
 	<string name="lock_task_mode_start_clear_task">נקה משימה (התחל מחדש)</string>
 	<string name="lock_when_leaving">נעילה בעת יציאה</string>

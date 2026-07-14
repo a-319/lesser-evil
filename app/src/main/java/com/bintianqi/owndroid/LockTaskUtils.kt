@@ -6,7 +6,10 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import androidx.annotation.RequiresApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -77,20 +80,29 @@ object LockTaskUtils {
         if (!dpm.isLockTaskPermitted(packageName)) {
             dpm.setLockTaskPackages(dar, dpm.getLockTaskPackages(dar) + packageName)
         }
+        var features = dpm.getLockTaskFeatures(dar)
         if (showNotification) {
-            dpm.setLockTaskFeatures(
-                dar,
-                dpm.getLockTaskFeatures(dar) or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_HOME
-            )
+            features = features or DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
+                    DevicePolicyManager.LOCK_TASK_FEATURE_HOME
         }
+        if (showNavigationButtons) {
+            // Always show the real Home button so it can be intercepted (exits lock task mode).
+            features = features or DevicePolicyManager.LOCK_TASK_FEATURE_HOME
+            // Only show the real Overview button when the accessibility service can put a transparent
+            // touch zone over it (3-button navigation); otherwise it would just do nothing useful.
+            if (NavigationAccessibilityService.instance != null && !isGestureNavigation(context)) {
+                features = features or DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW
+            }
+        }
+        if (features != dpm.getLockTaskFeatures(dar)) dpm.setLockTaskFeatures(dar, features)
+        if (showNavigationButtons) enableHomeInterception(context)
         liftTemporaryAppStates(dpm.getLockTaskPackages(dar).toList())
         val intent = if (activity.isNotEmpty()) {
             Intent().setComponent(ComponentName(packageName, activity))
         } else context.packageManager.getLaunchIntentForPackage(packageName)
         if (intent == null) {
             restoreTemporaryAppStates()
+            if (showNavigationButtons) disableHomeInterception(context)
             return false
         }
         intent.addFlags(
@@ -105,6 +117,7 @@ object LockTaskUtils {
             context.applicationContext.startForegroundService(
                 Intent(context.applicationContext, LockTaskService::class.java)
                     .putExtra(LockTaskService.EXTRA_NAVIGATION_BUTTONS, showNavigationButtons)
+                    .putExtra(LockTaskService.EXTRA_GESTURE_NAV, isGestureNavigation(context))
             )
         }
         return true
@@ -118,6 +131,80 @@ object LockTaskUtils {
         Privilege.DPM.setLockTaskPackages(Privilege.DAR, arrayOf())
         Privilege.DPM.setLockTaskPackages(Privilege.DAR, packages)
         Privilege.DPM.setLockTaskFeatures(Privilege.DAR, features)
+    }
+
+    /** @return true when the device uses gesture navigation (no on-screen navigation buttons). */
+    fun isGestureNavigation(context: Context): Boolean = try {
+        Settings.Secure.getInt(context.contentResolver, "navigation_mode", 0) == 2
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
+
+    private fun homeComponent(context: Context) =
+        ComponentName(context, LockTaskHomeActivity::class.java)
+
+    private val homeFilter: IntentFilter
+        get() = IntentFilter(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            addCategory(Intent.CATEGORY_DEFAULT)
+        }
+
+    /**
+     * Make OwnDroid's transparent home activity the persistent preferred HOME target, so the real
+     * Home button / gesture is routed to it (and therefore exits lock task mode). Device Owner
+     * capability, no extra OS permission required.
+     */
+    fun enableHomeInterception(context: Context) {
+        try {
+            context.packageManager.setComponentEnabledSetting(
+                homeComponent(context),
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP
+            )
+            Privilege.DPM.addPersistentPreferredActivity(Privilege.DAR, homeFilter, homeComponent(context))
+            SP.lockTaskHomeInterception = true
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /** Restore the normal launcher as the HOME target and disable the interception activity. */
+    fun disableHomeInterception(context: Context) {
+        try {
+            Privilege.DPM.clearPackagePersistentPreferredActivities(Privilege.DAR, context.packageName)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        try {
+            context.packageManager.setComponentEnabledSetting(
+                homeComponent(context),
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        SP.lockTaskHomeInterception = false
+    }
+
+    /** Open the real launcher (clearing the interception first so it resolves to the real home). */
+    fun launchHome(context: Context) {
+        disableHomeInterception(context)
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_HOME)
+                    .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /** Exit lock task mode and go to the real launcher. Used by the Home button. */
+    @RequiresApi(28)
+    fun exitToHome(context: Context) {
+        forceStopLockTask()
+        launchHome(context)
     }
 
     /**
@@ -168,11 +255,13 @@ object LockTaskUtils {
         SP.lockTaskUnsuspendedApps = null
     }
 
-    /** Restore app states left over from a lock task session that ended without cleanup. */
+    /** Restore state left over from a lock task session that ended without cleanup. */
     fun restoreStaleTemporaryAppStates(context: Context) {
-        if (Build.VERSION.SDK_INT < 28 || !hasTemporaryAppStates()) return
+        if (Build.VERSION.SDK_INT < 28) return
+        if (!hasTemporaryAppStates() && !SP.lockTaskHomeInterception) return
         val am = context.getSystemService(ActivityManager::class.java)
         if (am.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) return
-        restoreTemporaryAppStates()
+        if (hasTemporaryAppStates()) restoreTemporaryAppStates()
+        if (SP.lockTaskHomeInterception) disableHomeInterception(context)
     }
 }

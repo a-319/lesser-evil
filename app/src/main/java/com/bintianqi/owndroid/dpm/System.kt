@@ -1261,8 +1261,9 @@ private fun StartLockTaskMode(
             showNavigationButtons = it
             if (it) {
                 showNotification = false
+                // The Home button works without accessibility; Back / Overview need the service.
                 if (NavigationAccessibilityService.instance == null) {
-                    context.popToast(R.string.accessibility_service_not_enabled)
+                    context.popToast(R.string.lock_task_nav_accessibility_hint)
                     try {
                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     } catch (e: Exception) {

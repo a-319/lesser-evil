@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 @RequiresApi(28)
 class LockTaskService: Service() {
@@ -29,8 +30,7 @@ class LockTaskService: Service() {
     val stopReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             coroutineScope.cancel()
-            stopLockTask()
-            stop()
+            LockTaskUtils.exitLockTask(this@LockTaskService) { stop() }
         }
     }
 
@@ -71,16 +71,14 @@ class LockTaskService: Service() {
         return START_NOT_STICKY
     }
 
+    private val stopped = AtomicBoolean(false)
     fun stop() {
+        if (!stopped.compareAndSet(false, true)) return
         NavigationAccessibilityService.instance?.hideNavigationBar()
         if (SP.lockTaskHomeInterception) LockTaskUtils.disableHomeInterception(this)
         LockTaskUtils.restoreTemporaryAppStates()
         unregisterReceiver(stopReceiver)
         stopSelf()
-    }
-
-    fun stopLockTask() {
-        LockTaskUtils.forceStopLockTask()
     }
 
     override fun onDestroy() {

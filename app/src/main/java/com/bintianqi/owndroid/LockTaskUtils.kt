@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.annotation.RequiresApi
 import kotlinx.serialization.Serializable
@@ -95,7 +97,14 @@ object LockTaskUtils {
             }
         }
         if (features != dpm.getLockTaskFeatures(dar)) dpm.setLockTaskFeatures(dar, features)
-        if (showNavigationButtons) enableHomeInterception(context)
+        if (showNavigationButtons) {
+            enableHomeInterception(context)
+            // OwnDroid itself must be lock-task-permitted, otherwise the system will refuse to
+            // launch the transparent home activity when the Home button is pressed.
+            if (!dpm.isLockTaskPermitted(context.packageName)) {
+                dpm.setLockTaskPackages(dar, dpm.getLockTaskPackages(dar) + context.packageName)
+            }
+        }
         liftTemporaryAppStates(dpm.getLockTaskPackages(dar).toList())
         val intent = if (activity.isNotEmpty()) {
             Intent().setComponent(ComponentName(packageName, activity))
@@ -123,14 +132,46 @@ object LockTaskUtils {
         return true
     }
 
-    /** Force the device out of lock task mode by resetting the lock task packages. */
+    /**
+     * Force the device out of lock task mode by clearing the lock task whitelist, and run
+     * [onExited] once the system has actually left lock task mode. The whitelist and features are
+     * only restored after the state change is observed — restoring them immediately can cancel
+     * the exit on some devices, leaving the launcher visible while lock task mode is still active.
+     */
     @RequiresApi(28)
-    fun forceStopLockTask() {
-        val features = Privilege.DPM.getLockTaskFeatures(Privilege.DAR)
-        val packages = Privilege.DPM.getLockTaskPackages(Privilege.DAR)
-        Privilege.DPM.setLockTaskPackages(Privilege.DAR, arrayOf())
-        Privilege.DPM.setLockTaskPackages(Privilege.DAR, packages)
-        Privilege.DPM.setLockTaskFeatures(Privilege.DAR, features)
+    fun exitLockTask(context: Context, onExited: () -> Unit = {}) {
+        val am = context.getSystemService(ActivityManager::class.java)
+        if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) {
+            onExited()
+            return
+        }
+        val dpm = Privilege.DPM
+        val dar = Privilege.DAR
+        val features = dpm.getLockTaskFeatures(dar)
+        val packages = dpm.getLockTaskPackages(dar)
+        try {
+            dpm.setLockTaskPackages(dar, arrayOf())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        val handler = Handler(Looper.getMainLooper())
+        fun restoreAndFinish() {
+            try {
+                dpm.setLockTaskPackages(dar, packages)
+                dpm.setLockTaskFeatures(dar, features)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            onExited()
+        }
+        fun attempt(count: Int) {
+            if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE || count >= 40) {
+                restoreAndFinish()
+            } else {
+                handler.postDelayed({ attempt(count + 1) }, 50)
+            }
+        }
+        attempt(0)
     }
 
     /** @return true when the device uses gesture navigation (no on-screen navigation buttons). */
@@ -202,9 +243,11 @@ object LockTaskUtils {
 
     /** Exit lock task mode and go to the real launcher. Used by the Home button. */
     @RequiresApi(28)
-    fun exitToHome(context: Context) {
-        forceStopLockTask()
-        launchHome(context)
+    fun exitToHome(context: Context, onDone: () -> Unit = {}) {
+        exitLockTask(context) {
+            launchHome(context)
+            onDone()
+        }
     }
 
     /**

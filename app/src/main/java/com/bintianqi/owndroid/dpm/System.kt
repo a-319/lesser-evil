@@ -1272,6 +1272,15 @@ private fun StartLockTaskMode(
                 }
             }
         }
+        if (showNavigationButtons) {
+            var swapNavButtons by rememberSaveable { mutableStateOf(SP.lockTaskNavButtonsSwapped) }
+            FullWidthCheckBoxItem(
+                R.string.lock_task_swap_nav_buttons, swapNavButtons
+            ) {
+                swapNavButtons = it
+                SP.lockTaskNavButtonsSwapped = it
+            }
+        }
         Row(
             Modifier
                 .fillMaxWidth()

@@ -32,6 +32,7 @@ class SharedPrefs(context: Context) {
     var lockTaskUnsuspendedApps by StringSharedPref("lock_task.unsuspended_apps")
     var lockTaskUnhiddenApps by StringSharedPref("lock_task.unhidden_apps")
     var lockTaskHomeInterception by BooleanSharedPref("lock_task.home_interception")
+    var lockTaskNavButtonsSwapped by BooleanSharedPref("lock_task.nav_buttons_swapped")
 }
 
 private class BooleanSharedPref(val key: String, val defValue: Boolean = false): ReadWriteProperty<SharedPrefs, Boolean> {

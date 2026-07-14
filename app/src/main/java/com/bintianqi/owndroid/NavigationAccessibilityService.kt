@@ -1,7 +1,6 @@
 package com.bintianqi.owndroid
 
 import android.accessibilityservice.AccessibilityService
-import android.app.ActivityManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -60,16 +59,18 @@ class NavigationAccessibilityService : AccessibilityService() {
         else (48 * resources.displayMetrics.density).toInt()
     }
 
-    private val isRtl: Boolean
-        get() = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
-
     @RequiresApi(28)
     fun showNavigationBar(gestureNavigation: Boolean) {
         if (addedViews.isNotEmpty()) return
         if (gestureNavigation) showVisibleBar() else showTransparentZones()
     }
 
-    /** Fully transparent touch zones over the real Back and Overview buttons. */
+    /**
+     * Fully transparent touch zones over the real Back and Overview buttons. The system bar's
+     * button order cannot be queried and varies by manufacturer (and does not simply follow RTL),
+     * so the default is the AOSP order (Back on the left) and the user can flip it with the
+     * swap setting.
+     */
     @RequiresApi(28)
     private fun showTransparentZones() {
         val screenWidth = resources.displayMetrics.widthPixels
@@ -77,11 +78,11 @@ class NavigationAccessibilityService : AccessibilityService() {
         val height = navigationBarHeight()
         val backAction = { performGlobalAction(GLOBAL_ACTION_BACK); Unit }
         val recentsAction = { exitLockTaskThen { performGlobalAction(GLOBAL_ACTION_RECENTS) } }
-        // In RTL the Back / Overview buttons are usually mirrored, so swap the side each zone maps to.
-        val leftAction = if (isRtl) recentsAction else backAction
-        val rightAction = if (isRtl) backAction else recentsAction
-        addZone(zoneWidth, height, Gravity.BOTTOM or Gravity.LEFT, leftAction)
-        addZone(zoneWidth, height, Gravity.BOTTOM or Gravity.RIGHT, rightAction)
+        val swapped = SP.lockTaskNavButtonsSwapped
+        addZone(zoneWidth, height, Gravity.BOTTOM or Gravity.LEFT,
+            if (swapped) recentsAction else backAction)
+        addZone(zoneWidth, height, Gravity.BOTTOM or Gravity.RIGHT,
+            if (swapped) backAction else recentsAction)
     }
 
     private fun addZone(width: Int, height: Int, gravity: Int, onClick: () -> Unit) {
@@ -104,6 +105,8 @@ class NavigationAccessibilityService : AccessibilityService() {
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0xE6000000.toInt())
+            // Deterministic child order — otherwise an RTL locale silently reverses the buttons.
+            layoutDirection = View.LAYOUT_DIRECTION_LTR
         }
         fun addButton(icon: Int, onClick: () -> Unit) {
             val view = ImageView(this)
@@ -122,8 +125,8 @@ class NavigationAccessibilityService : AccessibilityService() {
         val back = { addButton(R.drawable.nav_back) { performGlobalAction(GLOBAL_ACTION_BACK) } }
         val home = { addButton(R.drawable.nav_home) { exitLockTaskThen { performGlobalAction(GLOBAL_ACTION_HOME) } } }
         val recents = { addButton(R.drawable.nav_recents) { exitLockTaskThen { performGlobalAction(GLOBAL_ACTION_RECENTS) } } }
-        // Home stays in the middle; Back and Overview mirror in RTL.
-        if (isRtl) { recents(); home(); back() } else { back(); home(); recents() }
+        // Home stays in the middle; the swap setting flips Back and Overview.
+        if (SP.lockTaskNavButtonsSwapped) { recents(); home(); back() } else { back(); home(); recents() }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             (48 * density).toInt(),
@@ -163,19 +166,10 @@ class NavigationAccessibilityService : AccessibilityService() {
     @RequiresApi(28)
     private fun exitLockTaskThen(action: () -> Unit) {
         try {
-            LockTaskUtils.forceStopLockTask()
+            LockTaskUtils.exitLockTask(this) { action() }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        val am = getSystemService(ActivityManager::class.java)
-        fun attempt(count: Int) {
-            if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE || count >= 20) {
-                action()
-            } else {
-                handler.postDelayed({ attempt(count + 1) }, 50)
-            }
-        }
-        attempt(0)
     }
 
     companion object {

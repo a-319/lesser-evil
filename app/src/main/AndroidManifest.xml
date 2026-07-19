@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <permission android:name="com.bintianqi.owndroid.MyPermission"/>
-    <uses-permission android:name="com.bintianqi.owndroid.MyPermission"/>
+    <permission android:name="lesser.evil.MyPermission"/>
+    <uses-permission android:name="lesser.evil.MyPermission"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"/>
@@ -66,7 +66,7 @@
         </activity>
         <activity
             android:name=".ShortcutsReceiverActivity"
-            android:permission="com.bintianqi.owndroid.MyPermission"
+            android:permission="lesser.evil.MyPermission"
             android:exported="true"
             android:theme="@android:style/Theme.NoDisplay" />
         <activity
@@ -76,7 +76,7 @@
             android:launchMode="singleInstance"
             android:theme="@style/Theme.Transparent">
             <intent-filter>
-                <action android:name="com.bintianqi.owndroid.action.REQUEST_DHIZUKU_PERMISSION" />
+                <action android:name="lesser.evil.action.REQUEST_DHIZUKU_PERMISSION" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
@@ -131,7 +131,7 @@
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
         <provider
             android:name=".MyDhizukuProvider"
-            android:authorities="com.bintianqi.owndroid.dhizuku_server.provider"
+            android:authorities="lesser.evil.dhizuku_server.provider"
             android:directBootAware="true"
             android:enabled="true"
             android:exported="true">

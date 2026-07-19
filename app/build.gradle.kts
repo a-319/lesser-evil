@@ -16,14 +16,14 @@ android {
             keyAlias = (project.findProperty("KeyAlias") as String?) ?: "testkey"
         }
     }
-    namespace = "com.bintianqi.owndroid"
+    namespace = "lesser.evil"
     compileSdk = 36
 
     lint.checkReleaseBuilds = false
     lint.disable += "All"
 
     defaultConfig {
-        applicationId = "com.bintianqi.owndroid"
+        applicationId = "lesser.evil"
         minSdk = 21
         targetSdk = 36
         versionCode = 42

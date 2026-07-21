@@ -29,7 +29,7 @@
   - Shizuku
   - Dhizuku
   - Root
-  - ADB shell命令 `dpm set-device-owner com.bintianqi.owndroid/.Receiver`
+  - ADB shell命令 `dpm set-device-owner lesser.evil/.Receiver`
 - [Dhizuku](https://github.com/iamr0s/Dhizuku)
 - 工作资料
 
@@ -60,7 +60,7 @@ java.lang.IllegalStateException: Not allowed to set the device owner because the
 ### Device owner 已存在
 
 ```text
-java.lang.IllegalStateException: Trying to set the device owner (com.bintianqi.owndroid/.Receiver), but device owner (xxx) is already set.
+java.lang.IllegalStateException: Trying to set the device owner (lesser.evil/.Receiver), but device owner (xxx) is already set.
 ```
 
 一个设备只能存在一个device owner，请先停用已存在的device owner。
@@ -113,13 +113,13 @@ OwnDroid提供了一个基于Intent的API。你需要在设置中设置密钥并
 
 ```shell
 # 一个在ADB shell中隐藏app的示例
-am broadcast -a com.bintianqi.owndroid.action.HIDE -n com.bintianqi.owndroid/.ApiReceiver --es key abcdefg --es package com.example.app
+am broadcast -a lesser.evil.action.HIDE -n lesser.evil/.ApiReceiver --es key abcdefg --es package com.example.app
 ```
 
 ```kotlin
 // 一个在Kotlin中隐藏app的示例
-val intent = Intent("com.bintianqi.owndroid.action.HIDE")
-    .setComponent(ComponentName("com.bintianqi.owndroid", "com.bintianqi.owndroid.ApiReceiver"))
+val intent = Intent("lesser.evil.action.HIDE")
+    .setComponent(ComponentName("lesser.evil", "lesser.evil.ApiReceiver"))
     .putExtra("key", "abcdefg")
     .putExtra("package", "com.example.app")
 context.sendBroadcast(intent)

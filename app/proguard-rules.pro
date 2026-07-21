@@ -25,4 +25,4 @@
 -dontwarn android.app.ContextImpl
 -dontwarn android.app.LoadedApk
 
--keep class com.bintianqi.owndroid.MyViewModel { *; }
+-keep class lesser.evil.MyViewModel { *; }

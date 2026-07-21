@@ -27,7 +27,7 @@
   - Shizuku [file:1]
   - Dhizuku [file:1]
   - Root [file:1]
-  - פקודת ADB shell: `dpm set-device-owner com.bintianqi.owndroid/.Receiver` [file:1]
+  - פקודת ADB shell: `dpm set-device-owner lesser.evil/.Receiver` [file:1]
 
 - [Dhizuku](https://github.com/iamr0s/Dhizuku) [file:1]
 - Work profile [file:1]
@@ -59,7 +59,7 @@ java.lang.IllegalStateException: Not allowed to set the device owner because the
 ### Device owner כבר מוגדר
 
 ```text
-java.lang.IllegalStateException: Trying to set the device owner (com.bintianqi.owndroid/.Receiver), but device owner (xxx) is already set.
+java.lang.IllegalStateException: Trying to set the device owner (lesser.evil/.Receiver), but device owner (xxx) is already set.
 ``` [file:1]
 
 יכול להיות רק Device owner אחד במכשיר. נא להסיר קודם את ה‑device owner הקיים. [file:1]
@@ -114,13 +114,13 @@ OwnDroid מספק ממשק API מבוסס Intents. [file:1] יש להגדיר מ
 
 ```shell
 # דוגמה להסתרת אפליקציה מ-ADB shell
-am broadcast -a com.bintianqi.owndroid.action.HIDE -n com.bintianqi.owndroid/.ApiReceiver --es key abcdefg --es package com.example.app
+am broadcast -a lesser.evil.action.HIDE -n lesser.evil/.ApiReceiver --es key abcdefg --es package com.example.app
 ``` [file:1]
 
 ```kotlin
 // דוגמה להסתרת אפליקציה ב-Kotlin
-val intent = Intent("com.bintianqi.owndroid.action.HIDE")
-    .setComponent(ComponentName("com.bintianqi.owndroid", "com.bintianqi.owndroid.ApiReceiver"))
+val intent = Intent("lesser.evil.action.HIDE")
+    .setComponent(ComponentName("lesser.evil", "lesser.evil.ApiReceiver"))
     .putExtra("key", "abcdefg")
     .putExtra("package", "com.example.app")
 context.sendBroadcast(intent)

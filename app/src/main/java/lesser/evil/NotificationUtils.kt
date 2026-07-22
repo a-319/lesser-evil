@@ -8,12 +8,16 @@ import androidx.core.app.NotificationManagerCompat
 
 object NotificationUtils {
     fun createChannels(context: Context) {
+        val manager = NotificationManagerCompat.from(context)
+        // A channel's importance is locked after creation, so the lock task channel was given a
+        // new id when its importance was lowered; drop the old high-importance one.
+        manager.deleteNotificationChannel("LockTaskMode")
         val channels = MyNotificationChannel.entries.map {
             NotificationChannelCompat.Builder(it.id, it.importance)
                 .setName(context.getString(it.text))
                 .build()
         }
-        NotificationManagerCompat.from(context).createNotificationChannelsCompat(channels)
+        manager.createNotificationChannelsCompat(channels)
     }
     fun sendBasicNotification(
         context: Context, type: NotificationType, text: String
@@ -79,7 +83,7 @@ enum class NotificationType(
 }
 
 enum class MyNotificationChannel(val id: String, val text: Int, val importance: Int) {
-    LockTaskMode("LockTaskMode", R.string.lock_task_mode, NotificationManagerCompat.IMPORTANCE_HIGH),
+    LockTaskMode("LockTaskModeSilent", R.string.lock_task_mode, NotificationManagerCompat.IMPORTANCE_LOW),
     Events("Events", R.string.events, NotificationManagerCompat.IMPORTANCE_LOW),
     SecurityLogging("SecurityLogging", R.string.security_logging, NotificationManagerCompat.IMPORTANCE_MIN),
     NetworkLogging("NetworkLogging", R.string.network_logging, NotificationManagerCompat.IMPORTANCE_MIN)

@@ -88,13 +88,21 @@ object LockTaskUtils {
                     DevicePolicyManager.LOCK_TASK_FEATURE_HOME
         }
         if (showNavigationButtons) {
-            // Always show the real Home button so it can be intercepted (exits lock task mode).
-            features = features or DevicePolicyManager.LOCK_TASK_FEATURE_HOME
-            // Only show the real Overview button when the accessibility service can put a transparent
-            // touch zone over it (3-button navigation); otherwise it would just do nothing useful.
-            if (NavigationAccessibilityService.instance != null && !isGestureNavigation(context)) {
-                features = features or DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW
+            val accessibility = NavigationAccessibilityService.instance != null
+            if (!isGestureNavigation(context)) {
+                // 3-button navigation: surface the real Home button so it can be intercepted
+                // (exits lock task mode), and the real Overview button when the accessibility
+                // service can put a transparent touch zone over it.
+                features = features or DevicePolicyManager.LOCK_TASK_FEATURE_HOME
+                if (accessibility) features = features or DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW
+            } else if (!accessibility && !Settings.canDrawOverlays(context)) {
+                // Gesture navigation with no way to draw our own bar: fall back to the system
+                // bar (the system temporarily switches to buttons) so Home can still exit.
+                features = features or DevicePolicyManager.LOCK_TASK_FEATURE_HOME
             }
+            // In gesture mode with our own bar, the home feature is deliberately not granted, so
+            // the system never switches the device to button navigation (which on some devices
+            // sticks after the session ends). Our bar is removed the moment the session exits.
         }
         if (features != dpm.getLockTaskFeatures(dar)) dpm.setLockTaskFeatures(dar, features)
         if (showNavigationButtons) {

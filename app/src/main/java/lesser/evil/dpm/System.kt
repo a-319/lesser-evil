@@ -104,11 +104,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lesser.evil.AppInfo
 import lesser.evil.BottomPadding
 import lesser.evil.HorizontalPadding
 import lesser.evil.LockTaskProfile
+import lesser.evil.LockTaskUtils
 import lesser.evil.MyViewModel
 import lesser.evil.NavigationAccessibilityService
 import lesser.evil.Privilege
@@ -1261,14 +1263,23 @@ private fun StartLockTaskMode(
             showNavigationButtons = it
             if (it) {
                 showNotification = false
-                // The Home button works without accessibility; Back / Overview need the service.
-                if (NavigationAccessibilityService.instance == null) {
-                    context.popToast(R.string.lock_task_nav_accessibility_hint)
-                    try {
+                if (NavigationAccessibilityService.instance == null) try {
+                    if (LockTaskUtils.isGestureNavigation(context)) {
+                        // Gesture navigation: our own bar needs the overlay permission (or the
+                        // accessibility service for full Back / Home / Overview buttons).
+                        if (!Settings.canDrawOverlays(context)) {
+                            context.popToast(R.string.lock_task_nav_overlay_hint)
+                            context.startActivity(Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                "package:${context.packageName}".toUri()
+                            ))
+                        }
+                    } else {
+                        context.popToast(R.string.lock_task_nav_accessibility_hint)
                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    } catch (e: Exception) {
-                        e.printStackTrace()
                     }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }

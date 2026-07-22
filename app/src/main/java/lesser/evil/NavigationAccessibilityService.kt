@@ -1,6 +1,7 @@
 package lesser.evil
 
 import android.accessibilityservice.AccessibilityService
+import android.app.ActivityManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -63,7 +64,32 @@ class NavigationAccessibilityService : AccessibilityService() {
     fun showNavigationBar(gestureNavigation: Boolean) {
         if (addedViews.isNotEmpty()) return
         if (gestureNavigation) showVisibleBar() else showTransparentZones()
+        startWatchdog()
     }
+
+    /**
+     * Self-hides the bar the moment the device leaves lock task mode, so it can never stay on
+     * screen after the session — even if the monitoring service was killed before cleaning up.
+     */
+    @RequiresApi(28)
+    private fun startWatchdog() {
+        if (watchdogRunning || addedViews.isEmpty()) return
+        watchdogRunning = true
+        val am = getSystemService(ActivityManager::class.java)
+        fun tick() {
+            if (addedViews.isEmpty()) {
+                watchdogRunning = false
+            } else if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) {
+                watchdogRunning = false
+                hideNavigationBar()
+            } else {
+                handler.postDelayed({ tick() }, 1000)
+            }
+        }
+        handler.postDelayed({ tick() }, 3000)
+    }
+
+    private var watchdogRunning = false
 
     /**
      * Fully transparent touch zones over the real Back and Overview buttons. The system bar's

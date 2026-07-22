@@ -186,7 +186,8 @@
     <string name="ltf_keyguard">允许锁屏</string>
     <string name="ltf_block_activity_start_in_task">阻止启动未允许的应用</string>
     <string name="lock_task_mode_nav_buttons">导航按键可退出锁定任务模式</string>
-    <string name="info_lock_task_nav_buttons">让导航按键能够退出锁定任务模式。主屏幕按键始终会退出锁定任务模式并返回启动器——无需无障碍服务。若启用了OwnDroid的无障碍服务，返回和概览按键也可用：三按键导航时，触摸区域保持透明并覆盖在真实的系统按键之上；手势导航时，会在底部显示可见的按键栏。</string>
+    <string name="info_lock_task_nav_buttons">让导航按键能够退出锁定任务模式。三按键导航时，主屏幕按键始终可退出（无需无障碍服务），启用OwnDroid的无障碍服务还可通过覆盖在真实按键上的透明触摸区域使返回和概览生效。手势导航时，OwnDroid会在底部绘制自己的按键栏，而不是让系统将设备切换为按键导航：启用无障碍服务时返回、主屏幕和概览均可用；未启用时，允许显示在其他应用上层可提供一个退出到主屏幕的按键，返回手势仍然有效。两项权限都没有时，将临时使用系统按键栏。</string>
+    <string name="lock_task_nav_overlay_hint">请允许OwnDroid显示在其他应用上层（或启用OwnDroid的无障碍服务），以便在手势导航下获得导航按键。</string>
     <string name="lock_task_nav_accessibility_hint">主屏幕按键无需无障碍服务即可使用。启用OwnDroid的无障碍服务可让返回和概览按键也生效。</string>
     <string name="lock_task_swap_nav_buttons">交换返回和概览按键</string>
     <string name="accessibility_service_not_enabled">请启用OwnDroid的无障碍服务</string>

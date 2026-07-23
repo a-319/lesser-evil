@@ -77,6 +77,7 @@ import lesser.evil.dpm.IntentFilterOptions
 import lesser.evil.dpm.IpMode
 import lesser.evil.dpm.KeyguardDisableConfig
 import lesser.evil.dpm.KeyguardDisableMode
+import lesser.evil.dpm.ManualRestriction
 import lesser.evil.dpm.NetworkStatsData
 import lesser.evil.dpm.NetworkStatsTarget
 import lesser.evil.dpm.PasswordComplexity
@@ -617,6 +618,58 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                 is AppRestriction.BooleanItem -> r.value?.let { b.putBoolean(r.key, it) }
                 is AppRestriction.ChoiceItem -> r.value?.let { b.putString(r.key, it) }
                 is AppRestriction.MultiSelectItem -> r.value?.let { b.putStringArray(r.key, r.value) }
+            }
+        }
+        return b
+    }
+
+    val manualRestrictions = MutableStateFlow(emptyList<ManualRestriction>())
+
+    fun getManualRestrictions(name: String) {
+        try {
+            val bundle = DPM.getApplicationRestrictions(DAR, name)
+            manualRestrictions.value = bundle.keySet().mapNotNull { key ->
+                when (val value = bundle.get(key)) {
+                    is Boolean -> ManualRestriction.BooleanItem(key, value)
+                    is Int -> ManualRestriction.IntItem(key, value)
+                    is String -> ManualRestriction.StringItem(key, value)
+                    is Array<*> -> ManualRestriction.StringArrayItem(
+                        key, value.filterIsInstance<String>()
+                    )
+                    else -> null
+                }
+            }.sortedBy { it.key }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            manualRestrictions.value = emptyList()
+        }
+    }
+
+    fun setManualRestriction(name: String, item: ManualRestriction) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val list = manualRestrictions.value.filter { it.key != item.key }.plus(item)
+            DPM.setApplicationRestrictions(DAR, name, manualRestrictionsToBundle(list))
+            getManualRestrictions(name)
+        }
+    }
+
+    fun removeManualRestriction(name: String, key: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val list = manualRestrictions.value.filter { it.key != key }
+            DPM.setApplicationRestrictions(DAR, name, manualRestrictionsToBundle(list))
+            getManualRestrictions(name)
+        }
+    }
+
+    private fun manualRestrictionsToBundle(list: List<ManualRestriction>): Bundle {
+        val b = Bundle()
+        for (r in list) {
+            when (r) {
+                is ManualRestriction.StringItem -> b.putString(r.key, r.value)
+                is ManualRestriction.IntItem -> b.putInt(r.key, r.value)
+                is ManualRestriction.BooleanItem -> b.putBoolean(r.key, r.value)
+                is ManualRestriction.StringArrayItem ->
+                    b.putStringArray(r.key, r.value.toTypedArray())
             }
         }
         return b

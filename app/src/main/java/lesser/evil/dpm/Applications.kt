@@ -224,6 +224,9 @@ fun ApplicationsFeaturesScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Un
                 FunctionItem(R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0) { onNavigate(DisableUserControl) }
             }
             FunctionItem(R.string.permissions, icon = R.drawable.shield_fill0) { onNavigate(PermissionsManager()) }
+            FunctionItem(R.string.add_managed_configuration, icon = R.drawable.description_fill0) {
+                onNavigate(AddManagedConfiguration)
+            }
             if(VERSION.SDK_INT >= 28) {
                 FunctionItem(R.string.disable_metered_data, icon = R.drawable.money_off_fill0) { onNavigate(DisableMeteredData) }
             }
@@ -1498,3 +1501,258 @@ sealed class AppRestriction(
 }
 
 data class MultiSelectEntry(val value: String, val title: String?, val selected: Boolean)
+
+sealed class ManualRestriction {
+    abstract val key: String
+    data class StringItem(override val key: String, val value: String) : ManualRestriction()
+    data class IntItem(override val key: String, val value: Int) : ManualRestriction()
+    data class BooleanItem(override val key: String, val value: Boolean) : ManualRestriction()
+    data class StringArrayItem(override val key: String, val value: List<String>) : ManualRestriction()
+}
+
+enum class ManualRestrictionType(val label: Int) {
+    STRING(R.string.type_string),
+    INTEGER(R.string.type_integer),
+    BOOLEAN(R.string.type_boolean),
+    STRING_ARRAY(R.string.type_string_array)
+}
+
+@Serializable object AddManagedConfiguration
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddManagedConfigurationScreen(
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
+    manualRestrictions: StateFlow<List<ManualRestriction>>,
+    getManualRestrictions: (String) -> Unit,
+    setManualRestriction: (String, ManualRestriction) -> Unit,
+    removeManualRestriction: (String, String) -> Unit,
+    onNavigateUp: () -> Unit
+) {
+    var packageName by rememberSaveable { mutableStateOf("") }
+    val restrictions by manualRestrictions.collectAsStateWithLifecycle()
+    var editDialog by remember { mutableStateOf<ManualRestriction?>(null) }
+    var addDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        packageName = chosenPackage.receive()
+    }
+    LaunchedEffect(packageName) {
+        if (packageName.isValidPackageName) getManualRestrictions(packageName)
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                { Text(stringResource(R.string.add_managed_configuration)) },
+                navigationIcon = { NavIcon(onNavigateUp) }
+            )
+        },
+        floatingActionButton = {
+            if (packageName.isValidPackageName) FloatingActionButton({ addDialog = true }) {
+                Icon(Icons.Default.Add, null)
+            }
+        },
+        contentWindowInsets = adaptiveInsets()
+    ) { paddingValues ->
+        LazyColumn(Modifier.padding(paddingValues)) {
+            item {
+                PackageNameTextField(packageName, onChoosePackage,
+                    Modifier.padding(HorizontalPadding, 8.dp)) { packageName = it }
+                Notes(R.string.info_add_managed_configuration, HorizontalPadding)
+                Spacer(Modifier.height(8.dp))
+            }
+            items(restrictions, { it.key }) { entry ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { editDialog = entry }
+                        .padding(HorizontalPadding, 8.dp)
+                        .animateItem(),
+                    Arrangement.SpaceBetween, Alignment.CenterVertically
+                ) {
+                    Row(Modifier.weight(1F), verticalAlignment = Alignment.CenterVertically) {
+                        val iconId = when (entry) {
+                            is ManualRestriction.IntItem -> R.drawable.number_123_fill0
+                            is ManualRestriction.StringItem -> R.drawable.abc_fill0
+                            is ManualRestriction.BooleanItem -> R.drawable.toggle_off_fill0
+                            is ManualRestriction.StringArrayItem -> R.drawable.check_box_fill0
+                        }
+                        Icon(painterResource(iconId), null, Modifier.padding(end = 12.dp))
+                        Column {
+                            Text(entry.key, style = typography.labelLarge)
+                            val text = when (entry) {
+                                is ManualRestriction.IntItem -> entry.value.toString()
+                                is ManualRestriction.StringItem -> entry.value.take(40)
+                                is ManualRestriction.BooleanItem -> entry.value.toString()
+                                is ManualRestriction.StringArrayItem ->
+                                    entry.value.joinToString(limit = 30)
+                            }
+                            Text(text, Modifier.alpha(0.7F), style = typography.bodyMedium)
+                        }
+                    }
+                    IconButton({ removeManualRestriction(packageName, entry.key) }) {
+                        Icon(Icons.Outlined.Delete, null)
+                    }
+                }
+            }
+            item {
+                Spacer(Modifier.height(BottomPadding))
+            }
+        }
+    }
+    if (addDialog) ManualRestrictionDialog(null, { addDialog = false }) {
+        setManualRestriction(packageName, it)
+        addDialog = false
+    }
+    editDialog?.let { current ->
+        ManualRestrictionDialog(current, { editDialog = null }) {
+            setManualRestriction(packageName, it)
+            editDialog = null
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ManualRestrictionDialog(
+    existing: ManualRestriction?,
+    onDismiss: () -> Unit,
+    onConfirm: (ManualRestriction) -> Unit
+) {
+    var key by rememberSaveable { mutableStateOf(existing?.key ?: "") }
+    var type by rememberSaveable {
+        mutableStateOf(
+            when (existing) {
+                is ManualRestriction.IntItem -> ManualRestrictionType.INTEGER
+                is ManualRestriction.BooleanItem -> ManualRestrictionType.BOOLEAN
+                is ManualRestriction.StringArrayItem -> ManualRestrictionType.STRING_ARRAY
+                else -> ManualRestrictionType.STRING
+            }
+        )
+    }
+    var stringValue by rememberSaveable {
+        mutableStateOf(
+            when (existing) {
+                is ManualRestriction.StringItem -> existing.value
+                is ManualRestriction.IntItem -> existing.value.toString()
+                else -> ""
+            }
+        )
+    }
+    var boolValue by rememberSaveable {
+        mutableStateOf((existing as? ManualRestriction.BooleanItem)?.value ?: false)
+    }
+    val arrayValue = remember {
+        mutableStateListOf(
+            *((existing as? ManualRestriction.StringArrayItem)?.value ?: emptyList()).toTypedArray()
+        )
+    }
+    val intError = type == ManualRestrictionType.INTEGER && stringValue.toIntOrNull() == null
+    val valid = key.isNotBlank() && !intError
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(
+                if (existing == null) R.string.add_managed_configuration
+                else R.string.managed_configuration
+            ))
+        },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    key, { key = it }, Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.key)) },
+                    enabled = existing == null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                )
+                Spacer(Modifier.height(8.dp))
+                if (existing == null) {
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        ManualRestrictionType.entries.forEachIndexed { index, t ->
+                            SegmentedButton(
+                                type == t, { type = t },
+                                SegmentedButtonDefaults.itemShape(
+                                    index, ManualRestrictionType.entries.size
+                                )
+                            ) {
+                                Text(stringResource(t.label), maxLines = 1)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                when (type) {
+                    ManualRestrictionType.STRING -> OutlinedTextField(
+                        stringValue, { stringValue = it }, Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.value)) }
+                    )
+                    ManualRestrictionType.INTEGER -> OutlinedTextField(
+                        stringValue, { stringValue = it }, Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.value)) },
+                        isError = intError,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
+                    )
+                    ManualRestrictionType.BOOLEAN ->
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            SegmentedButton(
+                                boolValue, { boolValue = true },
+                                SegmentedButtonDefaults.itemShape(0, 2)
+                            ) { Text("true") }
+                            SegmentedButton(
+                                !boolValue, { boolValue = false },
+                                SegmentedButtonDefaults.itemShape(1, 2)
+                            ) { Text("false") }
+                        }
+                    ManualRestrictionType.STRING_ARRAY -> Column {
+                        arrayValue.forEachIndexed { index, s ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    s, { arrayValue[index] = it }, Modifier.weight(1F),
+                                    singleLine = true
+                                )
+                                IconButton({ arrayValue.removeAt(index) }) {
+                                    Icon(Icons.Outlined.Clear, null)
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
+                        TextButton({ arrayValue.add("") }) {
+                            Icon(Icons.Default.Add, null)
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.add))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                {
+                    val result = when (type) {
+                        ManualRestrictionType.STRING ->
+                            ManualRestriction.StringItem(key, stringValue)
+                        ManualRestrictionType.INTEGER ->
+                            ManualRestriction.IntItem(key, stringValue.toIntOrNull() ?: 0)
+                        ManualRestrictionType.BOOLEAN ->
+                            ManualRestriction.BooleanItem(key, boolValue)
+                        ManualRestrictionType.STRING_ARRAY ->
+                            ManualRestriction.StringArrayItem(
+                                key, arrayValue.filter { it.isNotEmpty() }
+                            )
+                    }
+                    onConfirm(result)
+                },
+                enabled = valid
+            ) {
+                Text(stringResource(R.string.confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+}

@@ -64,6 +64,8 @@ import lesser.evil.dpm.AddApnSetting
 import lesser.evil.dpm.AddApnSettingScreen
 import lesser.evil.dpm.AddDelegatedAdmin
 import lesser.evil.dpm.AddDelegatedAdminScreen
+import lesser.evil.dpm.AddManagedConfiguration
+import lesser.evil.dpm.AddManagedConfigurationScreen
 import lesser.evil.dpm.AddPreferentialNetworkServiceConfig
 import lesser.evil.dpm.AddPreferentialNetworkServiceConfigScreen
 import lesser.evil.dpm.AffiliationId
@@ -644,6 +646,13 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             ManagedConfigurationScreen(
                 it.toRoute(), vm.appRestrictions, vm::setAppRestrictions,
                 vm::clearAppRestrictions, ::navigateUp
+            )
+        }
+        composable<AddManagedConfiguration> {
+            AddManagedConfigurationScreen(
+                vm.chosenPackage, ::chooseSinglePackage, vm.manualRestrictions,
+                vm::getManualRestrictions, vm::setManualRestriction,
+                vm::removeManualRestriction, ::navigateUp
             )
         }
         composable<ManageAppGroups> {

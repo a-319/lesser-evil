@@ -429,6 +429,14 @@
     <string name="add_to_list">Add to list</string>
     <string name="remove_from_list">Remove from list</string>
     <string name="managed_configuration">Managed configuration</string>
+    <string name="add_managed_configuration">Add managed configuration</string>
+    <string name="info_add_managed_configuration">Manually add managed configurations of any type to any app, even apps that do not declare configurations.</string>
+    <string name="key">Key</string>
+    <string name="value">Value</string>
+    <string name="type_string">String</string>
+    <string name="type_integer">Integer</string>
+    <string name="type_boolean">Boolean</string>
+    <string name="type_string_array">String[]</string>
     <string name="clear_configurations">Clear configurations</string>
     <string name="specify_value">Specify value</string>
     <string name="package_removed">Removed %1$s</string>

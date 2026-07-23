@@ -749,6 +749,6 @@
     <string name="enforced_while_on">Enforced while the switch is on</string>
     <string name="enforced_while_off">Enforced while the switch is off</string>
     <string name="excluded_packages">Excluded packages</string>
-    <string name="block_metered_data_note">While enforced, metered data (Wi-Fi and mobile) will be disabled for all apps except the excluded packages.</string>
+    <string name="block_metered_data_note">While enforced, metered data (Wi-Fi and mobile) will be disabled for all apps except the excluded packages. When released, the list that was configured before enforcement is restored.</string>
     <string name="switch_removed">Switch removed</string>
 </resources>

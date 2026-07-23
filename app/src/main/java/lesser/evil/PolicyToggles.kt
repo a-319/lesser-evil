@@ -1,6 +1,7 @@
 package lesser.evil
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build.VERSION
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -107,18 +108,51 @@ object PolicyToggleManager {
             }
             is TogglePolicy.AlwaysOnVpn -> {
                 if (VERSION.SDK_INT < 24) return false
-                if (enforce) dpm.setAlwaysOnVpnPackage(dar, policy.packageName, policy.lockdown)
-                else dpm.setAlwaysOnVpnPackage(dar, null, false)
+                if (enforce) {
+                    if (SP.policyToggleVpnBackup == null) {
+                        val current = dpm.getAlwaysOnVpnPackage(dar)
+                        val lockdown = VERSION.SDK_INT >= 29 &&
+                                dpm.isAlwaysOnVpnLockdownEnabled(dar)
+                        SP.policyToggleVpnBackup =
+                            if (current == null) "" else "$current|${if (lockdown) 1 else 0}"
+                    }
+                    dpm.setAlwaysOnVpnPackage(dar, policy.packageName, policy.lockdown)
+                } else {
+                    // Restore the configuration that was active before enforcement; a missing
+                    // backup means enforcement never ran, so leave the current config alone
+                    val backup = SP.policyToggleVpnBackup ?: return true
+                    try {
+                        if (backup.isEmpty()) {
+                            dpm.setAlwaysOnVpnPackage(dar, null, false)
+                        } else {
+                            val parts = backup.split('|')
+                            dpm.setAlwaysOnVpnPackage(dar, parts[0], parts.getOrNull(1) == "1")
+                        }
+                    } catch (_: PackageManager.NameNotFoundException) {
+                        dpm.setAlwaysOnVpnPackage(dar, null, false)
+                    }
+                    SP.policyToggleVpnBackup = null
+                }
             }
             is TogglePolicy.BlockMeteredData -> {
                 if (VERSION.SDK_INT < 28) return false
-                dpm.setMeteredDataDisabledPackages(
-                    dar,
-                    if (enforce) {
+                if (enforce) {
+                    if (SP.policyToggleMddBackup == null) {
+                        SP.policyToggleMddBackup =
+                            dpm.getMeteredDataDisabledPackages(dar).joinToString("\n")
+                    }
+                    dpm.setMeteredDataDisabledPackages(
+                        dar,
                         context.packageManager.getInstalledApplications(0).map { it.packageName }
                             .filter { it !in policy.excludedPackages && it != context.packageName }
-                    } else emptyList()
-                )
+                    )
+                } else {
+                    val backup = SP.policyToggleMddBackup ?: return true
+                    dpm.setMeteredDataDisabledPackages(
+                        dar, backup.split('\n').filter { it.isNotEmpty() }
+                    )
+                    SP.policyToggleMddBackup = null
+                }
             }
         }
         return true

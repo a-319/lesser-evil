@@ -68,7 +68,7 @@
 	<string name="battery_temp">טמפרטורות סוללה</string>
 	<string name="black_theme">נושא שחור</string>
 	<string name="blacklist">רשימה שחורה</string>
-	<string name="block_metered_data_note">כשהמדיניות נאכפת, נתונים מדודים (Wi-Fi ורשת סלולרית) יושבתו עבור כל האפליקציות מלבד החבילות המוחרגות.</string>
+	<string name="block_metered_data_note">כשהמדיניות נאכפת, נתונים מדודים (Wi-Fi ורשת סלולרית) יושבתו עבור כל האפליקציות מלבד החבילות המוחרגות. כשהיא משוחררת, הרשימה שהייתה מוגדרת לפני האכיפה משוחזרת.</string>
 	<string name="block_non_matching_networks">חסום רשתות שאינן תואמות</string>
 	<string name="block_uninstall">חסום הסרת התקנה</string>
 	<string name="bluetooth">בלוטות\'</string>

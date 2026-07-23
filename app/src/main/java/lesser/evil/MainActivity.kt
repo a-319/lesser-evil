@@ -294,7 +294,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         navController.navigate(ManageAppGroups)
     }
     LaunchedEffect(Unit) {
-        if(!Privilege.status.value.activated) {
+        if(!Privilege.status.value.managed) {
             navController.navigate(WorkModes(false)) {
                 popUpTo<Home> { inclusive = true }
             }
@@ -782,7 +782,7 @@ private fun HomeScreen(onNavigate: (Any) -> Unit) {
             .fillMaxSize()
             .padding(it)
             .verticalScroll(rememberScrollState())) {
-            if(privilege.device || privilege.profile) {
+            if(privilege.managed) {
                 HomePageItem(R.string.system, R.drawable.android_fill0) { onNavigate(SystemManager) }
                 HomePageItem(R.string.network, R.drawable.wifi_fill0) { onNavigate(Network) }
             }
@@ -791,7 +791,7 @@ private fun HomeScreen(onNavigate: (Any) -> Unit) {
                     onNavigate(WorkProfile)
                 }
             }
-            if(privilege.device || privilege.profile) {
+            if(privilege.managed) {
                 HomePageItem(R.string.applications, R.drawable.apps_fill0) {
                     onNavigate(
                         if (SP.applicationsListView) ApplicationsList(true, true)

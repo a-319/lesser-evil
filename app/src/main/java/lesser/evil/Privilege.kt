@@ -48,6 +48,8 @@ object Privilege {
         val roleHolder: Boolean = false
     ) {
         val activated = device || profile
+        /** Has some form of device policy access: an owner, or the role holder (permission based) */
+        val managed = device || profile || roleHolder
         val primary = Binder.getCallingUid() / 100000 == 0 // Primary user
     }
     val status = MutableStateFlow(Status())
@@ -72,5 +74,16 @@ object Privilege {
         } catch (_: Exception) {
             false
         }
+    }
+
+    /**
+     * Admin component for DevicePolicyManager policy calls. Returns null when the app operates
+     * purely through the device policy management role, selecting the permission based path.
+     * Equals [DAR] for every owner, so routing policy calls through this is behavior preserving.
+     * Called from [PolicyAdmin] (Java) so the null flows to @NonNull parameters at runtime.
+     */
+    fun policyAdmin(): ComponentName? {
+        val s = status.value
+        return if (s.roleHolder && !s.device && !s.profile) null else DAR
     }
 }

@@ -366,13 +366,13 @@ fun WorkModesScreen(
                         }
                         Button({
                             dialog = 2
-                            vm.activateRoleHolderByShizuku(::handleRoleHolderResult)
+                            vm.activateRoleHolderByShizuku(::handleResult)
                         }, Modifier.padding(end = 8.dp)) {
                             Text(stringResource(R.string.shizuku))
                         }
                         Button({
                             dialog = 2
-                            vm.activateRoleHolderByRoot(::handleRoleHolderResult)
+                            vm.activateRoleHolderByRoot(::handleResult)
                         }, Modifier.padding(end = 8.dp)) {
                             Text("Root")
                         }

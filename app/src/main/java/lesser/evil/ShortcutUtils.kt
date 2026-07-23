@@ -14,9 +14,9 @@ object ShortcutUtils {
             val list = listOf(
                 createShortcut(context, MyShortcut.Lock, true),
                 createShortcut(context, MyShortcut.DisableCamera,
-                    !Privilege.DPM.getCameraDisabled(Privilege.DAR)),
+                    !Privilege.DPM.getCameraDisabled(PolicyAdmin.get())),
                 createShortcut(context, MyShortcut.Mute,
-                    !Privilege.DPM.isMasterVolumeMuted(Privilege.DAR))
+                    !Privilege.DPM.isMasterVolumeMuted(PolicyAdmin.get()))
             )
             ShortcutManagerCompat.setDynamicShortcuts(context, list)
         } else {

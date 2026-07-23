@@ -9,8 +9,11 @@ import android.os.CancellationSignal
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,7 +64,9 @@ private fun calculateRemainingSeconds(lockoutUntil: Long, now: Long = System.cur
 }
 
 @Composable
-fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismiss, DialogProperties(true, false)) {
+fun AppLockDialog(
+    onSucceed: () -> Unit, onEnterRestricted: (() -> Unit)? = null, onDismiss: () -> Unit
+) = Dialog(onDismiss, DialogProperties(true, false)) {
     val context = LocalContext.current
     val fm = LocalFocusManager.current
     val fr = remember { FocusRequester() }
@@ -150,8 +156,21 @@ fun AppLockDialog(onSucceed: () -> Unit, onDismiss: () -> Unit) = Dialog(onDismi
                     }
                 }
             }
-            Button(::unlock, Modifier.align(Alignment.End).padding(top = 8.dp), enabled = !isLocked) {
-                Text(stringResource(R.string.unlock))
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (onEnterRestricted != null) {
+                    TextButton(onEnterRestricted) {
+                        Text(stringResource(R.string.enter_as_user))
+                    }
+                } else {
+                    Spacer(Modifier.width(1.dp))
+                }
+                Button(::unlock, enabled = !isLocked) {
+                    Text(stringResource(R.string.unlock))
+                }
             }
             if (remainingSeconds > 0) {
                 Text(

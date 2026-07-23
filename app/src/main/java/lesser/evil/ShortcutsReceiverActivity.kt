@@ -46,6 +46,23 @@ class ShortcutsReceiverActivity : Activity() {
                         if (serial == -1) return
                         doUserOperationWithContext(this, type, serial, false)
                     }
+                    "POLICY_TOGGLE" -> {
+                        val id = intent.getIntExtra("id", -1)
+                        val repo = (applicationContext as MyApplication).myRepo
+                        val toggle = if (id == -1) null else repo.getPolicyToggle(id)
+                        // Shortcuts bypass the app lock, so only switches available to the
+                        // user profile may be flipped this way while a password is set
+                        success = if (toggle == null ||
+                            (!toggle.userAllowed && !SP.lockPasswordHash.isNullOrEmpty())) {
+                            false
+                        } else {
+                            val newState = !toggle.enabled
+                            val result = PolicyToggleManager.apply(this, toggle.policies, newState)
+                            repo.setPolicyToggleEnabled(id, newState)
+                            ShortcutUtils.updatePolicyToggleShortcut(this, id, toggle.name, newState)
+                            result
+                        }
+                    }
                     "LOCK_TASK_PROFILE" -> {
                         success = if (Build.VERSION.SDK_INT >= 28) {
                             val id = intent.getIntExtra("profile", -1)

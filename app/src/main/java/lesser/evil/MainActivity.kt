@@ -168,6 +168,10 @@ import lesser.evil.dpm.PermissionsManagerScreen
 import lesser.evil.dpm.PermittedAccessibilityServices
 import lesser.evil.dpm.PermittedAsAndImPackages
 import lesser.evil.dpm.PermittedInputMethods
+import lesser.evil.dpm.EditPolicyToggle
+import lesser.evil.dpm.EditPolicyToggleScreen
+import lesser.evil.dpm.PolicyToggles
+import lesser.evil.dpm.PolicyTogglesScreen
 import lesser.evil.dpm.PreferentialNetworkService
 import lesser.evil.dpm.PreferentialNetworkServiceInfo
 import lesser.evil.dpm.PreferentialNetworkServiceScreen
@@ -266,7 +270,22 @@ class MainActivity : FragmentActivity() {
             OwnDroidTheme(theme) {
                 Home(vm) { appLockDialog = true }
                 if (appLockDialog) {
-                    AppLockDialog({ appLockDialog = false }) { moveTaskToBack(true) }
+                    val restricted by vm.restrictedMode.collectAsStateWithLifecycle()
+                    AppLockDialog(
+                        onSucceed = {
+                            vm.exitRestrictedMode()
+                            appLockDialog = false
+                        },
+                        onEnterRestricted = if (restricted || SP.lockPasswordHash.isNullOrEmpty()) null
+                        else ({
+                            vm.enterRestrictedMode()
+                            appLockDialog = false
+                        }),
+                        onDismiss = {
+                            if (vm.restrictedMode.value) appLockDialog = false
+                            else moveTaskToBack(true)
+                        }
+                    )
                 }
             }
         }
@@ -281,6 +300,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
     val context = LocalContext.current
     val focusMgr = LocalFocusManager.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val restricted by vm.restrictedMode.collectAsStateWithLifecycle()
     fun navigateUp() { navController.navigateUp() }
     fun navigate(destination: Any) {
         navController.navigate(destination) {
@@ -315,7 +335,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         popEnterTransition = { NavTransition.popEnterTransition },
         popExitTransition = { NavTransition.popExitTransition }
     ) {
-        composable<Home> { HomeScreen(::navigate) }
+        composable<Home> { HomeScreen(restricted, ::navigate, onLock) }
         composable<WorkModes> {
             WorkModesScreen(vm, it.toRoute(), ::navigateUp, {
                 navController.navigate(Home) {
@@ -671,6 +691,15 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 vm::setUserRestriction, vm::createUserRestrictionShortcut, ::navigateUp)
         }
 
+        composable<PolicyToggles> {
+            PolicyTogglesScreen(vm.policyToggles, vm::getPolicyToggles, vm::switchPolicyToggle,
+                vm::createPolicyToggleShortcut, restricted, ::navigateUp) { navigate(EditPolicyToggle(it)) }
+        }
+        composable<EditPolicyToggle> {
+            EditPolicyToggleScreen(it.toRoute(), vm.policyToggles, vm::setPolicyToggle,
+                vm::deletePolicyToggle, vm.chosenPackage, ::chooseSinglePackage, ::navigateUp)
+        }
+
         composable<Users> { UsersScreen(vm, ::navigateUp, ::navigate) }
         composable<UserInfo> { UserInfoScreen(vm::getUserInformation, ::navigateUp) }
         composable<UsersOptions> {
@@ -711,7 +740,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         }
         composable<RequiredPasswordQuality> { RequiredPasswordQualityScreen(::navigateUp) }
 
-        composable<Settings> { SettingsScreen(::navigateUp, ::navigate) }
+        composable<Settings> { SettingsScreen(restricted, ::navigateUp, ::navigate) }
         composable<SettingsOptions> {
             SettingsOptionsScreen(vm::getDisplayDangerousFeatures, vm::getShortcutsEnabled,
                 vm::setDisplayDangerousFeatures, vm::setShortcutsEnabled, ::navigateUp)
@@ -767,16 +796,24 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeScreen(onNavigate: (Any) -> Unit) {
+private fun HomeScreen(restricted: Boolean, onNavigate: (Any) -> Unit, onLock: () -> Unit) {
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     val sb = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         Modifier.nestedScroll(sb.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                { Text(stringResource(R.string.app_name)) },
+                {
+                    Text(stringResource(
+                        if (restricted) R.string.app_name_user_profile else R.string.app_name
+                    ))
+                },
                 actions = {
-                    IconButton({ onNavigate(WorkModes(true)) }) { Icon(painterResource(R.drawable.security_fill0), null) }
+                    if (restricted) {
+                        IconButton(onLock) { Icon(painterResource(R.drawable.lock_fill0), null) }
+                    } else {
+                        IconButton({ onNavigate(WorkModes(true)) }) { Icon(painterResource(R.drawable.security_fill0), null) }
+                    }
                     IconButton({ onNavigate(Settings) }) { Icon(Icons.Default.Settings, null) }
                 },
                 scrollBehavior = sb
@@ -807,6 +844,7 @@ private fun HomeScreen(onNavigate: (Any) -> Unit) {
                 if(VERSION.SDK_INT >= 24) {
                     HomePageItem(R.string.user_restriction, R.drawable.person_off) { onNavigate(UserRestriction) }
                 }
+                HomePageItem(R.string.mode_switches, R.drawable.toggle_off_fill0) { onNavigate(PolicyToggles) }
                 HomePageItem(R.string.users,R.drawable.manage_accounts_fill0) { onNavigate(Users) }
                 HomePageItem(R.string.password_and_keyguard, R.drawable.password_fill0) { onNavigate(Password) }
             }

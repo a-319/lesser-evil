@@ -70,7 +70,7 @@ import kotlin.system.exitProcess
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Unit) {
+fun SettingsScreen(restricted: Boolean, onNavigateUp: () -> Unit, onNavigate: (Any) -> Unit) {
     val context = LocalContext.current
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     val exportLogsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) {
@@ -124,8 +124,9 @@ fun SettingsScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Unit) {
         ) {
             FunctionItem(title = R.string.options, icon = R.drawable.tune_fill0) { onNavigate(SettingsOptions) }
             FunctionItem(title = R.string.appearance, icon = R.drawable.format_paint_fill0) { onNavigate(Appearance) }
-            FunctionItem(R.string.app_lock, icon = R.drawable.lock_fill0) { onNavigate(AppLockSettings) }
-            if (privilege.device || privilege.profile)
+            if (!restricted)
+                FunctionItem(R.string.app_lock, icon = R.drawable.lock_fill0) { onNavigate(AppLockSettings) }
+            if ((privilege.device || privilege.profile) && !restricted)
                 FunctionItem(title = R.string.api, icon = R.drawable.code_fill0) { onNavigate(ApiSettings) }
             if (privilege.device && !privilege.dhizuku)
                 FunctionItem(R.string.notifications, icon = R.drawable.notifications_fill0) { onNavigate(Notifications) }

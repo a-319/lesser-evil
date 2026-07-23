@@ -248,4 +248,52 @@ class MyRepository(val dbHelper: MyDbHelper) {
     fun deleteAppGroup(id: Int) {
         dbHelper.writableDatabase.delete("app_groups", "id = ?", arrayOf(id.toString()))
     }
+
+    fun getPolicyToggles(): List<PolicyToggle> {
+        val list = mutableListOf<PolicyToggle>()
+        dbHelper.readableDatabase.rawQuery("SELECT * FROM policy_toggles", null).use {
+            while (it.moveToNext()) {
+                list += PolicyToggle(
+                    it.getInt(0), it.getString(1), it.getInt(2) != 0, it.getInt(4) != 0,
+                    PolicyToggleManager.decodePolicies(it.getString(3))
+                )
+            }
+        }
+        return list
+    }
+    fun getPolicyToggle(id: Int): PolicyToggle? {
+        dbHelper.readableDatabase.rawQuery(
+            "SELECT * FROM policy_toggles WHERE id = ?", arrayOf(id.toString())
+        ).use {
+            if (it.moveToNext()) {
+                return PolicyToggle(
+                    it.getInt(0), it.getString(1), it.getInt(2) != 0, it.getInt(4) != 0,
+                    PolicyToggleManager.decodePolicies(it.getString(3))
+                )
+            }
+        }
+        return null
+    }
+    fun setPolicyToggle(
+        id: Int?, name: String, enabled: Boolean, userAllowed: Boolean, policies: List<TogglePolicy>
+    ) {
+        val cv = ContentValues()
+        cv.put("name", name)
+        cv.put("enabled", if (enabled) 1 else 0)
+        cv.put("user_allowed", if (userAllowed) 1 else 0)
+        cv.put("policies", PolicyToggleManager.encodePolicies(policies))
+        if (id == null) {
+            dbHelper.writableDatabase.insert("policy_toggles", null, cv)
+        } else {
+            dbHelper.writableDatabase.update("policy_toggles", cv, "id = ?", arrayOf(id.toString()))
+        }
+    }
+    fun setPolicyToggleEnabled(id: Int, enabled: Boolean) {
+        val cv = ContentValues()
+        cv.put("enabled", if (enabled) 1 else 0)
+        dbHelper.writableDatabase.update("policy_toggles", cv, "id = ?", arrayOf(id.toString()))
+    }
+    fun deletePolicyToggle(id: Int) {
+        dbHelper.writableDatabase.delete("policy_toggles", "id = ?", arrayOf(id.toString()))
+    }
 }

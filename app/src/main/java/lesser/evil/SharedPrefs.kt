@@ -28,6 +28,10 @@ class SharedPrefs(context: Context) {
     var dhizukuServer by BooleanSharedPref("dhizuku_server")
     var notifications by StringSharedPref("notifications")
     var shortcutKey by StringSharedPref("shortcut_key")
+    /** Metered data disabled packages captured before a mode switch enforced a blanket block */
+    var policyToggleMddBackup by StringSharedPref("policy_toggles.mdd_backup")
+    /** Always-on VPN config ("package|lockdown", or "" for none) captured before a mode switch enforced its own */
+    var policyToggleVpnBackup by StringSharedPref("policy_toggles.vpn_backup")
     var lockTaskProfiles by StringSharedPref("lock_task.profiles")
     var lockTaskUnsuspendedApps by StringSharedPref("lock_task.unsuspended_apps")
     var lockTaskUnhiddenApps by StringSharedPref("lock_task.unhidden_apps")

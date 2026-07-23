@@ -120,6 +120,22 @@ object ShortcutUtils {
             context, shortcuts, context.getString(R.string.user_removed)
         )
     }
+    fun createPolicyToggleShortcutInfo(
+        context: Context, id: Int, name: String, enabled: Boolean
+    ): ShortcutInfoCompat {
+        setShortcutKey()
+        val icon = if (enabled) R.drawable.toggle_on_fill0 else R.drawable.toggle_off_fill0
+        return ShortcutInfoCompat.Builder(context, "POLICY_TOGGLE-$id")
+            .setIcon(IconCompat.createWithResource(context, icon))
+            .setShortLabel(name)
+            .setIntent(
+                Intent(context, ShortcutsReceiverActivity::class.java)
+                    .setAction("lesser.evil.action.POLICY_TOGGLE")
+                    .putExtra("id", id)
+                    .putExtra("key", SP.shortcutKey)
+            )
+            .build()
+    }
     fun buildLockTaskProfileShortcut(context: Context, profile: LockTaskProfile): ShortcutInfoCompat {
         setShortcutKey()
         // The shortcut takes the icon and label of the profile's main app
@@ -143,6 +159,23 @@ object ShortcutUtils {
                     .putExtra("key", SP.shortcutKey)
             )
             .build()
+    }
+    fun setPolicyToggleShortcut(context: Context, id: Int, name: String, enabled: Boolean): Boolean {
+        val shortcut = createPolicyToggleShortcutInfo(context, id, name, enabled)
+        return ShortcutManagerCompat.requestPinShortcut(context, shortcut, null)
+    }
+    fun updatePolicyToggleShortcut(context: Context, id: Int, name: String, enabled: Boolean) {
+        val shortcuts = ShortcutManagerCompat.getShortcuts(
+            context, ShortcutManagerCompat.FLAG_MATCH_PINNED
+        )
+        if (shortcuts.find { it.id == "POLICY_TOGGLE-$id" } == null) return
+        val shortcut = createPolicyToggleShortcutInfo(context, id, name, enabled)
+        ShortcutManagerCompat.updateShortcuts(context, listOf(shortcut))
+    }
+    fun disablePolicyToggleShortcut(context: Context, id: Int) {
+        ShortcutManagerCompat.disableShortcuts(
+            context, listOf("POLICY_TOGGLE-$id"), context.getString(R.string.switch_removed)
+        )
     }
     fun setLockTaskProfileShortcut(context: Context, profile: LockTaskProfile): Boolean {
         val shortcut = buildLockTaskProfileShortcut(context, profile)

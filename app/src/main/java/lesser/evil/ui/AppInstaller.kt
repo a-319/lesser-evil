@@ -135,7 +135,7 @@ fun AppInstaller(
         AppLockDialog({
             appLockDialog = false
             onStartInstall(options)
-        }) { appLockDialog = false }
+        }, onDismiss = { appLockDialog = false })
     }
 }
 

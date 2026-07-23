@@ -144,7 +144,7 @@ class DhizukuActivity : ComponentActivity() {
                     },
                     onDismissRequest = { close(false) }
                 )
-                else AppLockDialog({ close(true) }) { close(false) }
+                else AppLockDialog({ close(true) }, onDismiss = { close(false) })
             }
         }
     }

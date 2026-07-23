@@ -1,5 +1,7 @@
 package lesser.evil.dpm
 
+import lesser.evil.PolicyAdmin
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.admin.ConnectEvent
@@ -20,7 +22,6 @@ import lesser.evil.MyApplication
 import lesser.evil.NotificationType
 import lesser.evil.NotificationUtils
 import lesser.evil.Privilege
-import lesser.evil.Privilege.DAR
 import lesser.evil.Privilege.DPM
 import lesser.evil.R
 import lesser.evil.SP
@@ -146,7 +147,7 @@ class NetworkLog(
 @RequiresApi(26)
 fun retrieveNetworkLogs(app: MyApplication, token: Long) {
     CoroutineScope(Dispatchers.IO).launch {
-        val logs = DPM.retrieveNetworkLogs(DAR, token)?.mapNotNull {
+        val logs = DPM.retrieveNetworkLogs(PolicyAdmin.get(), token)?.mapNotNull {
             when (it) {
                 is DnsEvent -> NetworkLog(
                     if (VERSION.SDK_INT >= 28) it.id else null, it.packageName, it.timestamp, "dns",
@@ -490,7 +491,7 @@ fun transformSecurityEventData(tag: Int, payload: Any): SecurityEventData? {
 @RequiresApi(24)
 fun retrieveSecurityLogs(app: MyApplication) {
     CoroutineScope(Dispatchers.IO).launch {
-        val logs = DPM.retrieveSecurityLogs(DAR)
+        val logs = DPM.retrieveSecurityLogs(PolicyAdmin.get())
         if (logs.isNullOrEmpty()) return@launch
         app.myRepo.writeSecurityLogs(logs)
         NotificationUtils.sendBasicNotification(
@@ -504,7 +505,7 @@ fun setDefaultAffiliationID() {
     if (VERSION.SDK_INT < 26) return
     if(!SP.isDefaultAffiliationIdSet) {
         try {
-            DPM.setAffiliationIds(DAR, setOf("OwnDroid_default_affiliation_id"))
+            DPM.setAffiliationIds(PolicyAdmin.get(), setOf("OwnDroid_default_affiliation_id"))
             SP.isDefaultAffiliationIdSet = true
             Log.d("DPM", "Default affiliation id set")
         } catch (e: Exception) {
@@ -577,15 +578,15 @@ fun doUserOperationWithContext(
     return when (type) {
         UserOperationType.Start -> {
             if (VERSION.SDK_INT >= 28)
-                DPM.startUserInBackground(DAR, handle) == UserManager.USER_OPERATION_SUCCESS
+                DPM.startUserInBackground(PolicyAdmin.get(), handle) == UserManager.USER_OPERATION_SUCCESS
             else false
         }
-        UserOperationType.Switch -> DPM.switchUser(DAR, handle)
+        UserOperationType.Switch -> DPM.switchUser(PolicyAdmin.get(), handle)
         UserOperationType.Stop -> {
             if (VERSION.SDK_INT >= 28)
-                DPM.stopUser(DAR, handle) == UserManager.USER_OPERATION_SUCCESS
+                DPM.stopUser(PolicyAdmin.get(), handle) == UserManager.USER_OPERATION_SUCCESS
             else false
         }
-        UserOperationType.Delete -> DPM.removeUser(DAR, handle)
+        UserOperationType.Delete -> DPM.removeUser(PolicyAdmin.get(), handle)
     }
 }

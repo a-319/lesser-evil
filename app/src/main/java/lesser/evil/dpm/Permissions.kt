@@ -115,16 +115,22 @@ fun WorkModesScreen(
     onDeactivate: () -> Unit, onNavigate: (Any) -> Unit
 ) {
     val privilege by Privilege.status.collectAsStateWithLifecycle()
-    /** 0: none, 1: device owner, 2: circular progress indicator, 3: result, 4: deactivate, 5: command */
+    /**
+     * 0: none, 1: device owner, 2: circular progress indicator, 3: result, 4: deactivate,
+     * 5: command, 6: role holder activate, 7: role holder command, 8: role holder deactivate
+     */
     var dialog by rememberSaveable { mutableIntStateOf(0) }
     var operationSucceed by rememberSaveable { mutableStateOf(false) }
     var resultText by rememberSaveable { mutableStateOf("") }
+    /** When true, the result dialog (3) closes without navigating away, since the role holder is not an owner */
+    var roleHolderOperation by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(privilege) {
         if (!params.canNavigateUp && privilege.device) {
             delay(1000)
             if (dialog != 3) { // Activated by ADB command
                 operationSucceed = true
                 resultText = ""
+                roleHolderOperation = false
                 dialog = 3
             }
         }
@@ -187,6 +193,13 @@ fun WorkModesScreen(
         fun handleResult(succeeded: Boolean, output: String?) {
             operationSucceed = succeeded
             resultText = output ?: ""
+            roleHolderOperation = false
+            dialog = 3
+        }
+        fun handleRoleHolderResult(succeeded: Boolean, output: String?) {
+            operationSucceed = succeeded
+            resultText = output ?: ""
+            roleHolderOperation = true
             dialog = 3
         }
         Column(Modifier.fillMaxSize().padding(paddingValues)) {
@@ -211,6 +224,12 @@ fun WorkModesScreen(
             ) {
                 WorkingModeItem(R.string.work_profile, privilege.work) {
                     if (!privilege.work) onNavigate(CreateWorkProfile)
+                }
+            }
+            if (VERSION.SDK_INT >= 33 && !privilege.dhizuku &&
+                (privilege.roleHolder || !privilege.activated)) {
+                WorkingModeItem(R.string.role_holder, privilege.roleHolder) {
+                    dialog = if (privilege.roleHolder) 8 else 6
                 }
             }
             if (privilege.activated && !privilege.dhizuku) Row(
@@ -280,7 +299,7 @@ fun WorkModesScreen(
             confirmButton = {
                 TextButton({
                     dialog = 0
-                    if (operationSucceed && !params.canNavigateUp) onActivate()
+                    if (operationSucceed && !roleHolderOperation && !params.canNavigateUp) onActivate()
                 }) {
                     Text(stringResource(R.string.confirm))
                 }
@@ -336,6 +355,69 @@ fun WorkModesScreen(
             },
             onDismissRequest = { dialog = 0 }
         )
+        if(dialog == 6) AlertDialog(
+            title = { Text(stringResource(R.string.role_holder)) },
+            text = {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.info_role_holder), Modifier.padding(bottom = 12.dp))
+                    FlowRow(Modifier.fillMaxWidth()) {
+                        Button({ dialog = 7 }, Modifier.padding(end = 8.dp)) {
+                            Text(stringResource(R.string.adb_command))
+                        }
+                        Button({
+                            dialog = 2
+                            vm.activateRoleHolderByShizuku(::handleResult)
+                        }, Modifier.padding(end = 8.dp)) {
+                            Text(stringResource(R.string.shizuku))
+                        }
+                        Button({
+                            dialog = 2
+                            vm.activateRoleHolderByRoot(::handleResult)
+                        }, Modifier.padding(end = 8.dp)) {
+                            Text("Root")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({ dialog = 0 }) { Text(stringResource(R.string.cancel)) }
+            },
+            onDismissRequest = { dialog = 0 }
+        )
+        if(dialog == 7) AlertDialog(
+            text = {
+                SelectionContainer {
+                    Text(ROLE_HOLDER_ADB_COMMAND)
+                }
+            },
+            confirmButton = {
+                TextButton({ dialog = 0 }) { Text(stringResource(R.string.confirm)) }
+            },
+            onDismissRequest = { dialog = 0 }
+        )
+        if(dialog == 8) AlertDialog(
+            title = { Text(stringResource(R.string.deactivate)) },
+            text = {
+                FlowRow(Modifier.fillMaxWidth()) {
+                    Button({
+                        dialog = 2
+                        vm.deactivateRoleHolderByShizuku(::handleRoleHolderResult)
+                    }, Modifier.padding(end = 8.dp)) {
+                        Text(stringResource(R.string.shizuku))
+                    }
+                    Button({
+                        dialog = 2
+                        vm.deactivateRoleHolderByRoot(::handleRoleHolderResult)
+                    }, Modifier.padding(end = 8.dp)) {
+                        Text("Root")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({ dialog = 0 }) { Text(stringResource(R.string.cancel)) }
+            },
+            onDismissRequest = { dialog = 0 }
+        )
     }
 }
 
@@ -358,6 +440,24 @@ fun WorkingModeItem(text: Int, active: Boolean, onClick: () -> Unit) {
 }
 
 const val ACTIVATE_DEVICE_OWNER_COMMAND = "dpm set-device-owner lesser.evil/.Receiver"
+
+const val DEVICE_POLICY_MANAGEMENT_ROLE = "android.app.role.DEVICE_POLICY_MANAGEMENT"
+
+/**
+ * Grants this app the device policy management role, providing temporary DPC permission
+ * (like Test DPC). The role is not persisted and is cleared when the device reboots.
+ * The qualification bypass is required because OwnDroid is not a preinstalled DPC.
+ */
+val ROLE_HOLDER_ACTIVATE_COMMANDS = listOf(
+    "cmd role set-bypassing-role-qualification true",
+    "cmd role add-role-holder $DEVICE_POLICY_MANAGEMENT_ROLE lesser.evil"
+)
+
+val ROLE_HOLDER_DEACTIVATE_COMMANDS = listOf(
+    "cmd role remove-role-holder $DEVICE_POLICY_MANAGEMENT_ROLE lesser.evil"
+)
+
+val ROLE_HOLDER_ADB_COMMAND = ROLE_HOLDER_ACTIVATE_COMMANDS.joinToString("\n")
 
 @Serializable object DhizukuServerSettings
 

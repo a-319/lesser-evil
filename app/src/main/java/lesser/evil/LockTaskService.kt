@@ -71,11 +71,11 @@ class LockTaskService: Service() {
     }
 
     fun stopLockTask() {
-        val features = Privilege.DPM.getLockTaskFeatures(Privilege.DAR)
-        val packages = Privilege.DPM.getLockTaskPackages(Privilege.DAR)
-        Privilege.DPM.setLockTaskPackages(Privilege.DAR, arrayOf())
-        Privilege.DPM.setLockTaskPackages(Privilege.DAR, packages)
-        Privilege.DPM.setLockTaskFeatures(Privilege.DAR, features)
+        val features = Privilege.DPM.getLockTaskFeatures(PolicyAdmin.get())
+        val packages = Privilege.DPM.getLockTaskPackages(PolicyAdmin.get())
+        Privilege.DPM.setLockTaskPackages(PolicyAdmin.get(), arrayOf())
+        Privilege.DPM.setLockTaskPackages(PolicyAdmin.get(), packages)
+        Privilege.DPM.setLockTaskFeatures(PolicyAdmin.get(), features)
     }
 
     companion object {

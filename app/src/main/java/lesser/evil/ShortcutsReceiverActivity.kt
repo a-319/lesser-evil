@@ -17,13 +17,13 @@ class ShortcutsReceiverActivity : Activity() {
                 when (action) {
                     "LOCK" -> Privilege.DPM.lockNow()
                     "DISABLE_CAMERA" -> {
-                        val state = Privilege.DPM.getCameraDisabled(Privilege.DAR)
-                        Privilege.DPM.setCameraDisabled(Privilege.DAR, !state)
+                        val state = Privilege.DPM.getCameraDisabled(PolicyAdmin.get())
+                        Privilege.DPM.setCameraDisabled(PolicyAdmin.get(), !state)
                         ShortcutUtils.setShortcut(this, MyShortcut.DisableCamera, state)
                     }
                     "MUTE" -> {
-                        val state = Privilege.DPM.isMasterVolumeMuted(Privilege.DAR)
-                        Privilege.DPM.setMasterVolumeMuted(Privilege.DAR, !state)
+                        val state = Privilege.DPM.isMasterVolumeMuted(PolicyAdmin.get())
+                        Privilege.DPM.setMasterVolumeMuted(PolicyAdmin.get(), !state)
                         ShortcutUtils.setShortcut(this, MyShortcut.Mute, state)
                     }
                     "USER_RESTRICTION" -> {
@@ -31,9 +31,9 @@ class ShortcutsReceiverActivity : Activity() {
                         val id = intent?.getStringExtra("restriction")
                         if (state == null || id == null) return
                         if (state) {
-                            Privilege.DPM.addUserRestriction(Privilege.DAR, id)
+                            Privilege.DPM.addUserRestriction(PolicyAdmin.get(), id)
                         } else {
-                            Privilege.DPM.clearUserRestriction(Privilege.DAR, id)
+                            Privilege.DPM.clearUserRestriction(PolicyAdmin.get(), id)
                         }
                         ShortcutUtils.updateUserRestrictionShortcut(this, id, !state, false)
                     }

@@ -1,5 +1,7 @@
 package lesser.evil.dpm
 
+import lesser.evil.PolicyAdmin
+
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
@@ -464,7 +466,7 @@ fun RequiredPasswordQualityScreen(onNavigateUp: () -> Unit) {
         PASSWORD_QUALITY_NUMERIC_COMPLEX to R.string.password_quality_numeric_complex
     )
     var selectedItem by rememberSaveable { mutableIntStateOf(PASSWORD_QUALITY_UNSPECIFIED) }
-    LaunchedEffect(Unit) { selectedItem = Privilege.DPM.getPasswordQuality(Privilege.DAR) }
+    LaunchedEffect(Unit) { selectedItem = Privilege.DPM.getPasswordQuality(PolicyAdmin.get()) }
     MyScaffold(R.string.required_password_quality, onNavigateUp) {
         passwordQuality.forEach {
             RadioButtonItem(it.value, selectedItem == it.key) { selectedItem = it.key }
@@ -472,7 +474,7 @@ fun RequiredPasswordQualityScreen(onNavigateUp: () -> Unit) {
         Spacer(Modifier.padding(vertical = 5.dp))
         Button(
             onClick = {
-                Privilege.DPM.setPasswordQuality(Privilege.DAR, selectedItem)
+                Privilege.DPM.setPasswordQuality(PolicyAdmin.get(), selectedItem)
                 context.showOperationResultToast(true)
             },
             modifier = Modifier.fillMaxWidth()

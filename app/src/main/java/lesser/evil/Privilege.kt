@@ -43,9 +43,13 @@ object Privilege {
         val dhizuku: Boolean = false,
         val work: Boolean = false,
         val org: Boolean = false,
-        val affiliated: Boolean = false
+        val affiliated: Boolean = false,
+        /** Holds the android.app.role.DEVICE_POLICY_MANAGEMENT role (temporary DPC, cleared on reboot) */
+        val roleHolder: Boolean = false
     ) {
         val activated = device || profile
+        /** Has some form of device policy access: an owner, or the role holder (permission based) */
+        val managed = device || profile || roleHolder
         val primary = Binder.getCallingUid() / 100000 == 0 // Primary user
     }
     val status = MutableStateFlow(Status())
@@ -58,7 +62,28 @@ object Privilege {
             dhizuku = SP.dhizuku,
             work = work,
             org = work && Build.VERSION.SDK_INT >= 30 && DPM.isOrganizationOwnedDeviceWithManagedProfile,
-            affiliated = Build.VERSION.SDK_INT >= 28 && DPM.isAffiliatedUser
+            affiliated = Build.VERSION.SDK_INT >= 28 && DPM.isAffiliatedUser,
+            roleHolder = isRoleHolder()
         )
+    }
+
+    private fun isRoleHolder(): Boolean {
+        if (SP.dhizuku || Build.VERSION.SDK_INT < 33) return false
+        return try {
+            DPM.devicePolicyManagementRoleHolderPackage == DAR.packageName
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Admin component for DevicePolicyManager policy calls. Returns null when the app operates
+     * purely through the device policy management role, selecting the permission based path.
+     * Equals [DAR] for every owner, so routing policy calls through this is behavior preserving.
+     * Called from [PolicyAdmin] (Java) so the null flows to @NonNull parameters at runtime.
+     */
+    fun policyAdmin(): ComponentName? {
+        val s = status.value
+        return if (s.roleHolder && !s.device && !s.profile) null else DAR
     }
 }

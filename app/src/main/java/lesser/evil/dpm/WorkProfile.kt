@@ -1,5 +1,7 @@
 package lesser.evil.dpm
 
+import lesser.evil.PolicyAdmin
+
 import android.app.admin.DevicePolicyManager
 import android.app.admin.DevicePolicyManager.WIPE_EUICC
 import android.app.admin.DevicePolicyManager.WIPE_EXTERNAL_STORAGE
@@ -325,7 +327,7 @@ fun CrossProfileIntentFilterScreen(
         }
         Button(
             onClick = {
-                Privilege.DPM.clearCrossProfileIntentFilters(Privilege.DAR)
+                Privilege.DPM.clearCrossProfileIntentFilters(PolicyAdmin.get())
                 context.showOperationResultToast(true)
             },
             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)

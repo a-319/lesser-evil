@@ -125,7 +125,9 @@ class DhizukuActivity : ComponentActivity() {
                             }
                         }
                         TextButton({
-                            if (SP.lockPasswordHash.isNullOrEmpty()) {
+                            val userGrantable = SP.dhizukuUserGrantable
+                                ?.split('\n')?.filter { it.isNotEmpty() } ?: emptyList()
+                            if (SP.lockPasswordHash.isNullOrEmpty() || packageName in userGrantable) {
                                 close(true)
                             } else {
                                 appLockDialog = true

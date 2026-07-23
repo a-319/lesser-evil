@@ -80,10 +80,11 @@ import kotlinx.serialization.Serializable
 fun PolicyTogglesScreen(
     toggles: StateFlow<List<PolicyToggle>>, getToggles: () -> Unit,
     onSwitch: (Int, Boolean) -> Boolean, onCreateShortcut: (Int) -> Boolean,
-    onNavigateUp: () -> Unit, onEdit: (Int) -> Unit
+    restricted: Boolean, onNavigateUp: () -> Unit, onEdit: (Int) -> Unit
 ) {
     val context = LocalContext.current
-    val list by toggles.collectAsStateWithLifecycle()
+    val allToggles by toggles.collectAsStateWithLifecycle()
+    val list = if (restricted) allToggles.filter { it.userAllowed } else allToggles
     LaunchedEffect(Unit) { getToggles() }
     Scaffold(
         topBar = {
@@ -93,7 +94,7 @@ fun PolicyTogglesScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton({ onEdit(-1) }) {
+            if (!restricted) FloatingActionButton({ onEdit(-1) }) {
                 Icon(Icons.Default.Add, null)
             }
         },
@@ -104,9 +105,13 @@ fun PolicyTogglesScreen(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .combinedClickable(onClick = { onEdit(toggle.id) }, onLongClick = {
-                            if (!onCreateShortcut(toggle.id)) context.popToast(R.string.unsupported)
-                        })
+                        .combinedClickable(
+                            enabled = !restricted,
+                            onClick = { onEdit(toggle.id) },
+                            onLongClick = {
+                                if (!onCreateShortcut(toggle.id)) context.popToast(R.string.unsupported)
+                            }
+                        )
                         .padding(HorizontalPadding, 8.dp),
                     Arrangement.SpaceBetween, Alignment.CenterVertically
                 ) {
@@ -149,12 +154,13 @@ private enum class TogglePolicyType(val label: Int, val requiresApi: Int) {
 @Composable
 fun EditPolicyToggleScreen(
     params: EditPolicyToggle, toggles: StateFlow<List<PolicyToggle>>,
-    onSave: (Int?, String, List<TogglePolicy>) -> Boolean, onDelete: (Int) -> Unit,
+    onSave: (Int?, String, List<TogglePolicy>, Boolean) -> Boolean, onDelete: (Int) -> Unit,
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
     val context = LocalContext.current
     val initial = remember { toggles.value.find { it.id == params.id } }
     var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
+    var userAllowed by rememberSaveable { mutableStateOf(initial?.userAllowed == true) }
     val policies = rememberSaveable(saver = listSaver(
         save = { list -> list.map { PolicyToggleManager.json.encodeToString<TogglePolicy>(it) } },
         restore = { saved ->
@@ -211,7 +217,7 @@ fun EditPolicyToggleScreen(
                     IconButton(
                         {
                             context.showOperationResultToast(
-                                onSave(params.id.takeIf { it != -1 }, name, policies)
+                                onSave(params.id.takeIf { it != -1 }, name, policies, userAllowed)
                             )
                             onNavigateUp()
                         },
@@ -235,6 +241,9 @@ fun EditPolicyToggleScreen(
                 name, { name = it }, Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 label = { Text(stringResource(R.string.name)) }
             )
+            FullWidthCheckBoxItem(R.string.available_to_user_profile, userAllowed) {
+                userAllowed = it
+            }
             policies.forEachIndexed { index, policy ->
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 4.dp),

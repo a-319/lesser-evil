@@ -140,6 +140,21 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     val myRepo = getApplication<MyApplication>().myRepo
     val PM = application.packageManager
 
+    /** True when the app was entered as the user profile (without the lock password) */
+    val restrictedMode = MutableStateFlow(false)
+    private fun packageSet(pref: String?) =
+        pref?.split('\n')?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+    private fun recordAdminPackages(current: String?, packages: List<String>, add: Boolean) =
+        (if (add) packageSet(current) + packages else packageSet(current) - packages.toSet())
+            .joinToString("\n")
+    /** Returns true (and shows a toast) when the user profile may not touch [pkg] */
+    private fun userProfileBlocked(pkg: String, featureAllowed: Boolean, adminList: String?): Boolean {
+        if (!restrictedMode.value) return false
+        if (featureAllowed && pkg !in packageSet(adminList)) return false
+        application.popToast(R.string.permission_denied)
+        return true
+    }
+
     val theme = MutableStateFlow(ThemeSettings(SP.materialYou, SP.darkTheme, SP.blackTheme))
     fun changeTheme(newTheme: ThemeSettings) {
         theme.value = newTheme
@@ -225,26 +240,52 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     val suspendedPackages = MutableStateFlow(emptyList<AppInfo>())
     @RequiresApi(24)
     fun getSuspendedPackaged() {
+        val adminLocked = if (restrictedMode.value) packageSet(SP.adminSuspendedPackages) else emptySet()
         val packages = PM.getInstalledApplications(getInstalledAppsFlags).filter {
-            DPM.isPackageSuspended(DAR, it.packageName)
+            DPM.isPackageSuspended(DAR, it.packageName) && it.packageName !in adminLocked
         }
         suspendedPackages.value = packages.map { getAppInfo(it) }
     }
     @RequiresApi(24)
     fun setPackageSuspended(packages: List<String>, status: Boolean) {
-        DPM.setPackagesSuspended(DAR, packages.toTypedArray(), status)
+        if (restrictedMode.value) {
+            val adminLocked = packageSet(SP.adminSuspendedPackages)
+            val allowed = packages.filter { it !in adminLocked }
+            if (!SP.userProfileSuspend || allowed.size != packages.size) {
+                application.popToast(R.string.permission_denied)
+            }
+            if (SP.userProfileSuspend && allowed.isNotEmpty()) {
+                DPM.setPackagesSuspended(DAR, allowed.toTypedArray(), status)
+            }
+        } else {
+            DPM.setPackagesSuspended(DAR, packages.toTypedArray(), status)
+            SP.adminSuspendedPackages = recordAdminPackages(SP.adminSuspendedPackages, packages, status)
+        }
         getSuspendedPackaged()
     }
 
     val hiddenPackages = MutableStateFlow(emptyList<AppInfo>())
     fun getHiddenPackages() {
+        val adminLocked = if (restrictedMode.value) packageSet(SP.adminHiddenPackages) else emptySet()
         hiddenPackages.value = PM.getInstalledApplications(getInstalledAppsFlags).filter {
-            DPM.isApplicationHidden(DAR, it.packageName)
+            DPM.isApplicationHidden(DAR, it.packageName) && it.packageName !in adminLocked
         }.map { getAppInfo(it) }
     }
     fun setPackageHidden(packages: List<String>, status: Boolean) {
-        for (name in packages) {
-            DPM.setApplicationHidden(DAR, name, status)
+        if (restrictedMode.value) {
+            val adminLocked = packageSet(SP.adminHiddenPackages)
+            val allowed = packages.filter { it !in adminLocked }
+            if (!SP.userProfileHide || allowed.size != packages.size) {
+                application.popToast(R.string.permission_denied)
+            }
+            if (SP.userProfileHide) for (name in allowed) {
+                DPM.setApplicationHidden(DAR, name, status)
+            }
+        } else {
+            for (name in packages) {
+                DPM.setApplicationHidden(DAR, name, status)
+            }
+            SP.adminHiddenPackages = recordAdminPackages(SP.adminHiddenPackages, packages, status)
         }
         getHiddenPackages()
     }
@@ -501,13 +542,22 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     // Application details
     @RequiresApi(24)
     fun adSetPackageSuspended(name: String, status: Boolean) {
+        if (userProfileBlocked(name, SP.userProfileSuspend, SP.adminSuspendedPackages)) return
         try {
             DPM.setPackagesSuspended(DAR, arrayOf(name), status)
+            if (!restrictedMode.value) {
+                SP.adminSuspendedPackages =
+                    recordAdminPackages(SP.adminSuspendedPackages, listOf(name), status)
+            }
             appStatus.update { it.copy(suspend = DPM.isPackageSuspended(DAR, name)) }
         } catch (_: Exception) {}
     }
     fun adSetPackageHidden(name: String, status: Boolean) {
+        if (userProfileBlocked(name, SP.userProfileHide, SP.adminHiddenPackages)) return
         DPM.setApplicationHidden(DAR, name, status)
+        if (!restrictedMode.value) {
+            SP.adminHiddenPackages = recordAdminPackages(SP.adminHiddenPackages, listOf(name), status)
+        }
         appStatus.update { it.copy(hide = DPM.isApplicationHidden(DAR, name)) }
     }
     fun adSetPackageUb(name: String, status: Boolean) {
@@ -661,20 +711,23 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun switchPolicyToggle(id: Int, state: Boolean): Boolean {
         val toggle = policyToggles.value.find { it.id == id } ?: return false
+        if (restrictedMode.value && !toggle.userAllowed) return false
         val result = PolicyToggleManager.apply(application, toggle.policies, state)
         myRepo.setPolicyToggleEnabled(id, state)
         ShortcutUtils.updatePolicyToggleShortcut(application, id, toggle.name, state)
         getPolicyToggles()
         return result
     }
-    fun setPolicyToggle(id: Int?, name: String, policies: List<TogglePolicy>): Boolean {
+    fun setPolicyToggle(id: Int?, name: String, policies: List<TogglePolicy>, userAllowed: Boolean): Boolean {
+        if (restrictedMode.value) return false
         val enabled = id != null && policyToggles.value.find { it.id == id }?.enabled == true
-        myRepo.setPolicyToggle(id, name, enabled, policies)
+        myRepo.setPolicyToggle(id, name, enabled, userAllowed, policies)
         if (id != null) ShortcutUtils.updatePolicyToggleShortcut(application, id, name, enabled)
         getPolicyToggles()
         return if (enabled) PolicyToggleManager.apply(application, policies, true) else true
     }
     fun deletePolicyToggle(id: Int) {
+        if (restrictedMode.value) return
         val toggle = policyToggles.value.find { it.id == id }
         if (toggle?.enabled == true) {
             PolicyToggleManager.apply(application, toggle.policies, false)
@@ -684,6 +737,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         getPolicyToggles()
     }
     fun createPolicyToggleShortcut(id: Int): Boolean {
+        if (restrictedMode.value) return false
         val toggle = policyToggles.value.find { it.id == id } ?: return false
         return ShortcutUtils.setPolicyToggleShortcut(application, id, toggle.name, toggle.enabled)
     }

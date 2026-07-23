@@ -58,6 +58,7 @@
 	<string name="auto_grant">הענקה אוטומטית</string>
 	<string name="auto_reboot_after_install_succeed">המכשיר שלך יאותחל אוטומטית כאשר התקנת עדכון המערכת תצליח.</string>
 	<string name="auto_time">שעה אוטומטית </string>
+	<string name="available_to_user_profile">זמין לפרופיל המשתמש</string>
 	<string name="auto_time_policy">מדיניות זמן אוטומטי</string>
 	<string name="auto_timezone">אזור זמן אוטומטי</string>
 	<string name="auto_timezone_policy">מדיניות אזור זמן אוטומטי</string>
@@ -168,6 +169,8 @@
 	<string name="dhizuku_permission_not_granted">הרשאת דיזוקו לא ניתנה</string>
 	<string name="dhizuku_server">שרת דיזוקו (Dhizuku)</string>
 	<string name="direction">כיוון</string>
+	<string name="dhizuku_user_grantable">בקשות Dhizuku שניתן לאשר ללא סיסמה</string>
+	<string name="dhizuku_user_grantable_note">בקשות הרשאה של Dhizuku מהחבילות שברשימה למעלה ניתנות לאישור ללא סיסמה. אזהרה: אפליקציה שקיבלה גישת Dhizuku מקבלת הרשאות מלאות של בעל המכשיר — היא אינה מוגבלת לפונקציות של פרופיל המשתמש — לכן יש לרשום כאן רק אפליקציות שאתה סומך עליהן לחלוטין.</string>
 	<string name="disable">השבת</string>
 	<string name="disable_account_management">השבת את ניהול החשבונות</string>
 	<string name="disable_all">השבת הכל</string>
@@ -228,6 +231,7 @@
 	<string name="excluded_hosts">מארחים לא נכללים</string>
 	<string name="excluded_packages">חבילות מוחרגות</string>
 	<string name="excluded_uids">לא נכללו מזהי UID</string>
+	<string name="enter_as_user">כניסה כמשתמש</string>
 	<string name="exit">יציאה</string>
 	<string name="export">יצוא</string>
 	<string name="export_logs">ייצוא יומנים</string>
@@ -699,6 +703,8 @@
 	<string name="user_not_exist">המשתמש לא קיים</string>
 	<string name="user_operation">פעולת המשתמש</string>
 	<string name="user_operation_switch">מתג</string>
+	<string name="user_profile">פרופיל משתמש</string>
+	<string name="user_profile_note">לפרופיל המשתמש אפשר להיכנס ממסך הנעילה ללא סיסמה. הוא יכול להחליף רק מתגי מצב שסומנו כזמינים עבורו, ולהשתמש בפונקציות שהופעלו למטה. אפליקציות שהוסתרו או הושעו על ידי המנהל נשארות נעולות ואינן מוצגות לפרופיל המשתמש.</string>
 	<string name="user_removed">המשתמש הוסר</string>
 	<string name="user_restriction">הגבלת משתמש</string>
 	<string name="user_restriction_tip">לחץ לחיצה ארוכה על פריט כדי ליצור קיצור דרך</string>

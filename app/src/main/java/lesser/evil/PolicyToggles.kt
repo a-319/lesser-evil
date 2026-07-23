@@ -58,7 +58,8 @@ sealed class TogglePolicy {
 }
 
 class PolicyToggle(
-    val id: Int, val name: String, val enabled: Boolean, val policies: List<TogglePolicy>
+    val id: Int, val name: String, val enabled: Boolean, val userAllowed: Boolean,
+    val policies: List<TogglePolicy>
 )
 
 object PolicyToggleManager {

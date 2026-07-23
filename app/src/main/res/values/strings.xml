@@ -751,4 +751,12 @@
     <string name="excluded_packages">Excluded packages</string>
     <string name="block_metered_data_note">While enforced, metered data (Wi-Fi and mobile) will be disabled for all apps except the excluded packages. When released, the list that was configured before enforcement is restored.</string>
     <string name="switch_removed">Switch removed</string>
+
+    <!--User profile-->
+    <string name="user_profile">User profile</string>
+    <string name="enter_as_user">Enter as user</string>
+    <string name="user_profile_note">The user profile can be entered from the lock screen without the password. It can only flip mode switches marked as available to it, and use the functions enabled below. Apps hidden or suspended by the admin stay locked and are not shown to the user profile.</string>
+    <string name="available_to_user_profile">Available to the user profile</string>
+    <string name="dhizuku_user_grantable">Dhizuku requests approvable without password</string>
+    <string name="dhizuku_user_grantable_note">Dhizuku permission requests from the packages listed above can be approved without the password. Warning: an app granted Dhizuku access receives full device owner privileges - it is not limited to the user profile\'s functions - so only list apps you fully trust.</string>
 </resources>

@@ -29,7 +29,7 @@ class ManageSpaceActivity: FragmentActivity() {
             OwnDroidTheme(theme) {
                 var appLockDialog by remember { mutableStateOf(!SP.lockPasswordHash.isNullOrEmpty()) }
                 if(appLockDialog) {
-                    AppLockDialog({ appLockDialog = false }, ::finish)
+                    AppLockDialog({ appLockDialog = false }, onDismiss = ::finish)
                 } else {
                     AlertDialog(
                         text = {

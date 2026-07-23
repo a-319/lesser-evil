@@ -32,6 +32,16 @@ class SharedPrefs(context: Context) {
     var policyToggleMddBackup by StringSharedPref("policy_toggles.mdd_backup")
     /** Always-on VPN config ("package|lockdown", or "" for none) captured before a mode switch enforced its own */
     var policyToggleVpnBackup by StringSharedPref("policy_toggles.vpn_backup")
+    /** Whether the user profile may hide/unhide apps (except admin-locked ones) */
+    var userProfileHide by BooleanSharedPref("user_profile.hide")
+    /** Whether the user profile may suspend/unsuspend apps (except admin-locked ones) */
+    var userProfileSuspend by BooleanSharedPref("user_profile.suspend")
+    /** Newline-separated packages hidden by the admin profile - locked for the user profile */
+    var adminHiddenPackages by StringSharedPref("user_profile.admin_hidden")
+    /** Newline-separated packages suspended by the admin profile - locked for the user profile */
+    var adminSuspendedPackages by StringSharedPref("user_profile.admin_suspended")
+    /** Newline-separated packages whose Dhizuku requests may be approved without the password */
+    var dhizukuUserGrantable by StringSharedPref("user_profile.dhizuku_grantable")
 }
 
 private class BooleanSharedPref(val key: String, val defValue: Boolean = false): ReadWriteProperty<SharedPrefs, Boolean> {

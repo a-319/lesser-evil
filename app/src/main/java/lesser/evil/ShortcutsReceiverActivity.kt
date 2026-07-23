@@ -53,6 +53,12 @@ class ShortcutsReceiverActivity : Activity() {
                             showOperationResultToast(false)
                             return
                         }
+                        // Shortcuts bypass the app lock, so only switches available to the
+                        // user profile may be flipped this way while a password is set
+                        if (!toggle.userAllowed && !SP.lockPasswordHash.isNullOrEmpty()) {
+                            showOperationResultToast(false)
+                            return
+                        }
                         val newState = !toggle.enabled
                         val result = PolicyToggleManager.apply(this, toggle.policies, newState)
                         repo.setPolicyToggleEnabled(id, newState)

@@ -119,6 +119,28 @@ object ShortcutUtils {
             context, shortcuts, context.getString(R.string.user_removed)
         )
     }
+    fun createPolicyToggleShortcutInfo(context: Context, id: Int, name: String): ShortcutInfoCompat {
+        setShortcutKey()
+        return ShortcutInfoCompat.Builder(context, "POLICY_TOGGLE-$id")
+            .setIcon(IconCompat.createWithResource(context, R.drawable.toggle_off_fill0))
+            .setShortLabel(name)
+            .setIntent(
+                Intent(context, ShortcutsReceiverActivity::class.java)
+                    .setAction("lesser.evil.action.POLICY_TOGGLE")
+                    .putExtra("id", id)
+                    .putExtra("key", SP.shortcutKey)
+            )
+            .build()
+    }
+    fun setPolicyToggleShortcut(context: Context, id: Int, name: String): Boolean {
+        val shortcut = createPolicyToggleShortcutInfo(context, id, name)
+        return ShortcutManagerCompat.requestPinShortcut(context, shortcut, null)
+    }
+    fun disablePolicyToggleShortcut(context: Context, id: Int) {
+        ShortcutManagerCompat.disableShortcuts(
+            context, listOf("POLICY_TOGGLE-$id"), context.getString(R.string.switch_removed)
+        )
+    }
     fun setShortcutKey() {
         if (SP.shortcutKey.isNullOrEmpty()) {
             SP.shortcutKey = generateBase64Key(10)

@@ -168,6 +168,10 @@ import lesser.evil.dpm.PermissionsManagerScreen
 import lesser.evil.dpm.PermittedAccessibilityServices
 import lesser.evil.dpm.PermittedAsAndImPackages
 import lesser.evil.dpm.PermittedInputMethods
+import lesser.evil.dpm.EditPolicyToggle
+import lesser.evil.dpm.EditPolicyToggleScreen
+import lesser.evil.dpm.PolicyToggles
+import lesser.evil.dpm.PolicyTogglesScreen
 import lesser.evil.dpm.PreferentialNetworkService
 import lesser.evil.dpm.PreferentialNetworkServiceInfo
 import lesser.evil.dpm.PreferentialNetworkServiceScreen
@@ -665,6 +669,15 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 vm::setUserRestriction, vm::createUserRestrictionShortcut, ::navigateUp)
         }
 
+        composable<PolicyToggles> {
+            PolicyTogglesScreen(vm.policyToggles, vm::getPolicyToggles, vm::switchPolicyToggle,
+                vm::createPolicyToggleShortcut, ::navigateUp) { navigate(EditPolicyToggle(it)) }
+        }
+        composable<EditPolicyToggle> {
+            EditPolicyToggleScreen(it.toRoute(), vm.policyToggles, vm::setPolicyToggle,
+                vm::deletePolicyToggle, vm.chosenPackage, ::chooseSinglePackage, ::navigateUp)
+        }
+
         composable<Users> { UsersScreen(vm, ::navigateUp, ::navigate) }
         composable<UserInfo> { UserInfoScreen(vm::getUserInformation, ::navigateUp) }
         composable<UsersOptions> {
@@ -801,6 +814,7 @@ private fun HomeScreen(onNavigate: (Any) -> Unit) {
                 if(VERSION.SDK_INT >= 24) {
                     HomePageItem(R.string.user_restriction, R.drawable.person_off) { onNavigate(UserRestriction) }
                 }
+                HomePageItem(R.string.mode_switches, R.drawable.toggle_off_fill0) { onNavigate(PolicyToggles) }
                 HomePageItem(R.string.users,R.drawable.manage_accounts_fill0) { onNavigate(Users) }
                 HomePageItem(R.string.password_and_keyguard, R.drawable.password_fill0) { onNavigate(Password) }
             }

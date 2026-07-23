@@ -44,6 +44,23 @@ class ShortcutsReceiverActivity : Activity() {
                         if (serial == -1) return
                         doUserOperationWithContext(this, type, serial, false)
                     }
+                    "POLICY_TOGGLE" -> {
+                        val id = intent.getIntExtra("id", -1)
+                        if (id == -1) return
+                        val repo = (applicationContext as MyApplication).myRepo
+                        val toggle = repo.getPolicyToggle(id)
+                        if (toggle == null) {
+                            showOperationResultToast(false)
+                            return
+                        }
+                        val newState = !toggle.enabled
+                        val result = PolicyToggleManager.apply(this, toggle.policies, newState)
+                        repo.setPolicyToggleEnabled(id, newState)
+                        if (!result) {
+                            showOperationResultToast(false)
+                            return
+                        }
+                    }
                 }
                 Log.d(TAG, "Received intent: $action")
                 showOperationResultToast(true)

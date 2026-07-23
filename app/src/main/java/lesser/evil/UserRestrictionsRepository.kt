@@ -99,12 +99,18 @@ object UserRestrictionsRepository {
         }.filter { Build.VERSION.SDK_INT >= it.requiresApi }
     }
     fun findRestrictionById(id: String): Restriction {
+        return findRestrictionOrNull(id) ?: throw Exception("User restriction not found")
+    }
+    fun findRestrictionOrNull(id: String): Restriction? {
         listOf(network, connectivity, applications, media, users, other).forEach { list ->
             val restriction = list.find { it.id == id }
             if (restriction != null) return restriction
         }
-        throw Exception("User restriction not found")
+        return null
     }
+    fun getAllRestrictions(): List<Restriction> =
+        listOf(network, connectivity, applications, media, users, other).flatten()
+            .filter { Build.VERSION.SDK_INT >= it.requiresApi }
 }
 
 enum class UserRestrictionCategory(val title: Int, val icon: Int) {

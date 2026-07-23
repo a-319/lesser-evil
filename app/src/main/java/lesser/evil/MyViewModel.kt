@@ -655,6 +655,37 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         getAppGroups()
     }
 
+    val policyToggles = MutableStateFlow(emptyList<PolicyToggle>())
+    fun getPolicyToggles() {
+        policyToggles.value = myRepo.getPolicyToggles()
+    }
+    fun switchPolicyToggle(id: Int, state: Boolean): Boolean {
+        val toggle = policyToggles.value.find { it.id == id } ?: return false
+        val result = PolicyToggleManager.apply(application, toggle.policies, state)
+        myRepo.setPolicyToggleEnabled(id, state)
+        getPolicyToggles()
+        return result
+    }
+    fun setPolicyToggle(id: Int?, name: String, policies: List<TogglePolicy>): Boolean {
+        val enabled = id != null && policyToggles.value.find { it.id == id }?.enabled == true
+        myRepo.setPolicyToggle(id, name, enabled, policies)
+        getPolicyToggles()
+        return if (enabled) PolicyToggleManager.apply(application, policies, true) else true
+    }
+    fun deletePolicyToggle(id: Int) {
+        val toggle = policyToggles.value.find { it.id == id }
+        if (toggle?.enabled == true) {
+            PolicyToggleManager.apply(application, toggle.policies, false)
+        }
+        myRepo.deletePolicyToggle(id)
+        ShortcutUtils.disablePolicyToggleShortcut(application, id)
+        getPolicyToggles()
+    }
+    fun createPolicyToggleShortcut(id: Int): Boolean {
+        val toggle = policyToggles.value.find { it.id == id } ?: return false
+        return ShortcutUtils.setPolicyToggleShortcut(application, id, toggle.name)
+    }
+
     @RequiresApi(24)
     fun reboot() {
         DPM.reboot(DAR)

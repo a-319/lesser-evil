@@ -740,4 +740,15 @@
     <string name="activate_method">Activate method</string>
     <string name="adb_command">ADB command</string>
     <string name="owndroid_warning">This app uses Device owner or Profile owner privileges. These privileges are extremely dangerous, please use them with caution. If used improperly, they may result in severe losses. The developers will not be responsible for this.</string>
+
+    <!--Mode switches-->
+    <string name="mode_switches">Mode switches</string>
+    <string name="mode_switches_note">Each switch applies its policies when turned on, and applies the opposite state when turned off. For example, a switch can allow developer options while blocking app installation, and do the reverse when turned off. Long press a switch to pin it to the launcher. Deleting a switch that is turned on will first apply its off state.</string>
+    <string name="n_policies">%1$d policies</string>
+    <string name="add_policy">Add policy</string>
+    <string name="enforced_while_on">Enforced while the switch is on</string>
+    <string name="enforced_while_off">Enforced while the switch is off</string>
+    <string name="excluded_packages">Excluded packages</string>
+    <string name="block_metered_data_note">While enforced, metered data (Wi-Fi and mobile) will be disabled for all apps except the excluded packages.</string>
+    <string name="switch_removed">Switch removed</string>
 </resources>

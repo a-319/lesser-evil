@@ -18,6 +18,7 @@
 	<string name="add_network">הוסף רשת</string>
 	<string name="add_network_result_invalid_configuration">תצורה לא חוקית</string>
 	<string name="add_packages">הוסף חבילות</string>
+	<string name="add_policy">הוספת מדיניות</string>
 	<string name="add_to_list">הוסף לרשימה</string>
 	<string name="add_user">הוסף משתמש</string>
 	<string name="add_wifi_conf">הוסף תצורת Wi-Fi</string>
@@ -67,6 +68,7 @@
 	<string name="battery_temp">טמפרטורות סוללה</string>
 	<string name="black_theme">נושא שחור</string>
 	<string name="blacklist">רשימה שחורה</string>
+	<string name="block_metered_data_note">כשהמדיניות נאכפת, נתונים מדודים (Wi-Fi ורשת סלולרית) יושבתו עבור כל האפליקציות מלבד החבילות המוחרגות.</string>
 	<string name="block_non_matching_networks">חסום רשתות שאינן תואמות</string>
 	<string name="block_uninstall">חסום הסרת התקנה</string>
 	<string name="bluetooth">בלוטות\'</string>
@@ -203,6 +205,8 @@
 	<string name="enable_frp">אפשר FRP</string>
 	<string name="enable_if_secure_enough">אותו חשבון מנוהל בלבד</string>
 	<string name="enable_lockdown">אפשר נעילה</string>
+	<string name="enforced_while_off">נאכף כשהמתג כבוי</string>
+	<string name="enforced_while_on">נאכף כשהמתג דולק</string>
 	<string name="enable_logout">אפשר התנתקות</string>
 	<string name="enable_system_app">הפעל אפליקציית מערכת</string>
 	<string name="enable_usb_signal">אפשר אות USB</string>
@@ -222,6 +226,7 @@
 	<string name="events">אירועים</string>
 	<string name="evict_credential_encryption_key">הוצא מפתח הצפנת אישורים</string>
 	<string name="excluded_hosts">מארחים לא נכללים</string>
+	<string name="excluded_packages">חבילות מוחרגות</string>
 	<string name="excluded_uids">לא נכללו מזהי UID</string>
 	<string name="exit">יציאה</string>
 	<string name="export">יצוא</string>
@@ -411,11 +416,14 @@
 	<string name="minutes_in_one_day">אנא הזן דקות ביום (0~1440)</string>
 	<string name="mobile">נייד</string>
 	<string name="mode">מצב</string>
+	<string name="mode_switches">מתגי מצב</string>
+	<string name="mode_switches_note">כל מתג מחיל את המדיניות שלו כשמדליקים אותו, ומחיל את המצב ההפוך כשמכבים אותו. למשל, מתג יכול לאפשר אפשרויות מפתחים ובו-זמנית לחסום התקנת אפליקציות, ולהפוך את המצב כשמכבים אותו. לחיצה ארוכה על מתג תצמיד אותו למסך הבית. מחיקת מתג דולק תחיל תחילה את מצב הכיבוי שלו.</string>
 	<string name="modify_accounts">שנה חשבונות</string>
 	<string name="mount_physical_media">הר מדיה פיזית</string>
 	<string name="mte_policy">מדיניות MTE</string>
 	<string name="mute">להשתיק</string>
 	<string name="n_logs_in_total">%1$d יומנים בסך הכל</string>
+	<string name="n_policies">%1$d כללי מדיניות</string>
 	<string name="name">שם</string>
 	<string name="navigation_menu">תפריט ניווט</string>
 	<string name="nearby_app_streaming">מדיניות הזרמת אפליקציה בקרבת מקום</string>
@@ -621,6 +629,7 @@
 	<string name="suspend">להשעות</string>
 	<string name="suspend_personal_app">השעיית אפליקציה אישית</string>
 	<string name="switch_role">מתג</string>
+	<string name="switch_removed">המתג הוסר</string>
 	<string name="switch_to_disable_feature">הפעל מתג כדי להשבית את הפונקציה הזו.</string>
 	<string name="switch_to_user_n">עבור למשתמש %1$d</string>
 	<string name="switch_user">החלף משתמש</string>

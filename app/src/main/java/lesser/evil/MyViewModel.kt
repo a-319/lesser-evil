@@ -58,6 +58,8 @@ import androidx.lifecycle.viewModelScope
 import lesser.evil.Privilege.DAR
 import lesser.evil.Privilege.DPM
 import lesser.evil.dpm.ACTIVATE_DEVICE_OWNER_COMMAND
+import lesser.evil.dpm.ROLE_HOLDER_ACTIVATE_COMMANDS
+import lesser.evil.dpm.ROLE_HOLDER_DEACTIVATE_COMMANDS
 import lesser.evil.dpm.ApnAuthType
 import lesser.evil.dpm.ApnConfig
 import lesser.evil.dpm.ApnMvnoType
@@ -1173,6 +1175,51 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             }
         }
     }
+    // Device policy management role holder (temporary DPC permission, like Test DPC)
+    private fun runPrivilegedCommandsByShizuku(
+        commands: List<String>, callback: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            useShizuku(application) { service ->
+                try {
+                    val api = IUserService.Stub.asInterface(service)
+                    val results = commands.map { api.execute(it) }
+                    val output = results.joinToString("\n") {
+                        ((it?.getString("output") ?: "") + (it?.getString("error") ?: "")).trim()
+                    }.trim()
+                    val success = results.isNotEmpty() && results.all { it?.getInt("code", -1) == 0 }
+                    if (success) Privilege.updateStatus()
+                    callback(success, output)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    callback(false, null)
+                }
+            }
+        }
+    }
+    private fun runPrivilegedCommandsByRoot(
+        commands: List<String>, callback: (Boolean, String?) -> Unit
+    ) {
+        Shell.getShell { shell ->
+            if (shell.isRoot) {
+                val result = Shell.cmd(*commands.toTypedArray()).exec()
+                val output = (result.out + result.err).joinToString("\n").trim()
+                if (result.isSuccess) Privilege.updateStatus()
+                callback(result.isSuccess, output)
+            } else {
+                callback(false, application.getString(R.string.permission_denied))
+            }
+        }
+    }
+    fun activateRoleHolderByShizuku(callback: (Boolean, String?) -> Unit) =
+        runPrivilegedCommandsByShizuku(ROLE_HOLDER_ACTIVATE_COMMANDS, callback)
+    fun activateRoleHolderByRoot(callback: (Boolean, String?) -> Unit) =
+        runPrivilegedCommandsByRoot(ROLE_HOLDER_ACTIVATE_COMMANDS, callback)
+    fun deactivateRoleHolderByShizuku(callback: (Boolean, String?) -> Unit) =
+        runPrivilegedCommandsByShizuku(ROLE_HOLDER_DEACTIVATE_COMMANDS, callback)
+    fun deactivateRoleHolderByRoot(callback: (Boolean, String?) -> Unit) =
+        runPrivilegedCommandsByRoot(ROLE_HOLDER_DEACTIVATE_COMMANDS, callback)
+
     @RequiresApi(28)
     fun activateDoByDhizuku(callback: (Boolean, String?) -> Unit) {
         DPM.transferOwnership(DAR, MyAdminComponent, null)

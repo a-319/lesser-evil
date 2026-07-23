@@ -739,5 +739,7 @@
     <string name="recommended">Recommended</string>
     <string name="activate_method">Activate method</string>
     <string name="adb_command">ADB command</string>
+    <string name="role_holder">Device policy management role</string>
+    <string name="info_role_holder">Grants this app the device policy management role, providing temporary DPC permission (like Test DPC). This role is not persisted and is cleared when the device reboots. Requires Android 13 or higher and Shizuku, root, or ADB.</string>
     <string name="owndroid_warning">This app uses Device owner or Profile owner privileges. These privileges are extremely dangerous, please use them with caution. If used improperly, they may result in severe losses. The developers will not be responsible for this.</string>
 </resources>

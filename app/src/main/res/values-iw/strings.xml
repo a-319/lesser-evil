@@ -12,6 +12,8 @@
 	<string name="activated_device_admin">מנהלי מכשירים פעילים</string>
 	<string name="active">פעיל</string>
 	<string name="adb_command">פקודת ADB</string>
+	<string name="role_holder">תפקיד ניהול מדיניות מכשיר</string>
+	<string name="info_role_holder">מעניק לאפליקציה זו את תפקיד ניהול מדיניות המכשיר, ומספק הרשאת DPC זמנית (כמו Test DPC). התפקיד אינו נשמר ומתאפס עם הפעלה מחדש של המכשיר. דורש Android 13 ומעלה וכן Shizuku, הרשאת root או ADB.</string>
 	<string name="add">להוסיף</string>
 	<string name="add_config">הוסף תצורה</string>
 	<string name="add_delegated_admin">הוסף מנהל מוסמך</string>

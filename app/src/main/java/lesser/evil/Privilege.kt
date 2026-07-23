@@ -43,7 +43,9 @@ object Privilege {
         val dhizuku: Boolean = false,
         val work: Boolean = false,
         val org: Boolean = false,
-        val affiliated: Boolean = false
+        val affiliated: Boolean = false,
+        /** Holds the android.app.role.DEVICE_POLICY_MANAGEMENT role (temporary DPC, cleared on reboot) */
+        val roleHolder: Boolean = false
     ) {
         val activated = device || profile
         val primary = Binder.getCallingUid() / 100000 == 0 // Primary user
@@ -58,7 +60,17 @@ object Privilege {
             dhizuku = SP.dhizuku,
             work = work,
             org = work && Build.VERSION.SDK_INT >= 30 && DPM.isOrganizationOwnedDeviceWithManagedProfile,
-            affiliated = Build.VERSION.SDK_INT >= 28 && DPM.isAffiliatedUser
+            affiliated = Build.VERSION.SDK_INT >= 28 && DPM.isAffiliatedUser,
+            roleHolder = isRoleHolder()
         )
+    }
+
+    private fun isRoleHolder(): Boolean {
+        if (SP.dhizuku || Build.VERSION.SDK_INT < 33) return false
+        return try {
+            DPM.devicePolicyManagementRoleHolderPackage == DAR.packageName
+        } catch (_: Exception) {
+            false
+        }
     }
 }

@@ -663,12 +663,14 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         val toggle = policyToggles.value.find { it.id == id } ?: return false
         val result = PolicyToggleManager.apply(application, toggle.policies, state)
         myRepo.setPolicyToggleEnabled(id, state)
+        ShortcutUtils.updatePolicyToggleShortcut(application, id, toggle.name, state)
         getPolicyToggles()
         return result
     }
     fun setPolicyToggle(id: Int?, name: String, policies: List<TogglePolicy>): Boolean {
         val enabled = id != null && policyToggles.value.find { it.id == id }?.enabled == true
         myRepo.setPolicyToggle(id, name, enabled, policies)
+        if (id != null) ShortcutUtils.updatePolicyToggleShortcut(application, id, name, enabled)
         getPolicyToggles()
         return if (enabled) PolicyToggleManager.apply(application, policies, true) else true
     }
@@ -683,7 +685,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun createPolicyToggleShortcut(id: Int): Boolean {
         val toggle = policyToggles.value.find { it.id == id } ?: return false
-        return ShortcutUtils.setPolicyToggleShortcut(application, id, toggle.name)
+        return ShortcutUtils.setPolicyToggleShortcut(application, id, toggle.name, toggle.enabled)
     }
 
     @RequiresApi(24)

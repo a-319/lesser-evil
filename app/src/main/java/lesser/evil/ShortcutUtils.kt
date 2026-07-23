@@ -119,10 +119,13 @@ object ShortcutUtils {
             context, shortcuts, context.getString(R.string.user_removed)
         )
     }
-    fun createPolicyToggleShortcutInfo(context: Context, id: Int, name: String): ShortcutInfoCompat {
+    fun createPolicyToggleShortcutInfo(
+        context: Context, id: Int, name: String, enabled: Boolean
+    ): ShortcutInfoCompat {
         setShortcutKey()
+        val icon = if (enabled) R.drawable.toggle_on_fill0 else R.drawable.toggle_off_fill0
         return ShortcutInfoCompat.Builder(context, "POLICY_TOGGLE-$id")
-            .setIcon(IconCompat.createWithResource(context, R.drawable.toggle_off_fill0))
+            .setIcon(IconCompat.createWithResource(context, icon))
             .setShortLabel(name)
             .setIntent(
                 Intent(context, ShortcutsReceiverActivity::class.java)
@@ -132,9 +135,17 @@ object ShortcutUtils {
             )
             .build()
     }
-    fun setPolicyToggleShortcut(context: Context, id: Int, name: String): Boolean {
-        val shortcut = createPolicyToggleShortcutInfo(context, id, name)
+    fun setPolicyToggleShortcut(context: Context, id: Int, name: String, enabled: Boolean): Boolean {
+        val shortcut = createPolicyToggleShortcutInfo(context, id, name, enabled)
         return ShortcutManagerCompat.requestPinShortcut(context, shortcut, null)
+    }
+    fun updatePolicyToggleShortcut(context: Context, id: Int, name: String, enabled: Boolean) {
+        val shortcuts = ShortcutManagerCompat.getShortcuts(
+            context, ShortcutManagerCompat.FLAG_MATCH_PINNED
+        )
+        if (shortcuts.find { it.id == "POLICY_TOGGLE-$id" } == null) return
+        val shortcut = createPolicyToggleShortcutInfo(context, id, name, enabled)
+        ShortcutManagerCompat.updateShortcuts(context, listOf(shortcut))
     }
     fun disablePolicyToggleShortcut(context: Context, id: Int) {
         ShortcutManagerCompat.disableShortcuts(

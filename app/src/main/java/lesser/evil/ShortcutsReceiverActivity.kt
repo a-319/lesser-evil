@@ -56,6 +56,7 @@ class ShortcutsReceiverActivity : Activity() {
                         val newState = !toggle.enabled
                         val result = PolicyToggleManager.apply(this, toggle.policies, newState)
                         repo.setPolicyToggleEnabled(id, newState)
+                        ShortcutUtils.updatePolicyToggleShortcut(this, id, toggle.name, newState)
                         if (!result) {
                             showOperationResultToast(false)
                             return

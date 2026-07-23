@@ -20,10 +20,12 @@ import android.app.admin.SystemUpdatePolicy.TYPE_INSTALL_AUTOMATIC
 import android.app.admin.SystemUpdatePolicy.TYPE_INSTALL_WINDOWED
 import android.app.admin.SystemUpdatePolicy.TYPE_POSTPONE
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build.VERSION
 import android.os.HardwarePropertiesManager
 import android.os.UserManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -93,18 +95,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lesser.evil.AppInfo
 import lesser.evil.BottomPadding
 import lesser.evil.HorizontalPadding
+import lesser.evil.LockTaskProfile
+import lesser.evil.LockTaskUtils
 import lesser.evil.MyViewModel
+import lesser.evil.NavigationAccessibilityService
 import lesser.evil.Privilege
 import lesser.evil.R
 import lesser.evil.SP
@@ -1147,11 +1155,18 @@ fun LockTaskModeScreen(
     chosenPackage: Channel<String>, chooseSinglePackage: () -> Unit, choosePackage: () -> Unit,
     lockTaskPackages: StateFlow<List<AppInfo>>, getLockTaskPackages: () -> Unit,
     setLockTaskPackage: (String, Boolean) -> Unit,
-    startLockTaskMode: (String, String, Boolean, Boolean) -> Boolean,
-    getLockTaskFeatures: () -> Int, setLockTaskFeature: (Int) -> String?, onNavigateUp: () -> Unit
+    startLockTaskMode: (String, String, Boolean, Boolean, Boolean) -> Boolean,
+    getLockTaskFeatures: () -> Int, setLockTaskFeature: (Int) -> String?,
+    lockTaskProfiles: StateFlow<List<LockTaskProfile>>, getLockTaskProfiles: () -> Unit,
+    buildLockTaskProfile: (String, String, String, Boolean, Boolean, Boolean) -> LockTaskProfile,
+    addLockTaskProfile: (LockTaskProfile) -> LockTaskProfile,
+    deleteLockTaskProfile: (Int) -> Unit,
+    startLockTaskProfile: (LockTaskProfile) -> Boolean,
+    createLockTaskProfileShortcut: (LockTaskProfile) -> Boolean,
+    onNavigateUp: () -> Unit
 ) {
     val coroutine = rememberCoroutineScope()
-    val pagerState = rememberPagerState { 3 }
+    val pagerState = rememberPagerState { 4 }
     var tabIndex by rememberSaveable { mutableIntStateOf(0) }
     tabIndex = pagerState.targetPage
     LaunchedEffect(Unit) {
@@ -1185,14 +1200,22 @@ fun LockTaskModeScreen(
                     tabIndex == 2, onClick = { coroutine.launch { pagerState.animateScrollToPage(2) } },
                     text = { Text(stringResource(R.string.features)) }
                 )
+                Tab(
+                    tabIndex == 3, onClick = { coroutine.launch { pagerState.animateScrollToPage(3) } },
+                    text = { Text(stringResource(R.string.profiles)) }
+                )
             }
             HorizontalPager(pagerState, verticalAlignment = Alignment.Top) { page ->
                 if(page == 0) {
-                    StartLockTaskMode(startLockTaskMode, chosenPackage, chooseSinglePackage)
+                    StartLockTaskMode(startLockTaskMode, chosenPackage, chooseSinglePackage,
+                        buildLockTaskProfile, addLockTaskProfile, createLockTaskProfileShortcut)
                 } else if (page == 1) {
                     LockTaskPackages(chosenPackage, choosePackage, lockTaskPackages, setLockTaskPackage)
-                } else {
+                } else if (page == 2) {
                     LockTaskFeatures(getLockTaskFeatures, setLockTaskFeature)
+                } else {
+                    LockTaskProfiles(lockTaskProfiles, getLockTaskProfiles, startLockTaskProfile,
+                        createLockTaskProfileShortcut, deleteLockTaskProfile)
                 }
             }
         }
@@ -1202,8 +1225,11 @@ fun LockTaskModeScreen(
 @RequiresApi(28)
 @Composable
 private fun StartLockTaskMode(
-    startLockTaskMode: (String, String, Boolean, Boolean) -> Boolean,
-    chosenPackage: Channel<String>, onChoosePackage: () -> Unit
+    startLockTaskMode: (String, String, Boolean, Boolean, Boolean) -> Boolean,
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
+    buildLockTaskProfile: (String, String, String, Boolean, Boolean, Boolean) -> LockTaskProfile,
+    addLockTaskProfile: (LockTaskProfile) -> LockTaskProfile,
+    createLockTaskProfileShortcut: (LockTaskProfile) -> Boolean
 ) {
     val context = LocalContext.current
     val focusMgr = LocalFocusManager.current
@@ -1213,6 +1239,7 @@ private fun StartLockTaskMode(
     var specifyActivity by rememberSaveable { mutableStateOf(false) }
     var clearTask by rememberSaveable { mutableStateOf(true) }
     var showNotification by rememberSaveable { mutableStateOf(true) }
+    var showNavigationButtons by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         packageName = chosenPackage.receive()
     }
@@ -1230,6 +1257,41 @@ private fun StartLockTaskMode(
         FullWidthCheckBoxItem(
             R.string.lock_task_mode_show_notification, showNotification
         ) { showNotification = it }
+        FullWidthCheckBoxItem(
+            R.string.lock_task_mode_nav_buttons, showNavigationButtons
+        ) {
+            showNavigationButtons = it
+            if (it) {
+                showNotification = false
+                if (NavigationAccessibilityService.instance == null) try {
+                    if (LockTaskUtils.isGestureNavigation(context)) {
+                        // Gesture navigation: our own bar needs the overlay permission (or the
+                        // accessibility service for full Back / Home / Overview buttons).
+                        if (!Settings.canDrawOverlays(context)) {
+                            context.popToast(R.string.lock_task_nav_overlay_hint)
+                            context.startActivity(Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                "package:${context.packageName}".toUri()
+                            ))
+                        }
+                    } else {
+                        context.popToast(R.string.lock_task_nav_accessibility_hint)
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        if (showNavigationButtons) {
+            var swapNavButtons by rememberSaveable { mutableStateOf(SP.lockTaskNavButtonsSwapped) }
+            FullWidthCheckBoxItem(
+                R.string.lock_task_swap_nav_buttons, swapNavButtons
+            ) {
+                swapNavButtons = it
+                SP.lockTaskNavButtonsSwapped = it
+            }
+        }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -1255,15 +1317,67 @@ private fun StartLockTaskMode(
                 .fillMaxWidth()
                 .padding(horizontal = HorizontalPadding),
             onClick = {
-                val result = startLockTaskMode(packageName, activity, clearTask, showNotification)
+                val result = startLockTaskMode(
+                    packageName, activity, clearTask, showNotification, showNavigationButtons
+                )
                 if (!result) context.showOperationResultToast(false)
             },
             enabled = packageName.isNotBlank() && (!specifyActivity || activity.isNotBlank())
         ) {
             Text(stringResource(R.string.start))
         }
+        var profileDialog by rememberSaveable { mutableStateOf(false) }
+        FilledTonalButton(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = HorizontalPadding),
+            onClick = { profileDialog = true },
+            enabled = packageName.isNotBlank() && (!specifyActivity || activity.isNotBlank())
+        ) {
+            Text(stringResource(R.string.lock_task_create_shortcut))
+        }
         Spacer(Modifier.height(5.dp))
         if (!privilege.dhizuku) Notes(R.string.info_start_lock_task_mode)
+        Notes(R.string.info_lock_task_nav_buttons)
+        Notes(R.string.info_lock_task_profile_shortcut)
+        Spacer(Modifier.height(BottomPadding))
+        if (profileDialog) {
+            var profileName by rememberSaveable { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { profileDialog = false },
+                title = { Text(stringResource(R.string.lock_task_create_shortcut)) },
+                text = {
+                    OutlinedTextField(
+                        value = profileName,
+                        onValueChange = { profileName = it },
+                        label = { Text(stringResource(R.string.profile_name)) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusMgr.clearFocus() }),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val profile = addLockTaskProfile(buildLockTaskProfile(
+                                profileName, packageName, activity, clearTask, showNotification,
+                                showNavigationButtons
+                            ))
+                            context.showOperationResultToast(createLockTaskProfileShortcut(profile))
+                            profileDialog = false
+                        },
+                        enabled = profileName.isNotBlank()
+                    ) {
+                        Text(stringResource(R.string.confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton({ profileDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -1299,6 +1413,7 @@ private fun LockTaskPackages(
                     Text(stringResource(R.string.add))
                 }
                 Notes(R.string.info_lock_task_packages)
+                Notes(R.string.info_lock_task_suspended_hidden)
                 Spacer(Modifier.height(BottomPadding))
             }
         }
@@ -1351,6 +1466,63 @@ private fun LockTaskFeatures(
         }
         Spacer(Modifier.height(BottomPadding))
         ErrorDialog(errorMessage) { errorMessage = null }
+    }
+}
+
+@RequiresApi(28)
+@Composable
+private fun LockTaskProfiles(
+    lockTaskProfiles: StateFlow<List<LockTaskProfile>>, getLockTaskProfiles: () -> Unit,
+    startLockTaskProfile: (LockTaskProfile) -> Boolean,
+    createLockTaskProfileShortcut: (LockTaskProfile) -> Boolean,
+    deleteLockTaskProfile: (Int) -> Unit
+) {
+    val context = LocalContext.current
+    val profiles by lockTaskProfiles.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        getLockTaskProfiles()
+    }
+    LazyColumn {
+        items(profiles, { it.id }) { profile ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = HorizontalPadding, vertical = 6.dp)
+            ) {
+                Column(Modifier.weight(1F)) {
+                    Text(profile.name, style = typography.titleLarge)
+                    Text(profile.packageName, Modifier.alpha(0.8F))
+                }
+                IconButton({
+                    if (!startLockTaskProfile(profile)) context.showOperationResultToast(false)
+                }) {
+                    Icon(painterResource(R.drawable.lock_fill0),
+                        stringResource(R.string.start))
+                }
+                IconButton({
+                    context.showOperationResultToast(createLockTaskProfileShortcut(profile))
+                }) {
+                    Icon(painterResource(R.drawable.open_in_new),
+                        stringResource(R.string.lock_task_create_shortcut))
+                }
+                IconButton({ deleteLockTaskProfile(profile.id) }) {
+                    Icon(painterResource(R.drawable.delete_fill0),
+                        stringResource(R.string.delete))
+                }
+            }
+        }
+        item {
+            Column(Modifier.padding(horizontal = HorizontalPadding)) {
+                if (profiles.isEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(stringResource(R.string.no_lock_task_profiles))
+                    Spacer(Modifier.height(10.dp))
+                }
+                Notes(R.string.info_lock_task_profiles)
+                Spacer(Modifier.height(BottomPadding))
+            }
+        }
     }
 }
 

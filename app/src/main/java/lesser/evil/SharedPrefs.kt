@@ -28,6 +28,11 @@ class SharedPrefs(context: Context) {
     var dhizukuServer by BooleanSharedPref("dhizuku_server")
     var notifications by StringSharedPref("notifications")
     var shortcutKey by StringSharedPref("shortcut_key")
+    var lockTaskProfiles by StringSharedPref("lock_task.profiles")
+    var lockTaskUnsuspendedApps by StringSharedPref("lock_task.unsuspended_apps")
+    var lockTaskUnhiddenApps by StringSharedPref("lock_task.unhidden_apps")
+    var lockTaskHomeInterception by BooleanSharedPref("lock_task.home_interception")
+    var lockTaskNavButtonsSwapped by BooleanSharedPref("lock_task.nav_buttons_swapped")
 }
 
 private class BooleanSharedPref(val key: String, val defValue: Boolean = false): ReadWriteProperty<SharedPrefs, Boolean> {

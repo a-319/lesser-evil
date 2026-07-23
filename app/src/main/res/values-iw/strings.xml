@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<string name="about">אודות</string>
+	<string name="accessibility_service_description">מוסיף לחצני חזרה ואחרונים פעילים בזמן שמצב נעילת המשימה פעיל.</string>
+	<string name="accessibility_service_not_enabled">יש להפעיל את שירות הנגישות של OwnDroid</string>
 	<string name="account">חשבון</string>
 	<string name="account_list_is">רשימת חשבונות:</string>
 	<string name="account_name">שם חשבון</string>
@@ -278,7 +280,14 @@
 	<string name="info_install_existing_app">התקן חבילה קיימת שהותקנה במשתמש אחר, או נשמרה לאחר הסרת ההתקנה.</string>
 	<string name="info_keep_uninstalled_apps">הגדר רשימה של אפליקציות לשמירה כחבילות APK גם אם אף משתמש לא התקין אותה כעת.</string>
 	<string name="info_lock_screen_info">הצג הודעה קצרה על מסך הנעילה שלך.\nעוקף כל מידע בעלים שהוגדר ידנית על ידי המשתמש ומונע מהמשתמש לשנות אותו.</string>
+	<string name="info_lock_task_nav_buttons">מאפשר ללחצני הניווט לצאת ממצב נעילת המשימה. בניווט שלושה-לחצנים לחצן הבית תמיד יוצא (ללא צורך בנגישות), ושירות הנגישות של OwnDroid מוסיף חזרה ואחרונים דרך אזורי מגע שקופים מעל הלחצנים האמיתיים. בניווט מחוות, OwnDroid מצייר סרגל משלו בתחתית במקום לתת למערכת להחליף את המכשיר ללחצנים: עם שירות הנגישות פועלים חזרה, בית ואחרונים; בלעדיו, אישור תצוגה מעל אפליקציות נותן לחצן יציאה למסך הבית בעוד מחוות החזרה ממשיכה לעבוד. ללא שתי ההרשאות ייעשה שימוש זמני בסרגל המערכת.</string>
+	<string name="lock_task_nav_overlay_hint">אפשר ל-OwnDroid להציג מעל אפליקציות אחרות (או הפעל את שירות הנגישות של OwnDroid) כדי לקבל לחצני ניווט בניווט מחוות.</string>
+	<string name="lock_task_nav_accessibility_hint">לחצן הבית יעבוד גם בלי נגישות. הפעל את שירות הנגישות של OwnDroid כדי שגם חזרה ואחרונים יעבדו.</string>
+	<string name="lock_task_swap_nav_buttons">החלף בין לחצני החזרה והאחרונים</string>
 	<string name="info_lock_task_packages">ניתן להפעיל רק חבילות ברשימת חבילות משימות נעילה במצב משימות נעילה.</string>
+	<string name="info_lock_task_profile_shortcut">שומר את הבחירה הנוכחית (כולל האפליקציות המורשות והתכונות הנוכחיות) כפרופיל ויוצר קיצור דרך במסך הבית שמפעיל אותה במצב נעילת משימה.</string>
+	<string name="info_lock_task_profiles">פרופיל שומר תצורת נעילת משימה: האפליקציה שתופעל, האפליקציות המורשות ותכונות נעילת המשימה. הפעלת פרופיל או לחיצה על קיצור הדרך שלו מחילה את התצורה השמורה ומפעילה את האפליקציה הראשית שלו במצב נעילת משימה.</string>
+	<string name="info_lock_task_suspended_hidden">ניתן להוסיף גם אפליקציות שהושעו או הוסתרו על ידי OwnDroid. ההשעיה / ההסתרה שלהן תבוטל באופן זמני בזמן שמצב נעילת המשימה פעיל, והמצב הקודם שלהן ישוחזר מיד עם היציאה ממנו.</string>
 	<string name="info_lockdown_admin_configured_network">שליטה אם המשתמש יכול לשנות רשתות שהוגדרו על ידי המנהל.\nכאשר הנעילה הזו מופעלת, המשתמש עדיין יכול להגדיר ולהתחבר לרשתות Wi-Fi אחרות, או להשתמש ביכולות Wi-Fi אחרות כגון שיתוף אינטרנט בין ניידים.</string>
 	<string name="info_logout">אם המשתמש הנוכחי לא הוחלף על ידי OwnDroid, לא ניתן להשתמש בפונקציה זו.</string>
 	<string name="info_long_support_message">זה יוצג למשתמש במסך הגדרות מנהלי המכשיר. אם ההודעה ארוכה מ-20000 תווים היא עשויה להיקטע.</string>
@@ -338,7 +347,9 @@
 	<string name="lock_now">נעל מסך עכשיו</string>
 	<string name="lock_screen">מסך נעילה</string>
 	<string name="lock_screen_info">מידע על מסך נעילה</string>
+	<string name="lock_task_create_shortcut">שמור פרופיל וצור קיצור דרך</string>
 	<string name="lock_task_mode">נעילת מצב משימה</string>
+	<string name="lock_task_mode_nav_buttons">לחצני הניווט יוצאים ממצב הנעילה</string>
 	<string name="lock_task_mode_show_notification">הצג התראה ליציאה</string>
 	<string name="lock_task_mode_start_clear_task">נקה משימה (התחל מחדש)</string>
 	<string name="lock_when_leaving">נעילה בעת יציאה</string>
@@ -432,6 +443,7 @@
 	<string name="nfc">NFC</string>
 	<string name="no">לא</string>
 	<string name="no_data">אין נתונים</string>
+	<string name="no_lock_task_profiles">אין פרופילים שמורים</string>
 	<string name="no_secondary_users">אין משתמשים משניים</string>
 	<string name="no_system_update">אין עדכון מערכת</string>
 	<string name="non_persistent">הם לא מתמידים</string>
@@ -520,9 +532,11 @@
 	<string name="printing">הדפס</string>
 	<string name="private_dns">DNS פרטי</string>
 	<string name="profile_max_time_off">חופשה מקסימלית</string>
+	<string name="profile_name">שם פרופיל</string>
 	<string name="profile_max_time_out_desc">אפליקציות אישיות יושעו לאחר סגירת פרופיל העבודה למשך פרק זמן זה. 0 פירושו אין גבול.</string>
 	<string name="profile_owner">בעל פרופיל</string>
 	<string name="profile_owner_is_restricted">בעל הפרופיל יכול להשתמש בפונקציה מוגבלת</string>
+	<string name="profiles">פרופילים</string>
 	<string name="project_homepage">דף הבית של הפרויקט</string>
 	<string name="proxy">פרוקסי</string>
 	<string name="proxy_type_direct">פרוקסי ישיר</string>

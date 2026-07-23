@@ -2,7 +2,6 @@ package lesser.evil
 
 import android.accounts.Account
 import android.annotation.SuppressLint
-import android.app.ActivityOptions
 import android.app.Application
 import android.app.KeyguardManager
 import android.app.PendingIntent
@@ -1026,38 +1025,41 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(28)
     fun startLockTaskMode(
-        packageName: String, activity: String, clearTask: Boolean, showNotification: Boolean
+        packageName: String, activity: String, clearTask: Boolean, showNotification: Boolean,
+        showNavigationButtons: Boolean
     ): Boolean {
-        if (!DPM.isLockTaskPermitted(packageName)) {
-            val list = lockTaskPackages.value.map { it.name } + packageName
-            DPM.setLockTaskPackages(DAR, list.toTypedArray())
-            getLockTaskPackages()
-        }
-        if (showNotification) {
-            DPM.setLockTaskFeatures(
-                DAR,
-                DPM.getLockTaskFeatures(DAR) or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
-                        DevicePolicyManager.LOCK_TASK_FEATURE_HOME
-            )
-        }
-        val options = ActivityOptions.makeBasic().setLockTaskEnabled(true)
-        val intent = if(activity.isNotEmpty()) {
-            Intent().setComponent(ComponentName(packageName, activity))
-        } else PM.getLaunchIntentForPackage(packageName)
-        if (intent != null) {
-            intent.addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK
-                    or (if (clearTask) Intent.FLAG_ACTIVITY_CLEAR_TASK else 0)
-            )
-            application.startActivity(intent, options.toBundle())
-            if (showNotification) {
-                application.startForegroundService(Intent(application, LockTaskService::class.java))
-            }
-            return true
-        } else {
-            return false
-        }
+        val result = LockTaskUtils.start(
+            application, packageName, activity, clearTask, showNotification, showNavigationButtons
+        )
+        getLockTaskPackages()
+        return result
+    }
+    val lockTaskProfiles = MutableStateFlow(emptyList<LockTaskProfile>())
+    fun getLockTaskProfiles() {
+        lockTaskProfiles.value = LockTaskUtils.getProfiles()
+    }
+    @RequiresApi(28)
+    fun buildLockTaskProfile(
+        name: String, packageName: String, activity: String, clearTask: Boolean,
+        showNotification: Boolean, showNavigationButtons: Boolean
+    ) = LockTaskProfile(
+        0, name, packageName, activity, clearTask, showNotification,
+        DPM.getLockTaskPackages(DAR).toList(), DPM.getLockTaskFeatures(DAR), showNavigationButtons
+    )
+    fun addLockTaskProfile(profile: LockTaskProfile): LockTaskProfile {
+        val added = LockTaskUtils.addProfile(profile)
+        getLockTaskProfiles()
+        return added
+    }
+    fun deleteLockTaskProfile(id: Int) {
+        LockTaskUtils.deleteProfile(id)
+        getLockTaskProfiles()
+    }
+    @RequiresApi(28)
+    fun startLockTaskProfile(profile: LockTaskProfile): Boolean {
+        val result = LockTaskUtils.startProfile(application, profile)
+        getLockTaskPackages()
+        return result
     }
     @RequiresApi(28)
     fun getLockTaskFeatures(): Int {

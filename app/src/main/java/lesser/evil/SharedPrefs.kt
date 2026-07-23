@@ -32,6 +32,11 @@ class SharedPrefs(context: Context) {
     var policyToggleMddBackup by StringSharedPref("policy_toggles.mdd_backup")
     /** Always-on VPN config ("package|lockdown", or "" for none) captured before a mode switch enforced its own */
     var policyToggleVpnBackup by StringSharedPref("policy_toggles.vpn_backup")
+    var lockTaskProfiles by StringSharedPref("lock_task.profiles")
+    var lockTaskUnsuspendedApps by StringSharedPref("lock_task.unsuspended_apps")
+    var lockTaskUnhiddenApps by StringSharedPref("lock_task.unhidden_apps")
+    var lockTaskHomeInterception by BooleanSharedPref("lock_task.home_interception")
+    var lockTaskNavButtonsSwapped by BooleanSharedPref("lock_task.nav_buttons_swapped")
 }
 
 private class BooleanSharedPref(val key: String, val defValue: Boolean = false): ReadWriteProperty<SharedPrefs, Boolean> {

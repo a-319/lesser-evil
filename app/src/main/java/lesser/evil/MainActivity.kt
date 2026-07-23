@@ -270,11 +270,12 @@ class MainActivity : FragmentActivity() {
                     val restricted by vm.restrictedMode.collectAsStateWithLifecycle()
                     AppLockDialog(
                         onSucceed = {
-                            vm.restrictedMode.value = false
+                            vm.exitRestrictedMode()
                             appLockDialog = false
                         },
-                        onEnterRestricted = if (restricted) null else ({
-                            vm.restrictedMode.value = true
+                        onEnterRestricted = if (restricted || SP.lockPasswordHash.isNullOrEmpty()) null
+                        else ({
+                            vm.enterRestrictedMode()
                             appLockDialog = false
                         }),
                         onDismiss = {
@@ -733,7 +734,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         }
         composable<RequiredPasswordQuality> { RequiredPasswordQualityScreen(::navigateUp) }
 
-        composable<Settings> { SettingsScreen(::navigateUp, ::navigate) }
+        composable<Settings> { SettingsScreen(restricted, ::navigateUp, ::navigate) }
         composable<SettingsOptions> {
             SettingsOptionsScreen(vm::getDisplayDangerousFeatures, vm::getShortcutsEnabled,
                 vm::setDisplayDangerousFeatures, vm::setShortcutsEnabled, ::navigateUp)
@@ -743,9 +744,6 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         }
         composable<AppLockSettings> {
             AppLockSettingsScreen(vm.getAppLockConfig(), vm::setAppLockConfig, ::navigateUp)
-        }
-        composable<UserProfileSettings> {
-            UserProfileSettingsScreen(vm.chosenPackage, ::chooseSinglePackage, ::navigateUp)
         }
         composable<ApiSettings> {
             ApiSettings(vm::getApiEnabled, vm::setApiKey, ::navigateUp)
@@ -792,21 +790,25 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeScreen(restricted: Boolean, onNavigate: (Any) -> Unit, onUnlock: () -> Unit) {
+private fun HomeScreen(restricted: Boolean, onNavigate: (Any) -> Unit, onLock: () -> Unit) {
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     val sb = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         Modifier.nestedScroll(sb.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                { Text(stringResource(R.string.app_name)) },
+                {
+                    Text(stringResource(
+                        if (restricted) R.string.app_name_user_profile else R.string.app_name
+                    ))
+                },
                 actions = {
                     if (restricted) {
-                        IconButton(onUnlock) { Icon(painterResource(R.drawable.lock_fill0), null) }
+                        IconButton(onLock) { Icon(painterResource(R.drawable.lock_fill0), null) }
                     } else {
                         IconButton({ onNavigate(WorkModes(true)) }) { Icon(painterResource(R.drawable.security_fill0), null) }
-                        IconButton({ onNavigate(Settings) }) { Icon(Icons.Default.Settings, null) }
                     }
+                    IconButton({ onNavigate(Settings) }) { Icon(Icons.Default.Settings, null) }
                 },
                 scrollBehavior = sb
             )
@@ -817,40 +819,28 @@ private fun HomeScreen(restricted: Boolean, onNavigate: (Any) -> Unit, onUnlock:
             .fillMaxSize()
             .padding(it)
             .verticalScroll(rememberScrollState())) {
-            if (restricted) {
-                if(privilege.device || privilege.profile) {
-                    HomePageItem(R.string.mode_switches, R.drawable.toggle_off_fill0) { onNavigate(PolicyToggles) }
-                    if (SP.userProfileHide) {
-                        HomePageItem(R.string.hide, R.drawable.visibility_off_fill0) { onNavigate(Hide) }
-                    }
-                    if (SP.userProfileSuspend && VERSION.SDK_INT >= 24) {
-                        HomePageItem(R.string.suspend, R.drawable.block_fill0) { onNavigate(Suspend) }
-                    }
+            if(privilege.device || privilege.profile) {
+                HomePageItem(R.string.system, R.drawable.android_fill0) { onNavigate(SystemManager) }
+                HomePageItem(R.string.network, R.drawable.wifi_fill0) { onNavigate(Network) }
+            }
+            if(privilege.work) {
+                HomePageItem(R.string.work_profile, R.drawable.work_fill0) {
+                    onNavigate(WorkProfile)
                 }
-            } else {
-                if(privilege.device || privilege.profile) {
-                    HomePageItem(R.string.system, R.drawable.android_fill0) { onNavigate(SystemManager) }
-                    HomePageItem(R.string.network, R.drawable.wifi_fill0) { onNavigate(Network) }
+            }
+            if(privilege.device || privilege.profile) {
+                HomePageItem(R.string.applications, R.drawable.apps_fill0) {
+                    onNavigate(
+                        if (SP.applicationsListView) ApplicationsList(true, true)
+                        else ApplicationsFeatures
+                    )
                 }
-                if(privilege.work) {
-                    HomePageItem(R.string.work_profile, R.drawable.work_fill0) {
-                        onNavigate(WorkProfile)
-                    }
+                if(VERSION.SDK_INT >= 24) {
+                    HomePageItem(R.string.user_restriction, R.drawable.person_off) { onNavigate(UserRestriction) }
                 }
-                if(privilege.device || privilege.profile) {
-                    HomePageItem(R.string.applications, R.drawable.apps_fill0) {
-                        onNavigate(
-                            if (SP.applicationsListView) ApplicationsList(true, true)
-                            else ApplicationsFeatures
-                        )
-                    }
-                    if(VERSION.SDK_INT >= 24) {
-                        HomePageItem(R.string.user_restriction, R.drawable.person_off) { onNavigate(UserRestriction) }
-                    }
-                    HomePageItem(R.string.mode_switches, R.drawable.toggle_off_fill0) { onNavigate(PolicyToggles) }
-                    HomePageItem(R.string.users,R.drawable.manage_accounts_fill0) { onNavigate(Users) }
-                    HomePageItem(R.string.password_and_keyguard, R.drawable.password_fill0) { onNavigate(Password) }
-                }
+                HomePageItem(R.string.mode_switches, R.drawable.toggle_off_fill0) { onNavigate(PolicyToggles) }
+                HomePageItem(R.string.users,R.drawable.manage_accounts_fill0) { onNavigate(Users) }
+                HomePageItem(R.string.password_and_keyguard, R.drawable.password_fill0) { onNavigate(Password) }
             }
             Spacer(Modifier.height(BottomPadding))
         }

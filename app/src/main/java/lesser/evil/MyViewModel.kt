@@ -140,19 +140,67 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     val myRepo = getApplication<MyApplication>().myRepo
     val PM = application.packageManager
 
+    /**
+     * Blocks the admin profile had in place at the moment the user profile was entered.
+     * In restricted mode the user profile may add its own blocks and remove those, but may
+     * never lift a block that is part of this baseline.
+     */
+    class AdminBaseline(
+        val hidden: Set<String>, val suspended: Set<String>, val uninstallBlocked: Set<String>,
+        val userControlDisabled: Set<String>, val meteredDataDisabled: Set<String>,
+        val userRestrictions: Set<String>
+    )
     /** True when the app was entered as the user profile (without the lock password) */
     val restrictedMode = MutableStateFlow(false)
-    private fun packageSet(pref: String?) =
-        pref?.split('\n')?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
-    private fun recordAdminPackages(current: String?, packages: List<String>, add: Boolean) =
-        (if (add) packageSet(current) + packages else packageSet(current) - packages.toSet())
-            .joinToString("\n")
-    /** Returns true (and shows a toast) when the user profile may not touch [pkg] */
-    private fun userProfileBlocked(pkg: String, featureAllowed: Boolean, adminList: String?): Boolean {
-        if (!restrictedMode.value) return false
-        if (featureAllowed && pkg !in packageSet(adminList)) return false
-        application.popToast(R.string.permission_denied)
-        return true
+    private var adminBaseline: AdminBaseline? = null
+
+    @SuppressLint("NewApi")
+    fun enterRestrictedMode() {
+        val apps = PM.getInstalledApplications(getInstalledAppsFlags)
+        val hidden = mutableSetOf<String>()
+        val suspended = mutableSetOf<String>()
+        val uninstallBlocked = mutableSetOf<String>()
+        apps.forEach {
+            val p = it.packageName
+            if (DPM.isApplicationHidden(DAR, p)) hidden += p
+            if (VERSION.SDK_INT >= 24 && DPM.isPackageSuspended(DAR, p)) suspended += p
+            if (DPM.isUninstallBlocked(DAR, p)) uninstallBlocked += p
+        }
+        val ucd = if (VERSION.SDK_INT >= 30) DPM.getUserControlDisabledPackages(DAR).toSet() else emptySet()
+        val mdd = if (VERSION.SDK_INT >= 28) DPM.getMeteredDataDisabledPackages(DAR).toSet() else emptySet()
+        val restrictions = if (VERSION.SDK_INT >= 24) {
+            val bundle = DPM.getUserRestrictions(DAR)
+            bundle.keySet().filter { bundle.getBoolean(it) }.toSet()
+        } else emptySet()
+        adminBaseline = AdminBaseline(hidden, suspended, uninstallBlocked, ucd, mdd, restrictions)
+        restrictedMode.value = true
+    }
+    fun exitRestrictedMode() {
+        adminBaseline = null
+        restrictedMode.value = false
+    }
+    /** True (and toasts) if restricted mode may not remove the admin block on [key] from [baseline] */
+    private fun adminProtected(baseline: Set<String>?, key: String): Boolean {
+        if (restrictedMode.value && baseline?.contains(key) == true) {
+            application.popToast(R.string.cannot_modify_admin_block)
+            return true
+        }
+        return false
+    }
+    /** Packages from [keys] whose block the admin owns - filtered out of a user-profile removal */
+    private fun filterAdminProtected(baseline: Set<String>?, keys: List<String>): List<String> {
+        if (!restrictedMode.value) return keys
+        val allowed = keys.filter { baseline?.contains(it) != true }
+        if (allowed.size != keys.size) application.popToast(R.string.cannot_modify_admin_block)
+        return allowed
+    }
+    /** True (and toasts) if the current session may not perform an admin-only operation */
+    private fun adminOnly(): Boolean {
+        if (restrictedMode.value) {
+            application.popToast(R.string.permission_denied)
+            return true
+        }
+        return false
     }
 
     val theme = MutableStateFlow(ThemeSettings(SP.materialYou, SP.darkTheme, SP.blackTheme))
@@ -180,6 +228,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         return AppLockConfig(passwordHash?.ifEmpty { null }, SP.biometricsUnlock, SP.lockWhenLeaving)
     }
     fun setAppLockConfig(config: AppLockConfig) {
+        if (adminOnly()) return
         if (config.password == null) {
             SP.lockPasswordHash = ""
         } else if (!config.password.isEmpty()) {
@@ -192,6 +241,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         return SP.apiKeyHash?.isNotEmpty() ?: false
     }
     fun setApiKey(key: String) {
+        if (adminOnly()) return
         SP.apiKeyHash = if (key.isEmpty()) "" else key.hash()
     }
     val enabledNotifications = MutableStateFlow(emptyList<Int>())
@@ -240,52 +290,31 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     val suspendedPackages = MutableStateFlow(emptyList<AppInfo>())
     @RequiresApi(24)
     fun getSuspendedPackaged() {
-        val adminLocked = if (restrictedMode.value) packageSet(SP.adminSuspendedPackages) else emptySet()
         val packages = PM.getInstalledApplications(getInstalledAppsFlags).filter {
-            DPM.isPackageSuspended(DAR, it.packageName) && it.packageName !in adminLocked
+            DPM.isPackageSuspended(DAR, it.packageName)
         }
         suspendedPackages.value = packages.map { getAppInfo(it) }
     }
     @RequiresApi(24)
     fun setPackageSuspended(packages: List<String>, status: Boolean) {
-        if (restrictedMode.value) {
-            val adminLocked = packageSet(SP.adminSuspendedPackages)
-            val allowed = packages.filter { it !in adminLocked }
-            if (!SP.userProfileSuspend || allowed.size != packages.size) {
-                application.popToast(R.string.permission_denied)
-            }
-            if (SP.userProfileSuspend && allowed.isNotEmpty()) {
-                DPM.setPackagesSuspended(DAR, allowed.toTypedArray(), status)
-            }
-        } else {
-            DPM.setPackagesSuspended(DAR, packages.toTypedArray(), status)
-            SP.adminSuspendedPackages = recordAdminPackages(SP.adminSuspendedPackages, packages, status)
-        }
+        // Adding a block is always allowed; removing one is denied for admin-owned packages
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.suspended, packages)
+        if (effective.isNotEmpty()) DPM.setPackagesSuspended(DAR, effective.toTypedArray(), status)
         getSuspendedPackaged()
     }
 
     val hiddenPackages = MutableStateFlow(emptyList<AppInfo>())
     fun getHiddenPackages() {
-        val adminLocked = if (restrictedMode.value) packageSet(SP.adminHiddenPackages) else emptySet()
         hiddenPackages.value = PM.getInstalledApplications(getInstalledAppsFlags).filter {
-            DPM.isApplicationHidden(DAR, it.packageName) && it.packageName !in adminLocked
+            DPM.isApplicationHidden(DAR, it.packageName)
         }.map { getAppInfo(it) }
     }
     fun setPackageHidden(packages: List<String>, status: Boolean) {
-        if (restrictedMode.value) {
-            val adminLocked = packageSet(SP.adminHiddenPackages)
-            val allowed = packages.filter { it !in adminLocked }
-            if (!SP.userProfileHide || allowed.size != packages.size) {
-                application.popToast(R.string.permission_denied)
-            }
-            if (SP.userProfileHide) for (name in allowed) {
-                DPM.setApplicationHidden(DAR, name, status)
-            }
-        } else {
-            for (name in packages) {
-                DPM.setApplicationHidden(DAR, name, status)
-            }
-            SP.adminHiddenPackages = recordAdminPackages(SP.adminHiddenPackages, packages, status)
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.hidden, packages)
+        for (name in effective) {
+            DPM.setApplicationHidden(DAR, name, status)
         }
         getHiddenPackages()
     }
@@ -298,7 +327,9 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         }.map { getAppInfo(it) }
     }
     fun setPackageUb(packages: List<String>, status: Boolean) {
-        for (name in packages) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.uninstallBlocked, packages)
+        for (name in effective) {
             DPM.setUninstallBlocked(DAR, name, status)
         }
         getUbPackages()
@@ -314,10 +345,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(30)
     fun setPackageUcd(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.userControlDisabled, packages)
         DPM.setUserControlDisabledPackages(
             DAR,
             ucdPackages.value.map { it.name }.run {
-                if (status) plus(packages) else minus(packages)
+                if (status) plus(effective) else minus(effective)
             }
         )
         getUcdPackages()
@@ -347,9 +380,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(28)
     fun setPackageMdd(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.meteredDataDisabled, packages)
         DPM.setMeteredDataDisabledPackages(
             DAR, mddPackages.value.map { it.name }.run {
-                if (status) plus(packages) else minus(packages)
+                if (status) plus(effective) else minus(effective)
             }
         )
         getMddPackages()
@@ -542,30 +577,25 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     // Application details
     @RequiresApi(24)
     fun adSetPackageSuspended(name: String, status: Boolean) {
-        if (userProfileBlocked(name, SP.userProfileSuspend, SP.adminSuspendedPackages)) return
+        if (!status && adminProtected(adminBaseline?.suspended, name)) return
         try {
             DPM.setPackagesSuspended(DAR, arrayOf(name), status)
-            if (!restrictedMode.value) {
-                SP.adminSuspendedPackages =
-                    recordAdminPackages(SP.adminSuspendedPackages, listOf(name), status)
-            }
             appStatus.update { it.copy(suspend = DPM.isPackageSuspended(DAR, name)) }
         } catch (_: Exception) {}
     }
     fun adSetPackageHidden(name: String, status: Boolean) {
-        if (userProfileBlocked(name, SP.userProfileHide, SP.adminHiddenPackages)) return
+        if (!status && adminProtected(adminBaseline?.hidden, name)) return
         DPM.setApplicationHidden(DAR, name, status)
-        if (!restrictedMode.value) {
-            SP.adminHiddenPackages = recordAdminPackages(SP.adminHiddenPackages, listOf(name), status)
-        }
         appStatus.update { it.copy(hide = DPM.isApplicationHidden(DAR, name)) }
     }
     fun adSetPackageUb(name: String, status: Boolean) {
+        if (!status && adminProtected(adminBaseline?.uninstallBlocked, name)) return
         DPM.setUninstallBlocked(DAR, name, status)
         appStatus.update { it.copy(uninstallBlocked = DPM.isUninstallBlocked(DAR, name)) }
     }
     @RequiresApi(30)
     fun adSetPackageUcd(name: String, status: Boolean) {
+        if (!status && adminProtected(adminBaseline?.userControlDisabled, name)) return
         DPM.setUserControlDisabledPackages(DAR,
             DPM.getUserControlDisabledPackages(DAR).run { if (status) plus(name) else minus(name) })
         appStatus.update {
@@ -574,6 +604,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(28)
     fun adSetPackageMdd(name: String, status: Boolean) {
+        if (!status && adminProtected(adminBaseline?.meteredDataDisabled, name)) return
         DPM.setMeteredDataDisabledPackages(DAR,
             DPM.getMeteredDataDisabledPackages(DAR).run { if (status) plus(name) else minus(name) })
         appStatus.update {
@@ -1122,6 +1153,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         DPM.setFactoryResetProtectionPolicy(DAR, policy)
     }
     fun wipeData(wipeDevice: Boolean, flags: Int, reason: String) {
+        if (adminOnly()) return
         if (wipeDevice && VERSION.SDK_INT >= 34) {
             DPM.wipeDevice(flags)
         } else {
@@ -1291,13 +1323,16 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         }
     }
     fun clearDeviceOwner() {
+        if (adminOnly()) return
         DPM.clearDeviceOwnerApp(application.packageName)
     }
     @RequiresApi(24)
     fun clearProfileOwner() {
+        if (adminOnly()) return
         DPM.clearProfileOwner(MyAdminComponent)
     }
     fun deactivateDhizukuMode() {
+        if (adminOnly()) return
         SP.dhizuku = false
         Privilege.initialize(application)
     }
@@ -1461,6 +1496,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(28)
     fun transferOwnership(component: ComponentName) {
+        if (adminOnly()) return
         DPM.transferOwnership(DAR, component, null)
         Privilege.updateStatus()
     }
@@ -1471,6 +1507,8 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         userRestrictions.value = bundle.keySet().associateWith { bundle.getBoolean(it) }
     }
     fun setUserRestriction(name: String, state: Boolean): Boolean {
+        // The user profile may add restrictions, but not lift ones the admin set
+        if (!state && adminProtected(adminBaseline?.userRestrictions, name)) return false
         return try {
             if (state) {
                 DPM.addUserRestriction(DAR, name)
@@ -2085,6 +2123,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(26)
     fun setRpToken(token: String): Boolean {
+        if (adminOnly()) return false
         return try {
             DPM.setResetPasswordToken(DAR, token.encodeToByteArray())
         } catch (e: Exception) {
@@ -2094,6 +2133,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(26)
     fun clearRpToken(): Boolean {
+        if (adminOnly()) return false
         return DPM.clearResetPasswordToken(DAR)
     }
     @RequiresApi(26)
@@ -2103,6 +2143,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         return km.createConfirmDeviceCredentialIntent(title, "")
     }
     fun resetPassword(password: String, token: String, flags: Int): Boolean {
+        if (adminOnly()) return false
         return if (VERSION.SDK_INT >= 26) {
             DPM.resetPasswordWithToken(DAR, password, token.encodeToByteArray(), flags)
         } else {

@@ -44,6 +44,7 @@
 	<string name="api_key_exist">מפתח ה-API כבר קיים, הגדרת מפתח חדש תחליף את המפתח הנוכחי.</string>
 	<string name="apn_setting">הגדרת APN</string>
 	<string name="app_group">קבוצת אפליקציות</string>
+	<string name="app_name_user_profile">OwnDroid (משתמש)</string>
 	<string name="app_installer">מתקין אפליקציה</string>
 	<string name="app_lock">נעילת אפליקציה</string>
 	<string name="app_name">OwnDroid</string>
@@ -82,6 +83,7 @@
 	<string name="bug_report_shared">שותף דוח באג</string>
 	<string name="bug_report_sharing_declined">שיתוף דוחות באג נדחה</string>
 	<string name="ca_cert">תעודות CA</string>
+	<string name="cannot_modify_admin_block">לא ניתן לבטל הגבלה שהוגדרה על ידי המנהל</string>
 	<string name="camera_toggle">החלפת מצלמה</string>
 	<string name="cancel">לבטל</string>
 	<string name="cellular_2g">2G סלולר</string>
@@ -169,8 +171,6 @@
 	<string name="dhizuku_permission_not_granted">הרשאת דיזוקו לא ניתנה</string>
 	<string name="dhizuku_server">שרת דיזוקו (Dhizuku)</string>
 	<string name="direction">כיוון</string>
-	<string name="dhizuku_user_grantable">בקשות Dhizuku שניתן לאשר ללא סיסמה</string>
-	<string name="dhizuku_user_grantable_note">בקשות הרשאה של Dhizuku מהחבילות שברשימה למעלה ניתנות לאישור ללא סיסמה. אזהרה: אפליקציה שקיבלה גישת Dhizuku מקבלת הרשאות מלאות של בעל המכשיר — היא אינה מוגבלת לפונקציות של פרופיל המשתמש — לכן יש לרשום כאן רק אפליקציות שאתה סומך עליהן לחלוטין.</string>
 	<string name="disable">השבת</string>
 	<string name="disable_account_management">השבת את ניהול החשבונות</string>
 	<string name="disable_all">השבת הכל</string>
@@ -703,8 +703,6 @@
 	<string name="user_not_exist">המשתמש לא קיים</string>
 	<string name="user_operation">פעולת המשתמש</string>
 	<string name="user_operation_switch">מתג</string>
-	<string name="user_profile">פרופיל משתמש</string>
-	<string name="user_profile_note">לפרופיל המשתמש אפשר להיכנס ממסך הנעילה ללא סיסמה. הוא יכול להחליף רק מתגי מצב שסומנו כזמינים עבורו, ולהשתמש בפונקציות שהופעלו למטה. אפליקציות שהוסתרו או הושעו על ידי המנהל נשארות נעולות ואינן מוצגות לפרופיל המשתמש.</string>
 	<string name="user_removed">המשתמש הוסר</string>
 	<string name="user_restriction">הגבלת משתמש</string>
 	<string name="user_restriction_tip">לחץ לחיצה ארוכה על פריט כדי ליצור קיצור דרך</string>

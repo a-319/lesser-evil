@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
@@ -32,7 +31,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -61,7 +59,6 @@ import lesser.evil.ui.MyScaffold
 import lesser.evil.ui.NavIcon
 import lesser.evil.ui.Notes
 import lesser.evil.ui.SwitchItem
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
@@ -73,7 +70,7 @@ import kotlin.system.exitProcess
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Unit) {
+fun SettingsScreen(restricted: Boolean, onNavigateUp: () -> Unit, onNavigate: (Any) -> Unit) {
     val context = LocalContext.current
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     val exportLogsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) {
@@ -127,9 +124,9 @@ fun SettingsScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Unit) {
         ) {
             FunctionItem(title = R.string.options, icon = R.drawable.tune_fill0) { onNavigate(SettingsOptions) }
             FunctionItem(title = R.string.appearance, icon = R.drawable.format_paint_fill0) { onNavigate(Appearance) }
-            FunctionItem(R.string.app_lock, icon = R.drawable.lock_fill0) { onNavigate(AppLockSettings) }
-            FunctionItem(R.string.user_profile, icon = R.drawable.manage_accounts_fill0) { onNavigate(UserProfileSettings) }
-            if (privilege.device || privilege.profile)
+            if (!restricted)
+                FunctionItem(R.string.app_lock, icon = R.drawable.lock_fill0) { onNavigate(AppLockSettings) }
+            if ((privilege.device || privilege.profile) && !restricted)
                 FunctionItem(title = R.string.api, icon = R.drawable.code_fill0) { onNavigate(ApiSettings) }
             if (privilege.device && !privilege.dhizuku)
                 FunctionItem(R.string.notifications, icon = R.drawable.notifications_fill0) { onNavigate(Notifications) }
@@ -161,60 +158,6 @@ fun SettingsOptionsScreen(
                 shortcuts = it
             }, R.drawable.open_in_new
         )
-    }
-}
-
-@Serializable object UserProfileSettings
-
-@Composable
-fun UserProfileSettingsScreen(
-    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
-) {
-    val context = LocalContext.current
-    var hideApps by remember { mutableStateOf(SP.userProfileHide) }
-    var suspendApps by remember { mutableStateOf(SP.userProfileSuspend) }
-    var grantable by rememberSaveable { mutableStateOf(SP.dhizukuUserGrantable ?: "") }
-    LaunchedEffect(Unit) {
-        val pkg = chosenPackage.receive()
-        grantable = (grantable.trim() + "\n" + pkg).trim()
-    }
-    MyScaffold(R.string.user_profile, onNavigateUp, 0.dp) {
-        Column(Modifier.padding(horizontal = HorizontalPadding)) {
-            Notes(R.string.user_profile_note)
-        }
-        Spacer(Modifier.padding(vertical = 4.dp))
-        SwitchItem(
-            R.string.hide, hideApps,
-            { hideApps = it; SP.userProfileHide = it }, R.drawable.visibility_off_fill0
-        )
-        if (VERSION.SDK_INT >= 24) SwitchItem(
-            R.string.suspend, suspendApps,
-            { suspendApps = it; SP.userProfileSuspend = it }, R.drawable.block_fill0
-        )
-        Column(Modifier.padding(horizontal = HorizontalPadding)) {
-            Spacer(Modifier.padding(vertical = 4.dp))
-            Text(stringResource(R.string.dhizuku_user_grantable), style = typography.titleMedium)
-            OutlinedTextField(
-                grantable, { grantable = it },
-                Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                label = { Text(stringResource(R.string.package_name)) },
-                minLines = 2,
-                trailingIcon = {
-                    IconButton(onChoosePackage) { Icon(Icons.AutoMirrored.Default.List, null) }
-                },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
-            )
-            Button(
-                {
-                    SP.dhizukuUserGrantable = parsePackageNames(grantable).joinToString("\n")
-                    context.showOperationResultToast(true)
-                },
-                Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.apply))
-            }
-            Notes(R.string.dhizuku_user_grantable_note)
-        }
     }
 }
 

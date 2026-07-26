@@ -54,7 +54,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -1721,7 +1720,7 @@ fun ManualRestrictionDialog(
                     label = { Text(stringResource(R.string.type)) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeMenuExpanded) }
                 )
-                ExposedDropdownMenu(typeMenuExpanded, { typeMenuExpanded = false }) {
+                DropdownMenu(typeMenuExpanded, { typeMenuExpanded = false }) {
                     ManualRestrictionType.entries.forEach { t ->
                         DropdownMenuItem(
                             { Text(stringResource(t.label)) },

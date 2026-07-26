@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.SaverScope
@@ -163,6 +164,13 @@ fun adaptiveInsets(): WindowInsets {
     val navbar = WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)
     return WindowInsets.ime.union(navbar).union(WindowInsets.displayCutout)
 }
+
+/**
+ * [adaptiveInsets] leaves out the bottom navigation bar on purpose, so lists can scroll under it.
+ * That also drops a Scaffold's floating action button behind the bar, so lift it back up.
+ */
+fun Modifier.fabInsetsPadding() =
+    windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
 
 fun registerPackageRemovedReceiver(
     ctx: Context, callback: (String) -> Unit

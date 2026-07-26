@@ -443,6 +443,11 @@
     <string name="type_integer">Integer</string>
     <string name="type_boolean">Boolean</string>
     <string name="type_string_array">String[]</string>
+    <string name="type_bundle">Bundle</string>
+    <string name="type_bundle_array">Bundle[]</string>
+    <string name="info_edit_bundle_contents">Save first, then open the entry from the list to edit what it contains.</string>
+    <string name="entries_count">%1$d entries</string>
+    <string name="elements_count">%1$d elements</string>
     <string name="clear_configurations">Clear configurations</string>
     <string name="specify_value">Specify value</string>
     <string name="package_removed">Removed %1$s</string>

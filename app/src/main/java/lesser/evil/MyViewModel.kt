@@ -42,6 +42,7 @@ import android.os.Binder
 import android.os.Build.VERSION
 import android.os.Bundle
 import android.os.HardwarePropertiesManager
+import android.os.Parcelable
 import android.os.UserHandle
 import android.os.UserManager
 import android.telephony.data.ApnSetting
@@ -639,23 +640,39 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
 
     fun getManualRestrictions(name: String) {
         try {
-            val bundle = DPM.getApplicationRestrictions(DAR, name)
-            manualRestrictions.value = bundle.keySet().mapNotNull { key ->
-                when (val value = bundle.get(key)) {
-                    is Boolean -> ManualRestriction.BooleanItem(key, value)
-                    is Int -> ManualRestriction.IntItem(key, value)
-                    is String -> ManualRestriction.StringItem(key, value)
-                    is Array<*> -> ManualRestriction.StringArrayItem(
-                        key, value.filterIsInstance<String>()
-                    )
-                    else -> null
-                }
-            }.sortedBy { it.key }
+            manualRestrictions.value = parseRestrictions(DPM.getApplicationRestrictions(DAR, name))
         } catch (e: Exception) {
             e.printStackTrace()
             manualRestrictions.value = emptyList()
         }
     }
+
+    private fun parseRestrictions(bundle: Bundle): List<ManualRestriction> =
+        bundle.keySet().mapNotNull { key ->
+            when (val value = bundle.get(key)) {
+                is Boolean -> ManualRestriction.BooleanItem(key, value)
+                is Int -> ManualRestriction.IntItem(key, value)
+                is String -> ManualRestriction.StringItem(key, value)
+                is Bundle -> ManualRestriction.BundleItem(key, parseRestrictions(value))
+                is Array<*> -> {
+                    // A bundle array comes back as Parcelable[] once it has been through a
+                    // parcel, so trust the elements and only fall back to the component type
+                    // when the array is empty and there's nothing to look at.
+                    val component: Class<*>? = value.javaClass.componentType
+                    when {
+                        value.any { it is Bundle } -> ManualRestriction.BundleArrayItem(
+                            key, value.map { parseRestrictions(it as? Bundle ?: Bundle()) }
+                        )
+                        value.any { it is String } ->
+                            ManualRestriction.StringArrayItem(key, value.filterIsInstance<String>())
+                        component != null && Parcelable::class.java.isAssignableFrom(component) ->
+                            ManualRestriction.BundleArrayItem(key, emptyList())
+                        else -> ManualRestriction.StringArrayItem(key, emptyList())
+                    }
+                }
+                else -> null
+            }
+        }.sortedBy { it.key }
 
     fun setManualRestriction(name: String, oldKey: String?, item: ManualRestriction) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -691,7 +708,16 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             is ManualRestriction.BooleanItem -> bundle.putBoolean(r.key, r.value)
             is ManualRestriction.StringArrayItem ->
                 bundle.putStringArray(r.key, r.value.toTypedArray())
+            is ManualRestriction.BundleItem -> bundle.putBundle(r.key, buildBundle(r.value))
+            is ManualRestriction.BundleArrayItem ->
+                bundle.putParcelableArray(r.key, r.value.map { buildBundle(it) }.toTypedArray())
         }
+    }
+
+    private fun buildBundle(list: List<ManualRestriction>): Bundle {
+        val b = Bundle()
+        list.forEach { putManualRestriction(b, it) }
+        return b
     }
 
     val appGroups = MutableStateFlow(emptyList<AppGroup>())

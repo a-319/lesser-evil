@@ -224,9 +224,6 @@ fun ApplicationsFeaturesScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Un
                 FunctionItem(R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0) { onNavigate(DisableUserControl) }
             }
             FunctionItem(R.string.permissions, icon = R.drawable.shield_fill0) { onNavigate(PermissionsManager()) }
-            FunctionItem(R.string.add_managed_configuration, icon = R.drawable.description_fill0) {
-                onNavigate(AddManagedConfiguration)
-            }
             if(VERSION.SDK_INT >= 28) {
                 FunctionItem(R.string.disable_metered_data, icon = R.drawable.money_off_fill0) { onNavigate(DisableMeteredData) }
             }
@@ -334,6 +331,10 @@ fun ApplicationDetailsScreen(
         if (appRestrictions.isNotEmpty()) {
             FunctionItem(R.string.managed_configuration, icon = R.drawable.description_fill0) {
                 onNavigate(ManagedConfiguration(packageName))
+            }
+        } else {
+            FunctionItem(R.string.add_managed_configuration, icon = R.drawable.description_fill0) {
+                onNavigate(ManualConfiguration(packageName))
             }
         }
         if(VERSION.SDK_INT >= 28) FunctionItem(R.string.clear_app_storage, icon = R.drawable.mop_fill0) { dialog = 1 }
@@ -1110,10 +1111,14 @@ fun EditAppGroupScreen(
 @Composable
 fun ManagedConfigurationScreen(
     params: ManagedConfiguration, appRestrictions: StateFlow<List<AppRestriction>>,
-    setRestriction: (String, AppRestriction) -> Unit, clearRestriction: (String) -> Unit,
-    navigateUp: () -> Unit
+    getRestrictions: (String) -> Unit, setRestriction: (String, AppRestriction) -> Unit,
+    clearRestriction: (String) -> Unit, navigateToManual: () -> Unit, navigateUp: () -> Unit
 ) {
     val restrictions by appRestrictions.collectAsStateWithLifecycle()
+    // Refresh when coming back from the manual configurations screen
+    LaunchedEffect(Unit) {
+        getRestrictions(params.packageName)
+    }
     var searchMode by remember { mutableStateOf(false) }
     var searchKeyword by remember { mutableStateOf("") }
     val displayRestrictions = if (searchKeyword.isEmpty()) {
@@ -1176,6 +1181,14 @@ fun ManagedConfigurationScreen(
         contentWindowInsets = adaptiveInsets()
     ) { paddingValues ->
         LazyColumn(Modifier.padding(paddingValues)) {
+            item {
+                if (!searchMode) {
+                    FunctionItem(R.string.manual_configurations, icon = R.drawable.edit_fill0) {
+                        navigateToManual()
+                    }
+                    HorizontalDivider(Modifier.padding(bottom = 8.dp))
+                }
+            }
             items(displayRestrictions, { it.key }) { entry ->
                 Row(
                     Modifier
@@ -1517,37 +1530,33 @@ enum class ManualRestrictionType(val label: Int) {
     STRING_ARRAY(R.string.type_string_array)
 }
 
-@Serializable object AddManagedConfiguration
+@Serializable class ManualConfiguration(val packageName: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddManagedConfigurationScreen(
-    chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    manualRestrictions: StateFlow<List<ManualRestriction>>,
+fun ManualConfigurationScreen(
+    params: ManualConfiguration, manualRestrictions: StateFlow<List<ManualRestriction>>,
     getManualRestrictions: (String) -> Unit,
     setManualRestriction: (String, ManualRestriction) -> Unit,
     removeManualRestriction: (String, String) -> Unit,
     onNavigateUp: () -> Unit
 ) {
-    var packageName by rememberSaveable { mutableStateOf("") }
+    val packageName = params.packageName
     val restrictions by manualRestrictions.collectAsStateWithLifecycle()
     var editDialog by remember { mutableStateOf<ManualRestriction?>(null) }
     var addDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        packageName = chosenPackage.receive()
-    }
-    LaunchedEffect(packageName) {
-        if (packageName.isValidPackageName) getManualRestrictions(packageName)
+        getManualRestrictions(packageName)
     }
     Scaffold(
         topBar = {
             TopAppBar(
-                { Text(stringResource(R.string.add_managed_configuration)) },
+                { Text(stringResource(R.string.manual_configurations)) },
                 navigationIcon = { NavIcon(onNavigateUp) }
             )
         },
         floatingActionButton = {
-            if (packageName.isValidPackageName) FloatingActionButton({ addDialog = true }) {
+            FloatingActionButton({ addDialog = true }) {
                 Icon(Icons.Default.Add, null)
             }
         },
@@ -1555,9 +1564,7 @@ fun AddManagedConfigurationScreen(
     ) { paddingValues ->
         LazyColumn(Modifier.padding(paddingValues)) {
             item {
-                PackageNameTextField(packageName, onChoosePackage,
-                    Modifier.padding(HorizontalPadding, 8.dp)) { packageName = it }
-                Notes(R.string.info_add_managed_configuration, HorizontalPadding)
+                Notes(R.string.info_manual_configurations, HorizontalPadding)
                 Spacer(Modifier.height(8.dp))
             }
             items(restrictions, { it.key }) { entry ->

@@ -578,9 +578,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
 
     fun setAppRestrictions(name: String, item: AppRestriction) {
         viewModelScope.launch(Dispatchers.IO) {
-            val bundle = transformAppRestriction(
-                appRestrictions.value.filter { it.key != item.key }.plus(item)
-            )
+            val declared = appRestrictions.value.filter { it.key != item.key }.plus(item)
+            // Start from what is currently applied so manually added keys are kept
+            val bundle = DPM.getApplicationRestrictions(DAR, name)
+            declared.forEach { bundle.remove(it.key) }
+            bundle.putAll(transformAppRestriction(declared))
             DPM.setApplicationRestrictions(DAR, name, bundle)
             getAppRestrictions(name)
         }

@@ -430,7 +430,8 @@
     <string name="remove_from_list">Remove from list</string>
     <string name="managed_configuration">Managed configuration</string>
     <string name="add_managed_configuration">Add managed configuration</string>
-    <string name="info_add_managed_configuration">Manually add managed configurations of any type to any app, even apps that do not declare configurations.</string>
+    <string name="manual_configurations">Manual configurations</string>
+    <string name="info_manual_configurations">Configurations added here are applied to the app even if it does not declare them. Configurations declared by the app are listed here too.</string>
     <string name="key">Key</string>
     <string name="value">Value</string>
     <string name="type_string">String</string>

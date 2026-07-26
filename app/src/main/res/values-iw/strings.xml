@@ -407,7 +407,8 @@
 	<string name="manage_uninstalled_packages">נהל חבילות שהוסרו</string>
 	<string name="managed_configuration">תצורה מנוהלת</string>
 	<string name="add_managed_configuration">הוסף תצורה מנוהלת</string>
-	<string name="info_add_managed_configuration">הוסף ידנית תצורות מנוהלות מכל סוג לכל אפליקציה, גם לאפליקציות שאינן מגדירות תצורות.</string>
+	<string name="manual_configurations">תצורות ידניות</string>
+	<string name="info_manual_configurations">תצורות שנוספות כאן מוחלות על האפליקציה גם אם היא אינה מגדירה אותן. גם תצורות שהאפליקציה מגדירה מופיעות כאן.</string>
 	<string name="key">מפתח</string>
 	<string name="value">ערך</string>
 	<string name="type_string">מחרוזת</string>

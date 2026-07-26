@@ -4,7 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class MyDbHelper(context: Context): SQLiteOpenHelper(context, "data", null, 6) {
+class MyDbHelper(context: Context): SQLiteOpenHelper(context, "data", null, 7) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(DHIZUKU_CLIENTS_TABLE)
         db.execSQL(SECURITY_LOGS_TABLE)
@@ -28,6 +28,9 @@ class MyDbHelper(context: Context): SQLiteOpenHelper(context, "data", null, 6) {
         if (oldVersion == 5) {
             db.execSQL("ALTER TABLE policy_toggles ADD COLUMN user_allowed INTEGER DEFAULT 0")
         }
+        if (oldVersion in 5..6) {
+            db.execSQL("ALTER TABLE policy_toggles ADD COLUMN backup TEXT DEFAULT ''")
+        }
     }
     companion object {
         const val DHIZUKU_CLIENTS_TABLE = "CREATE TABLE dhizuku_clients (uid INTEGER PRIMARY KEY," +
@@ -42,6 +45,7 @@ class MyDbHelper(context: Context): SQLiteOpenHelper(context, "data", null, 6) {
                 "name TEXT, apps TEXT)"
         const val POLICY_TOGGLES_TABLE = "CREATE TABLE policy_toggles(" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                "name TEXT, enabled INTEGER, policies TEXT, user_allowed INTEGER DEFAULT 0)"
+                "name TEXT, enabled INTEGER, policies TEXT, user_allowed INTEGER DEFAULT 0," +
+                "backup TEXT DEFAULT '')"
     }
 }

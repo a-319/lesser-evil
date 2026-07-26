@@ -28,10 +28,6 @@ class SharedPrefs(context: Context) {
     var dhizukuServer by BooleanSharedPref("dhizuku_server")
     var notifications by StringSharedPref("notifications")
     var shortcutKey by StringSharedPref("shortcut_key")
-    /** Metered data disabled packages captured before a mode switch enforced a blanket block */
-    var policyToggleMddBackup by StringSharedPref("policy_toggles.mdd_backup")
-    /** Always-on VPN config ("package|lockdown", or "" for none) captured before a mode switch enforced its own */
-    var policyToggleVpnBackup by StringSharedPref("policy_toggles.vpn_backup")
     /**
      * Blocks created by the user profile, per function - newline separated.
      * Only these may be lifted by the user profile; everything else belongs to the admin.

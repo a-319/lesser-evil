@@ -757,11 +757,13 @@
 
     <!--Mode switches-->
     <string name="mode_switches">Mode switches</string>
-    <string name="mode_switches_note">Each switch applies its policies when turned on, and applies the opposite state when turned off. For example, a switch can allow developer options while blocking app installation, and do the reverse when turned off. Long press a switch to pin it to the launcher. Deleting a switch that is turned on will first apply its off state.</string>
+    <string name="mode_switches_note">Each switch describes what happens while it is on - for example allowing developer options while blocking app installation. Turning it off restores whatever was configured in the app before. Long press a switch to pin it to the launcher. Deleting a switch that is on restores its targets first.</string>
     <string name="n_policies">%1$d policies</string>
     <string name="add_policy">Add policy</string>
-    <string name="enforced_while_on">Enforced while the switch is on</string>
-    <string name="enforced_while_off">Enforced while the switch is off</string>
+    <string name="while_the_switch_is_on">While the switch is on</string>
+    <string name="blocked_while_on">Blocked</string>
+    <string name="released_while_on">Released</string>
+    <string name="switch_off_restores_note">Turning the switch off restores whatever is configured in the app, so a block only has to be described here for the time the switch is on.</string>
     <string name="excluded_packages">Excluded packages</string>
     <string name="block_metered_data_note">While enforced, metered data (Wi-Fi and mobile) will be disabled for all apps except the excluded packages. When released, the list that was configured before enforcement is restored.</string>
     <string name="switch_removed">Switch removed</string>

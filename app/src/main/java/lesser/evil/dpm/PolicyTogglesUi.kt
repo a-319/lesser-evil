@@ -172,7 +172,7 @@ fun EditPolicyToggleScreen(
     var packageInput by rememberSaveable { mutableStateOf("") }
     var lockdown by rememberSaveable { mutableStateOf(false) }
     var excludedInput by rememberSaveable { mutableStateOf("") }
-    var enforceWhenOn by rememberSaveable { mutableStateOf(true) }
+    var blockedWhenOn by rememberSaveable { mutableStateOf(true) }
     var restrictionDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         val pkg = chosenPackage.receive()
@@ -185,22 +185,22 @@ fun EditPolicyToggleScreen(
     fun buildPolicy(): TogglePolicy? = when (type) {
         TogglePolicyType.UserRestriction ->
             if (restrictionId.isNotBlank()) {
-                TogglePolicy.UserRestriction(restrictionId.trim(), enforceWhenOn)
+                TogglePolicy.UserRestriction(restrictionId.trim(), blockedWhenOn)
             } else null
         TogglePolicyType.HideApp ->
             if (packageInput.isValidPackageName) {
-                TogglePolicy.HideApp(packageInput.trim(), enforceWhenOn)
+                TogglePolicy.HideApp(packageInput.trim(), blockedWhenOn)
             } else null
         TogglePolicyType.SuspendApp ->
             if (packageInput.isValidPackageName) {
-                TogglePolicy.SuspendApp(packageInput.trim(), enforceWhenOn)
+                TogglePolicy.SuspendApp(packageInput.trim(), blockedWhenOn)
             } else null
         TogglePolicyType.AlwaysOnVpn ->
             if (packageInput.isValidPackageName) {
-                TogglePolicy.AlwaysOnVpn(packageInput.trim(), lockdown, enforceWhenOn)
+                TogglePolicy.AlwaysOnVpn(packageInput.trim(), lockdown, blockedWhenOn)
             } else null
         TogglePolicyType.BlockMeteredData ->
-            TogglePolicy.BlockMeteredData(parsePackageNames(excludedInput), enforceWhenOn)
+            TogglePolicy.BlockMeteredData(parsePackageNames(excludedInput), blockedWhenOn)
     }
     Scaffold(
         topBar = {
@@ -253,8 +253,8 @@ fun EditPolicyToggleScreen(
                         Text(policyTitle(policy), style = typography.titleMedium)
                         Text(
                             stringResource(
-                                if (policy.enforceWhenOn) R.string.enforced_while_on
-                                else R.string.enforced_while_off
+                                if (policy.blockedWhenOn) R.string.blocked_while_on
+                                else R.string.released_while_on
                             ),
                             style = typography.bodyMedium,
                             color = colorScheme.onBackground.copy(alpha = 0.8F)
@@ -314,12 +314,14 @@ fun EditPolicyToggleScreen(
                 }
             }
             Spacer(Modifier.padding(vertical = 2.dp))
-            FullWidthRadioButtonItem(R.string.enforced_while_on, enforceWhenOn) {
-                enforceWhenOn = true
+            Text(stringResource(R.string.while_the_switch_is_on), style = typography.titleSmall)
+            FullWidthRadioButtonItem(R.string.blocked_while_on, blockedWhenOn) {
+                blockedWhenOn = true
             }
-            FullWidthRadioButtonItem(R.string.enforced_while_off, !enforceWhenOn) {
-                enforceWhenOn = false
+            FullWidthRadioButtonItem(R.string.released_while_on, !blockedWhenOn) {
+                blockedWhenOn = false
             }
+            Notes(R.string.switch_off_restores_note)
             Spacer(Modifier.padding(vertical = 2.dp))
             Button(
                 {

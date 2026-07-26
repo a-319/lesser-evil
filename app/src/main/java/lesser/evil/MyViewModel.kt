@@ -791,25 +791,37 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun switchPolicyToggle(id: Int, state: Boolean): Boolean {
         val toggle = policyToggles.value.find { it.id == id } ?: return false
         if (restrictedMode.value && !toggle.userAllowed) return false
-        val result = PolicyToggleManager.apply(application, toggle.policies, state)
-        myRepo.setPolicyToggleEnabled(id, state)
+        // Turning on records what to come back to; turning off restores it and drops the snapshot
+        val backup = if (state) PolicyToggleManager.captureBackup(toggle.policies) else ""
+        val result = PolicyToggleManager.apply(
+            application, toggle.policies, state, if (state) "" else toggle.backup
+        )
+        myRepo.setPolicyToggleEnabled(id, state, backup)
         ShortcutUtils.updatePolicyToggleShortcut(application, id, toggle.name, state)
         getPolicyToggles()
         return result
     }
     fun setPolicyToggle(id: Int?, name: String, policies: List<TogglePolicy>, userAllowed: Boolean): Boolean {
         if (restrictedMode.value) return false
-        val enabled = id != null && policyToggles.value.find { it.id == id }?.enabled == true
+        val existing = if (id == null) null else policyToggles.value.find { it.id == id }
+        val enabled = existing?.enabled == true
         myRepo.setPolicyToggle(id, name, enabled, userAllowed, policies)
         if (id != null) ShortcutUtils.updatePolicyToggleShortcut(application, id, name, enabled)
+        var result = true
+        if (enabled && id != null) {
+            // Editing a switch that is already on re-snapshots, so newly added policies can be
+            // restored too, then applies the new policy set
+            myRepo.setPolicyToggleEnabled(id, true, PolicyToggleManager.captureBackup(policies))
+            result = PolicyToggleManager.apply(application, policies, true)
+        }
         getPolicyToggles()
-        return if (enabled) PolicyToggleManager.apply(application, policies, true) else true
+        return result
     }
     fun deletePolicyToggle(id: Int) {
         if (restrictedMode.value) return
         val toggle = policyToggles.value.find { it.id == id }
         if (toggle?.enabled == true) {
-            PolicyToggleManager.apply(application, toggle.policies, false)
+            PolicyToggleManager.apply(application, toggle.policies, false, toggle.backup)
         }
         myRepo.deletePolicyToggle(id)
         ShortcutUtils.disablePolicyToggleShortcut(application, id)

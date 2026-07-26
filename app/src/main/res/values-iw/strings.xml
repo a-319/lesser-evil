@@ -70,6 +70,7 @@
 	<string name="backup_service">שירות גיבוי</string>
 	<string name="battery_low">הסוללה חלשה</string>
 	<string name="battery_temp">טמפרטורות סוללה</string>
+	<string name="blocked_while_on">חסום</string>
 	<string name="black_theme">נושא שחור</string>
 	<string name="blacklist">רשימה שחורה</string>
 	<string name="block_metered_data_note">כשהמדיניות נאכפת, נתונים מדודים (Wi-Fi ורשת סלולרית) יושבתו עבור כל האפליקציות מלבד החבילות המוחרגות. כשהיא משוחררת, הרשימה שהייתה מוגדרת לפני האכיפה משוחזרת.</string>
@@ -211,8 +212,6 @@
 	<string name="enable_frp">אפשר FRP</string>
 	<string name="enable_if_secure_enough">אותו חשבון מנוהל בלבד</string>
 	<string name="enable_lockdown">אפשר נעילה</string>
-	<string name="enforced_while_off">נאכף כשהמתג כבוי</string>
-	<string name="enforced_while_on">נאכף כשהמתג דולק</string>
 	<string name="enable_logout">אפשר התנתקות</string>
 	<string name="enable_system_app">הפעל אפליקציית מערכת</string>
 	<string name="enable_usb_signal">אפשר אות USB</string>
@@ -433,7 +432,7 @@
 	<string name="mobile">נייד</string>
 	<string name="mode">מצב</string>
 	<string name="mode_switches">מתגי מצב</string>
-	<string name="mode_switches_note">כל מתג מחיל את המדיניות שלו כשמדליקים אותו, ומחיל את המצב ההפוך כשמכבים אותו. למשל, מתג יכול לאפשר אפשרויות מפתחים ובו-זמנית לחסום התקנת אפליקציות, ולהפוך את המצב כשמכבים אותו. לחיצה ארוכה על מתג תצמיד אותו למסך הבית. מחיקת מתג דולק תחיל תחילה את מצב הכיבוי שלו.</string>
+	<string name="mode_switches_note">כל מתג מתאר מה קורה בזמן שהוא דולק — למשל לאפשר אפשרויות מפתחים ובו-זמנית לחסום התקנת אפליקציות. כיבוי המתג מחזיר את מה שהוגדר באפליקציה קודם לכן. לחיצה ארוכה על מתג תצמיד אותו למסך הבית. מחיקת מתג דולק משחזרת קודם את היעדים שלו.</string>
 	<string name="modify_accounts">שנה חשבונות</string>
 	<string name="mount_physical_media">הר מדיה פיזית</string>
 	<string name="mte_policy">מדיניות MTE</string>
@@ -560,6 +559,7 @@
 	<string name="query">שאלה</string>
 	<string name="range_end">סוף טווח</string>
 	<string name="range_start">תחילת טווח</string>
+	<string name="released_while_on">משוחרר</string>
 	<string name="reason">לנמק</string>
 	<string name="reboot">לאתחל</string>
 	<string name="received">התקבל</string>
@@ -648,6 +648,7 @@
 	<string name="suspend">להשעות</string>
 	<string name="suspend_personal_app">השעיית אפליקציה אישית</string>
 	<string name="switch_role">מתג</string>
+	<string name="switch_off_restores_note">כיבוי המתג מחזיר את מה שמוגדר באפליקציה, כך שצריך לתאר כאן חסימה רק עבור הזמן שבו המתג דולק.</string>
 	<string name="switch_removed">המתג הוסר</string>
 	<string name="switch_to_disable_feature">הפעל מתג כדי להשבית את הפונקציה הזו.</string>
 	<string name="switch_to_user_n">עבור למשתמש %1$d</string>
@@ -730,6 +731,7 @@
 	<string name="users">משתמשים</string>
 	<string name="vpn">VPN</string>
 	<string name="warning">אזהרה</string>
+	<string name="while_the_switch_is_on">כשהמתג דולק</string>
 	<string name="whitelist">רשימת הלבנים</string>
 	<string name="whitelist_and_system_app">רשימת היתרים ואפליקציית מערכת</string>
 	<string name="wifi">Wi-Fi</string>

@@ -432,8 +432,13 @@
     <string name="add_managed_configuration">Add managed configuration</string>
     <string name="manual_configurations">Manual configurations</string>
     <string name="info_manual_configurations">Configurations added here are applied to the app even if it does not declare them. Configurations declared by the app are listed here too.</string>
+    <string name="add_configuration">Add configuration</string>
+    <string name="edit_configuration">Edit configuration</string>
     <string name="key">Key</string>
     <string name="value">Value</string>
+    <string name="key_empty_error">Key cannot be empty</string>
+    <string name="key_already_exists">A configuration with this key already exists</string>
+    <string name="value_not_a_number">Value must be a whole number</string>
     <string name="type_string">String</string>
     <string name="type_integer">Integer</string>
     <string name="type_boolean">Boolean</string>

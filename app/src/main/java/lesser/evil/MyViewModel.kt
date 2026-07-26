@@ -647,9 +647,10 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
-    fun setManualRestriction(name: String, item: ManualRestriction) {
+    fun setManualRestriction(name: String, oldKey: String?, item: ManualRestriction) {
         viewModelScope.launch(Dispatchers.IO) {
-            val list = manualRestrictions.value.filter { it.key != item.key }.plus(item)
+            val list = manualRestrictions.value
+                .filter { it.key != oldKey && it.key != item.key }.plus(item)
             DPM.setApplicationRestrictions(DAR, name, manualRestrictionsToBundle(list))
             getManualRestrictions(name)
         }

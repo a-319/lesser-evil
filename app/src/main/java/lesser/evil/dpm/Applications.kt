@@ -54,6 +54,9 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenu
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,6 +65,7 @@ import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -1537,7 +1541,7 @@ enum class ManualRestrictionType(val label: Int) {
 fun ManualConfigurationScreen(
     params: ManualConfiguration, manualRestrictions: StateFlow<List<ManualRestriction>>,
     getManualRestrictions: (String) -> Unit,
-    setManualRestriction: (String, ManualRestriction) -> Unit,
+    setManualRestriction: (String, String?, ManualRestriction) -> Unit,
     removeManualRestriction: (String, String) -> Unit,
     onNavigateUp: () -> Unit
 ) {
@@ -1606,27 +1610,47 @@ fun ManualConfigurationScreen(
             }
         }
     }
-    if (addDialog) ManualRestrictionDialog(null, { addDialog = false }) {
-        setManualRestriction(packageName, it)
-        addDialog = false
+    if (addDialog) Dialog({ addDialog = false }) {
+        Surface(
+            color = AlertDialogDefaults.containerColor,
+            shape = AlertDialogDefaults.shape,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
+        ) {
+            ManualRestrictionDialog(null, restrictions.map { it.key }, { addDialog = false }) { oldKey, item ->
+                setManualRestriction(packageName, oldKey, item)
+                addDialog = false
+            }
+        }
     }
     editDialog?.let { current ->
-        ManualRestrictionDialog(current, { editDialog = null }) {
-            setManualRestriction(packageName, it)
-            editDialog = null
+        Dialog({ editDialog = null }) {
+            Surface(
+                color = AlertDialogDefaults.containerColor,
+                shape = AlertDialogDefaults.shape,
+                tonalElevation = AlertDialogDefaults.TonalElevation,
+            ) {
+                val otherKeys = restrictions.map { it.key }.filter { it != current.key }
+                ManualRestrictionDialog(current, otherKeys, { editDialog = null }) { oldKey, item ->
+                    setManualRestriction(packageName, oldKey, item)
+                    editDialog = null
+                }
+            }
         }
     }
 }
+
+private data class ArrayRow(val id: Int, val value: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualRestrictionDialog(
     existing: ManualRestriction?,
+    existingKeys: List<String>,
     onDismiss: () -> Unit,
-    onConfirm: (ManualRestriction) -> Unit
+    onConfirm: (String?, ManualRestriction) -> Unit
 ) {
-    var key by rememberSaveable { mutableStateOf(existing?.key ?: "") }
-    var type by rememberSaveable {
+    var key by remember { mutableStateOf(existing?.key ?: "") }
+    var type by remember {
         mutableStateOf(
             when (existing) {
                 is ManualRestriction.IntItem -> ManualRestrictionType.INTEGER
@@ -1636,7 +1660,8 @@ fun ManualRestrictionDialog(
             }
         )
     }
-    var stringValue by rememberSaveable {
+    var typeMenuExpanded by remember { mutableStateOf(false) }
+    var stringValue by remember {
         mutableStateOf(
             when (existing) {
                 is ManualRestriction.StringItem -> existing.value
@@ -1645,121 +1670,164 @@ fun ManualRestrictionDialog(
             }
         )
     }
-    var boolValue by rememberSaveable {
+    var boolValue by remember {
         mutableStateOf((existing as? ManualRestriction.BooleanItem)?.value ?: false)
     }
+    var nextRowId by remember { mutableIntStateOf(0) }
     val arrayValue = remember {
         mutableStateListOf(
-            *((existing as? ManualRestriction.StringArrayItem)?.value ?: emptyList()).toTypedArray()
+            *((existing as? ManualRestriction.StringArrayItem)?.value ?: emptyList())
+                .map { ArrayRow(nextRowId++, it) }.toTypedArray()
         )
     }
+    val listState = rememberLazyListState()
+    val reorderableListState = rememberReorderableLazyListState(listState) { from, to ->
+        // `-1` because there's an `item` (key + type) before the array rows
+        arrayValue.add(from.index - 1, arrayValue.removeAt(to.index - 1))
+    }
+    val keyTaken = key in existingKeys
+    val keyError = key.isBlank() || keyTaken
     val intError = type == ManualRestrictionType.INTEGER && stringValue.toIntOrNull() == null
-    val valid = key.isNotBlank() && !intError
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(
-                if (existing == null) R.string.add_managed_configuration
-                else R.string.managed_configuration
-            ))
-        },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
-                    key, { key = it }, Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.key)) },
-                    enabled = existing == null,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
-                )
-                Spacer(Modifier.height(8.dp))
-                if (existing == null) {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        ManualRestrictionType.entries.forEachIndexed { index, t ->
-                            SegmentedButton(
-                                type == t, { type = t },
-                                SegmentedButtonDefaults.itemShape(
-                                    index, ManualRestrictionType.entries.size
-                                )
-                            ) {
-                                Text(stringResource(t.label), maxLines = 1)
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-                when (type) {
-                    ManualRestrictionType.STRING -> OutlinedTextField(
-                        stringValue, { stringValue = it }, Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.value)) }
-                    )
-                    ManualRestrictionType.INTEGER -> OutlinedTextField(
-                        stringValue, { stringValue = it }, Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.value)) },
-                        isError = intError,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
-                    ManualRestrictionType.BOOLEAN ->
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                            SegmentedButton(
-                                boolValue, { boolValue = true },
-                                SegmentedButtonDefaults.itemShape(0, 2)
-                            ) { Text("true") }
-                            SegmentedButton(
-                                !boolValue, { boolValue = false },
-                                SegmentedButtonDefaults.itemShape(1, 2)
-                            ) { Text("false") }
-                        }
-                    ManualRestrictionType.STRING_ARRAY -> Column {
-                        arrayValue.forEachIndexed { index, s ->
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedTextField(
-                                    s, { arrayValue[index] = it }, Modifier.weight(1F),
-                                    singleLine = true
-                                )
-                                IconButton({ arrayValue.removeAt(index) }) {
-                                    Icon(Icons.Outlined.Clear, null)
-                                }
-                            }
-                            Spacer(Modifier.height(4.dp))
-                        }
-                        TextButton({ arrayValue.add("") }) {
-                            Icon(Icons.Default.Add, null)
-                            Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.add))
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                {
-                    val result = when (type) {
-                        ManualRestrictionType.STRING ->
-                            ManualRestriction.StringItem(key, stringValue)
-                        ManualRestrictionType.INTEGER ->
-                            ManualRestriction.IntItem(key, stringValue.toIntOrNull() ?: 0)
-                        ManualRestrictionType.BOOLEAN ->
-                            ManualRestriction.BooleanItem(key, boolValue)
-                        ManualRestrictionType.STRING_ARRAY ->
-                            ManualRestriction.StringArrayItem(
-                                key, arrayValue.filter { it.isNotEmpty() }
-                            )
-                    }
-                    onConfirm(result)
+    val valid = !keyError && !intError
+    LazyColumn(Modifier.padding(12.dp), listState) {
+        item {
+            Text(
+                stringResource(
+                    if (existing == null) R.string.add_configuration
+                    else R.string.edit_configuration
+                ),
+                style = typography.titleLarge
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                key, { key = it }, Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.key)) },
+                singleLine = true,
+                isError = keyError,
+                supportingText = {
+                    if (key.isBlank()) Text(stringResource(R.string.key_empty_error))
+                    else if (keyTaken) Text(stringResource(R.string.key_already_exists))
                 },
-                enabled = valid
-            ) {
-                Text(stringResource(R.string.confirm))
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+            )
+            Spacer(Modifier.height(8.dp))
+            ExposedDropdownMenuBox(typeMenuExpanded, { typeMenuExpanded = it }) {
+                OutlinedTextField(
+                    stringResource(type.label), {},
+                    Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    readOnly = true,
+                    label = { Text(stringResource(R.string.type)) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeMenuExpanded) }
+                )
+                ExposedDropdownMenu(typeMenuExpanded, { typeMenuExpanded = false }) {
+                    ManualRestrictionType.entries.forEach { t ->
+                        DropdownMenuItem(
+                            { Text(stringResource(t.label)) },
+                            {
+                                type = t
+                                typeMenuExpanded = false
+                            }
+                        )
+                    }
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onDismiss) { Text(stringResource(R.string.cancel)) }
+            Spacer(Modifier.height(8.dp))
         }
-    )
+        when (type) {
+            ManualRestrictionType.STRING -> item {
+                OutlinedTextField(
+                    stringValue, { stringValue = it }, Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.value)) }
+                )
+            }
+            ManualRestrictionType.INTEGER -> item {
+                OutlinedTextField(
+                    stringValue, { stringValue = it }, Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.value)) },
+                    isError = intError,
+                    supportingText = { if (intError) Text(stringResource(R.string.value_not_a_number)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+            }
+            ManualRestrictionType.BOOLEAN -> item {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        boolValue, { boolValue = true },
+                        SegmentedButtonDefaults.itemShape(0, 2)
+                    ) { Text("true") }
+                    SegmentedButton(
+                        !boolValue, { boolValue = false },
+                        SegmentedButtonDefaults.itemShape(1, 2)
+                    ) { Text("false") }
+                }
+            }
+            ManualRestrictionType.STRING_ARRAY -> {
+                itemsIndexed(arrayValue, { _, row -> row.id }) { index, row ->
+                    ReorderableItem(reorderableListState, row.id) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                row.value, { arrayValue[index] = row.copy(value = it) },
+                                Modifier.weight(1F),
+                                singleLine = true
+                            )
+                            IconButton({ arrayValue.removeAt(index) }) {
+                                Icon(Icons.Outlined.Clear, null)
+                            }
+                            Icon(
+                                painterResource(R.drawable.drag_indicator_fill0), null,
+                                Modifier.draggableHandle()
+                            )
+                        }
+                    }
+                }
+                item {
+                    TextButton({ arrayValue.add(ArrayRow(nextRowId++, "")) }) {
+                        Icon(Icons.Default.Add, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.add))
+                    }
+                }
+            }
+        }
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                Arrangement.End
+            ) {
+                TextButton(onDismiss, Modifier.padding(end = 4.dp)) {
+                    Text(stringResource(R.string.cancel))
+                }
+                TextButton(
+                    {
+                        val result = when (type) {
+                            ManualRestrictionType.STRING ->
+                                ManualRestriction.StringItem(key, stringValue)
+                            ManualRestrictionType.INTEGER ->
+                                ManualRestriction.IntItem(key, stringValue.toIntOrNull() ?: 0)
+                            ManualRestrictionType.BOOLEAN ->
+                                ManualRestriction.BooleanItem(key, boolValue)
+                            ManualRestrictionType.STRING_ARRAY ->
+                                ManualRestriction.StringArrayItem(
+                                    key, arrayValue.map { it.value }.filter { it.isNotBlank() }
+                                )
+                        }
+                        onConfirm(existing?.key, result)
+                    },
+                    enabled = valid
+                ) {
+                    Text(stringResource(R.string.confirm))
+                }
+            }
+        }
+    }
 }

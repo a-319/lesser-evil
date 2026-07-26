@@ -409,8 +409,13 @@
 	<string name="add_managed_configuration">הוסף תצורה מנוהלת</string>
 	<string name="manual_configurations">תצורות ידניות</string>
 	<string name="info_manual_configurations">תצורות שנוספות כאן מוחלות על האפליקציה גם אם היא אינה מגדירה אותן. גם תצורות שהאפליקציה מגדירה מופיעות כאן.</string>
+	<string name="add_configuration">הוספת תצורה</string>
+	<string name="edit_configuration">עריכת תצורה</string>
 	<string name="key">מפתח</string>
 	<string name="value">ערך</string>
+	<string name="key_empty_error">המפתח לא יכול להיות ריק</string>
+	<string name="key_already_exists">כבר קיימת תצורה עם מפתח זה</string>
+	<string name="value_not_a_number">הערך חייב להיות מספר שלם</string>
 	<string name="type_string">מחרוזת</string>
 	<string name="type_integer">מספר שלם</string>
 	<string name="type_boolean">בוליאני</string>

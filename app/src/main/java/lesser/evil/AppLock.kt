@@ -135,9 +135,9 @@ fun AppLockDialog(
                     enabled = !isLocked,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
-                        imeAction = if (input.length >= 4) ImeAction.Go else ImeAction.Done
+                        imeAction = ImeAction.Go
                     ),
-                    keyboardActions = KeyboardActions({ fm.clearFocus() }, { unlock() }),
+                    keyboardActions = KeyboardActions(onGo = { if (input.length >= 4) unlock() else fm.clearFocus() }),
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showPassword = !showPassword }) {

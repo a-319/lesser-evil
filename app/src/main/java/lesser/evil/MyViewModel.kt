@@ -140,56 +140,65 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     val PM = application.packageManager
 
     /**
-     * Blocks the admin profile had in place at the moment the user profile was entered.
-     * In restricted mode the user profile may add its own blocks and remove those, but may
-     * never lift a block that is part of this baseline.
+     * The blocking functions the user profile can take ownership of. For each one the set of
+     * blocks the user profile created is persisted, so ownership survives admin sessions and
+     * app restarts. Anything blocked but not user-owned belongs to the admin.
      */
-    class AdminBaseline(
-        val hidden: Set<String>, val suspended: Set<String>, val uninstallBlocked: Set<String>,
-        val userControlDisabled: Set<String>, val meteredDataDisabled: Set<String>,
-        val userRestrictions: Set<String>
-    )
+    enum class BlockKind { Hidden, Suspended, UninstallBlocked, Ucd, Mdd, UserRestriction }
+
     /** True when the app was entered as the user profile (without the lock password) */
     val restrictedMode = MutableStateFlow(false)
-    private var adminBaseline: AdminBaseline? = null
 
-    @SuppressLint("NewApi")
     fun enterRestrictedMode() {
-        val apps = PM.getInstalledApplications(getInstalledAppsFlags)
-        val hidden = mutableSetOf<String>()
-        val suspended = mutableSetOf<String>()
-        val uninstallBlocked = mutableSetOf<String>()
-        apps.forEach {
-            val p = it.packageName
-            if (DPM.isApplicationHidden(DAR, p)) hidden += p
-            if (VERSION.SDK_INT >= 24 && DPM.isPackageSuspended(DAR, p)) suspended += p
-            if (DPM.isUninstallBlocked(DAR, p)) uninstallBlocked += p
-        }
-        val ucd = if (VERSION.SDK_INT >= 30) DPM.getUserControlDisabledPackages(DAR).toSet() else emptySet()
-        val mdd = if (VERSION.SDK_INT >= 28) DPM.getMeteredDataDisabledPackages(DAR).toSet() else emptySet()
-        val restrictions = if (VERSION.SDK_INT >= 24) {
-            val bundle = DPM.getUserRestrictions(DAR)
-            bundle.keySet().filter { bundle.getBoolean(it) }.toSet()
-        } else emptySet()
-        adminBaseline = AdminBaseline(hidden, suspended, uninstallBlocked, ucd, mdd, restrictions)
         restrictedMode.value = true
     }
     fun exitRestrictedMode() {
-        adminBaseline = null
         restrictedMode.value = false
     }
-    /** True (and toasts) if restricted mode may not remove the admin block on [key] from [baseline] */
-    private fun adminProtected(baseline: Set<String>?, key: String): Boolean {
-        if (restrictedMode.value && baseline?.contains(key) == true) {
+    private fun getUserOwned(kind: BlockKind): Set<String> = when (kind) {
+        BlockKind.Hidden -> SP.userOwnedHidden
+        BlockKind.Suspended -> SP.userOwnedSuspended
+        BlockKind.UninstallBlocked -> SP.userOwnedUninstallBlocked
+        BlockKind.Ucd -> SP.userOwnedUcd
+        BlockKind.Mdd -> SP.userOwnedMdd
+        BlockKind.UserRestriction -> SP.userOwnedRestrictions
+    }?.split('\n')?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+
+    private fun putUserOwned(kind: BlockKind, value: Set<String>) {
+        val text = value.joinToString("\n")
+        when (kind) {
+            BlockKind.Hidden -> SP.userOwnedHidden = text
+            BlockKind.Suspended -> SP.userOwnedSuspended = text
+            BlockKind.UninstallBlocked -> SP.userOwnedUninstallBlocked = text
+            BlockKind.Ucd -> SP.userOwnedUcd = text
+            BlockKind.Mdd -> SP.userOwnedMdd = text
+            BlockKind.UserRestriction -> SP.userOwnedRestrictions = text
+        }
+    }
+    /**
+     * Records who owns the blocks on [keys] after they were just set to [blocked].
+     * A block the user profile creates becomes user-owned; anything the admin sets or either
+     * side clears is no longer user-owned - so an admin block always overrides a user one.
+     */
+    private fun recordOwnership(kind: BlockKind, keys: List<String>, blocked: Boolean) {
+        if (keys.isEmpty()) return
+        val current = getUserOwned(kind)
+        val updated = if (blocked && restrictedMode.value) current + keys else current - keys.toSet()
+        if (updated != current) putUserOwned(kind, updated)
+    }
+    /** True (and toasts) if the user profile may not lift the block on [key] - the admin owns it */
+    private fun adminProtected(kind: BlockKind, key: String): Boolean {
+        if (restrictedMode.value && key !in getUserOwned(kind)) {
             application.popToast(R.string.cannot_modify_admin_block)
             return true
         }
         return false
     }
-    /** Packages from [keys] whose block the admin owns - filtered out of a user-profile removal */
-    private fun filterAdminProtected(baseline: Set<String>?, keys: List<String>): List<String> {
+    /** Keys from [keys] the user profile may lift - admin-owned ones are filtered out */
+    private fun filterAdminProtected(kind: BlockKind, keys: List<String>): List<String> {
         if (!restrictedMode.value) return keys
-        val allowed = keys.filter { baseline?.contains(it) != true }
+        val userOwned = getUserOwned(kind)
+        val allowed = keys.filter { it in userOwned }
         if (allowed.size != keys.size) application.popToast(R.string.cannot_modify_admin_block)
         return allowed
     }
@@ -298,8 +307,9 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun setPackageSuspended(packages: List<String>, status: Boolean) {
         // Adding a block is always allowed; removing one is denied for admin-owned packages
         val effective = if (status) packages
-        else filterAdminProtected(adminBaseline?.suspended, packages)
+        else filterAdminProtected(BlockKind.Suspended, packages)
         if (effective.isNotEmpty()) DPM.setPackagesSuspended(DAR, effective.toTypedArray(), status)
+        recordOwnership(BlockKind.Suspended, effective, status)
         getSuspendedPackaged()
     }
 
@@ -311,10 +321,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun setPackageHidden(packages: List<String>, status: Boolean) {
         val effective = if (status) packages
-        else filterAdminProtected(adminBaseline?.hidden, packages)
+        else filterAdminProtected(BlockKind.Hidden, packages)
         for (name in effective) {
             DPM.setApplicationHidden(DAR, name, status)
         }
+        recordOwnership(BlockKind.Hidden, effective, status)
         getHiddenPackages()
     }
 
@@ -327,10 +338,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun setPackageUb(packages: List<String>, status: Boolean) {
         val effective = if (status) packages
-        else filterAdminProtected(adminBaseline?.uninstallBlocked, packages)
+        else filterAdminProtected(BlockKind.UninstallBlocked, packages)
         for (name in effective) {
             DPM.setUninstallBlocked(DAR, name, status)
         }
+        recordOwnership(BlockKind.UninstallBlocked, effective, status)
         getUbPackages()
     }
 
@@ -345,13 +357,14 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     @RequiresApi(30)
     fun setPackageUcd(packages: List<String>, status: Boolean) {
         val effective = if (status) packages
-        else filterAdminProtected(adminBaseline?.userControlDisabled, packages)
+        else filterAdminProtected(BlockKind.Ucd, packages)
         DPM.setUserControlDisabledPackages(
             DAR,
             ucdPackages.value.map { it.name }.run {
                 if (status) plus(effective) else minus(effective)
             }
         )
+        recordOwnership(BlockKind.Ucd, effective, status)
         getUcdPackages()
     }
 
@@ -380,12 +393,13 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     @RequiresApi(28)
     fun setPackageMdd(packages: List<String>, status: Boolean) {
         val effective = if (status) packages
-        else filterAdminProtected(adminBaseline?.meteredDataDisabled, packages)
+        else filterAdminProtected(BlockKind.Mdd, packages)
         DPM.setMeteredDataDisabledPackages(
             DAR, mddPackages.value.map { it.name }.run {
                 if (status) plus(effective) else minus(effective)
             }
         )
+        recordOwnership(BlockKind.Mdd, effective, status)
         getMddPackages()
     }
 
@@ -576,36 +590,41 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     // Application details
     @RequiresApi(24)
     fun adSetPackageSuspended(name: String, status: Boolean) {
-        if (!status && adminProtected(adminBaseline?.suspended, name)) return
+        if (!status && adminProtected(BlockKind.Suspended, name)) return
         try {
             DPM.setPackagesSuspended(DAR, arrayOf(name), status)
+            recordOwnership(BlockKind.Suspended, listOf(name), status)
             appStatus.update { it.copy(suspend = DPM.isPackageSuspended(DAR, name)) }
         } catch (_: Exception) {}
     }
     fun adSetPackageHidden(name: String, status: Boolean) {
-        if (!status && adminProtected(adminBaseline?.hidden, name)) return
+        if (!status && adminProtected(BlockKind.Hidden, name)) return
         DPM.setApplicationHidden(DAR, name, status)
+        recordOwnership(BlockKind.Hidden, listOf(name), status)
         appStatus.update { it.copy(hide = DPM.isApplicationHidden(DAR, name)) }
     }
     fun adSetPackageUb(name: String, status: Boolean) {
-        if (!status && adminProtected(adminBaseline?.uninstallBlocked, name)) return
+        if (!status && adminProtected(BlockKind.UninstallBlocked, name)) return
         DPM.setUninstallBlocked(DAR, name, status)
+        recordOwnership(BlockKind.UninstallBlocked, listOf(name), status)
         appStatus.update { it.copy(uninstallBlocked = DPM.isUninstallBlocked(DAR, name)) }
     }
     @RequiresApi(30)
     fun adSetPackageUcd(name: String, status: Boolean) {
-        if (!status && adminProtected(adminBaseline?.userControlDisabled, name)) return
+        if (!status && adminProtected(BlockKind.Ucd, name)) return
         DPM.setUserControlDisabledPackages(DAR,
             DPM.getUserControlDisabledPackages(DAR).run { if (status) plus(name) else minus(name) })
+        recordOwnership(BlockKind.Ucd, listOf(name), status)
         appStatus.update {
             it.copy(userControlDisabled = name in DPM.getUserControlDisabledPackages(DAR))
         }
     }
     @RequiresApi(28)
     fun adSetPackageMdd(name: String, status: Boolean) {
-        if (!status && adminProtected(adminBaseline?.meteredDataDisabled, name)) return
+        if (!status && adminProtected(BlockKind.Mdd, name)) return
         DPM.setMeteredDataDisabledPackages(DAR,
             DPM.getMeteredDataDisabledPackages(DAR).run { if (status) plus(name) else minus(name) })
+        recordOwnership(BlockKind.Mdd, listOf(name), status)
         appStatus.update {
             it.copy(meteredDataDisabled = name in DPM.getMeteredDataDisabledPackages(DAR))
         }
@@ -1510,13 +1529,14 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun setUserRestriction(name: String, state: Boolean): Boolean {
         // The user profile may add restrictions, but not lift ones the admin set
-        if (!state && adminProtected(adminBaseline?.userRestrictions, name)) return false
+        if (!state && adminProtected(BlockKind.UserRestriction, name)) return false
         return try {
             if (state) {
                 DPM.addUserRestriction(DAR, name)
             } else {
                 DPM.clearUserRestriction(DAR, name)
             }
+            recordOwnership(BlockKind.UserRestriction, listOf(name), state)
             userRestrictions.update { it.plus(name to state) }
             ShortcutUtils.updateUserRestrictionShortcut(application, name, !state, true)
             true

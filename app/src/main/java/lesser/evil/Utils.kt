@@ -169,6 +169,7 @@ fun adaptiveInsets(): WindowInsets {
  * [adaptiveInsets] leaves out the bottom navigation bar on purpose, so lists can scroll under it.
  * That also drops a Scaffold's floating action button behind the bar, so lift it back up.
  */
+@Composable
 fun Modifier.fabInsetsPadding() =
     windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
 

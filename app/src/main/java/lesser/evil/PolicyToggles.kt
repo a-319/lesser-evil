@@ -149,10 +149,12 @@ object PolicyToggleManager {
                 val applied = if (state) {
                     applyPolicy(context, policy, policy.blockedWhenOn)
                 } else {
-                    // Without a snapshot the switch was never turned on through this path,
-                    // so there is nothing to restore and the current state is left alone
                     val saved = snapshot[backupKey(policy)]
-                    if (saved == null) true else restorePolicy(context, policy, saved)
+                    if (saved != null) restorePolicy(context, policy, saved)
+                    // A switch turned on before snapshots existed has nothing to restore, so fall
+                    // back to the old behaviour and undo the on state - otherwise the switch would
+                    // report itself off while its policies stayed enforced
+                    else applyPolicy(context, policy, !policy.blockedWhenOn)
                 }
                 if (!applied) success = false
             } catch (e: Exception) {

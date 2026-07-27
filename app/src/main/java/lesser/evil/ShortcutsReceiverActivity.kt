@@ -37,6 +37,10 @@ class ShortcutsReceiverActivity : Activity() {
                         } else {
                             Privilege.DPM.clearUserRestriction(Privilege.DAR, id)
                         }
+                        // A shortcut runs outside any session and bypasses the app lock, so it
+                        // never claims ownership for the user profile - it only keeps the record
+                        // in step, so a restriction changed here does not look user-owned later
+                        BlockOwnership.record(BlockKind.UserRestriction, listOf(id), state, false)
                         ShortcutUtils.updateUserRestrictionShortcut(this, id, !state, false)
                     }
                     "USER_OPERATION" -> {

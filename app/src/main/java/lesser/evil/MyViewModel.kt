@@ -139,13 +139,6 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     val myRepo = getApplication<MyApplication>().myRepo
     val PM = application.packageManager
 
-    /**
-     * The blocking functions the user profile can take ownership of. For each one the set of
-     * blocks the user profile created is persisted, so ownership survives admin sessions and
-     * app restarts. Anything blocked but not user-owned belongs to the admin.
-     */
-    enum class BlockKind { Hidden, Suspended, UninstallBlocked, Ucd, Mdd, UserRestriction }
-
     /** True when the app was entered as the user profile (without the lock password) */
     val restrictedMode = MutableStateFlow(false)
 
@@ -155,40 +148,21 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun exitRestrictedMode() {
         restrictedMode.value = false
     }
-    private fun getUserOwned(kind: BlockKind): Set<String> = when (kind) {
-        BlockKind.Hidden -> SP.userOwnedHidden
-        BlockKind.Suspended -> SP.userOwnedSuspended
-        BlockKind.UninstallBlocked -> SP.userOwnedUninstallBlocked
-        BlockKind.Ucd -> SP.userOwnedUcd
-        BlockKind.Mdd -> SP.userOwnedMdd
-        BlockKind.UserRestriction -> SP.userOwnedRestrictions
-    }?.split('\n')?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+    private fun getUserOwned(kind: BlockKind) = BlockOwnership.get(kind)
 
-    private fun putUserOwned(kind: BlockKind, value: Set<String>) {
-        val text = value.joinToString("\n")
-        when (kind) {
-            BlockKind.Hidden -> SP.userOwnedHidden = text
-            BlockKind.Suspended -> SP.userOwnedSuspended = text
-            BlockKind.UninstallBlocked -> SP.userOwnedUninstallBlocked = text
-            BlockKind.Ucd -> SP.userOwnedUcd = text
-            BlockKind.Mdd -> SP.userOwnedMdd = text
-            BlockKind.UserRestriction -> SP.userOwnedRestrictions = text
-        }
+    /** Records who owns the blocks on [keys] after they were just set to [blocked] */
+    private fun recordOwnership(kind: BlockKind, keys: List<String>, blocked: Boolean) {
+        // A key a mode switch drives stays with the switch, never claimed by the user profile
+        val claimable = if (blocked) keys.filter { !switchControlled(kind, it) } else keys
+        BlockOwnership.record(kind, claimable, blocked, restrictedMode.value)
     }
     /**
-     * Records who owns the blocks on [keys] after they were just set to [blocked].
-     * A block the user profile creates becomes user-owned; anything the admin sets or either
-     * side clears is no longer user-owned - so an admin block always overrides a user one.
+     * Of [keys], the ones this call is about to newly block. A key that is blocked already keeps
+     * whoever owns it, so passing a whole app group cannot hand the user profile the admin's
+     * blocks on members that were already blocked.
      */
-    private fun recordOwnership(kind: BlockKind, keys: List<String>, blocked: Boolean) {
-        if (keys.isEmpty()) return
-        val current = getUserOwned(kind)
-        val updated = if (blocked && restrictedMode.value) {
-            // A key a mode switch drives stays with the switch, never claimed by the user profile
-            current + keys.filter { !switchControlled(kind, it) }
-        } else current - keys.toSet()
-        if (updated != current) putUserOwned(kind, updated)
-    }
+    private fun newlyBlocked(kind: BlockKind, keys: List<String>, blocked: Boolean) =
+        if (blocked) keys.filter { !BlockOwnership.isBlocked(kind, it) } else keys
     /**
      * True if a mode switch drives [key]. The switch owns that state, so the user profile must
      * flip the switch rather than edit the key by hand: otherwise the switch and the real state
@@ -341,8 +315,9 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun setPackageSuspended(packages: List<String>, status: Boolean) {
         // Adding a block is always allowed; removing one is denied for admin-owned packages
         val effective = filterBlockChange(BlockKind.Suspended, packages, status)
+        val claimable = newlyBlocked(BlockKind.Suspended, effective, status)
         if (effective.isNotEmpty()) DPM.setPackagesSuspended(DAR, effective.toTypedArray(), status)
-        recordOwnership(BlockKind.Suspended, effective, status)
+        recordOwnership(BlockKind.Suspended, claimable, status)
         getSuspendedPackaged()
     }
 
@@ -354,10 +329,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun setPackageHidden(packages: List<String>, status: Boolean) {
         val effective = filterBlockChange(BlockKind.Hidden, packages, status)
+        val claimable = newlyBlocked(BlockKind.Hidden, effective, status)
         for (name in effective) {
             DPM.setApplicationHidden(DAR, name, status)
         }
-        recordOwnership(BlockKind.Hidden, effective, status)
+        recordOwnership(BlockKind.Hidden, claimable, status)
         getHiddenPackages()
     }
 
@@ -370,10 +346,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun setPackageUb(packages: List<String>, status: Boolean) {
         val effective = filterBlockChange(BlockKind.UninstallBlocked, packages, status)
+        val claimable = newlyBlocked(BlockKind.UninstallBlocked, effective, status)
         for (name in effective) {
             DPM.setUninstallBlocked(DAR, name, status)
         }
-        recordOwnership(BlockKind.UninstallBlocked, effective, status)
+        recordOwnership(BlockKind.UninstallBlocked, claimable, status)
         getUbPackages()
     }
 
@@ -388,13 +365,14 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     @RequiresApi(30)
     fun setPackageUcd(packages: List<String>, status: Boolean) {
         val effective = filterBlockChange(BlockKind.Ucd, packages, status)
+        val claimable = newlyBlocked(BlockKind.Ucd, effective, status)
         DPM.setUserControlDisabledPackages(
             DAR,
             ucdPackages.value.map { it.name }.run {
                 if (status) plus(effective) else minus(effective)
             }
         )
-        recordOwnership(BlockKind.Ucd, effective, status)
+        recordOwnership(BlockKind.Ucd, claimable, status)
         getUcdPackages()
     }
 
@@ -423,12 +401,13 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     @RequiresApi(28)
     fun setPackageMdd(packages: List<String>, status: Boolean) {
         val effective = filterBlockChange(BlockKind.Mdd, packages, status)
+        val claimable = newlyBlocked(BlockKind.Mdd, effective, status)
         DPM.setMeteredDataDisabledPackages(
             DAR, mddPackages.value.map { it.name }.run {
                 if (status) plus(effective) else minus(effective)
             }
         )
-        recordOwnership(BlockKind.Mdd, effective, status)
+        recordOwnership(BlockKind.Mdd, claimable, status)
         getMddPackages()
     }
 
@@ -620,30 +599,34 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     @RequiresApi(24)
     fun adSetPackageSuspended(name: String, status: Boolean) {
         if (blockChangeDenied(BlockKind.Suspended, name, status)) return
+        val claimable = newlyBlocked(BlockKind.Suspended, listOf(name), status)
         try {
             DPM.setPackagesSuspended(DAR, arrayOf(name), status)
-            recordOwnership(BlockKind.Suspended, listOf(name), status)
+            recordOwnership(BlockKind.Suspended, claimable, status)
             appStatus.update { it.copy(suspend = DPM.isPackageSuspended(DAR, name)) }
         } catch (_: Exception) {}
     }
     fun adSetPackageHidden(name: String, status: Boolean) {
         if (blockChangeDenied(BlockKind.Hidden, name, status)) return
+        val claimable = newlyBlocked(BlockKind.Hidden, listOf(name), status)
         DPM.setApplicationHidden(DAR, name, status)
-        recordOwnership(BlockKind.Hidden, listOf(name), status)
+        recordOwnership(BlockKind.Hidden, claimable, status)
         appStatus.update { it.copy(hide = DPM.isApplicationHidden(DAR, name)) }
     }
     fun adSetPackageUb(name: String, status: Boolean) {
         if (blockChangeDenied(BlockKind.UninstallBlocked, name, status)) return
+        val claimable = newlyBlocked(BlockKind.UninstallBlocked, listOf(name), status)
         DPM.setUninstallBlocked(DAR, name, status)
-        recordOwnership(BlockKind.UninstallBlocked, listOf(name), status)
+        recordOwnership(BlockKind.UninstallBlocked, claimable, status)
         appStatus.update { it.copy(uninstallBlocked = DPM.isUninstallBlocked(DAR, name)) }
     }
     @RequiresApi(30)
     fun adSetPackageUcd(name: String, status: Boolean) {
         if (blockChangeDenied(BlockKind.Ucd, name, status)) return
+        val claimable = newlyBlocked(BlockKind.Ucd, listOf(name), status)
         DPM.setUserControlDisabledPackages(DAR,
             DPM.getUserControlDisabledPackages(DAR).run { if (status) plus(name) else minus(name) })
-        recordOwnership(BlockKind.Ucd, listOf(name), status)
+        recordOwnership(BlockKind.Ucd, claimable, status)
         appStatus.update {
             it.copy(userControlDisabled = name in DPM.getUserControlDisabledPackages(DAR))
         }
@@ -651,9 +634,10 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     @RequiresApi(28)
     fun adSetPackageMdd(name: String, status: Boolean) {
         if (blockChangeDenied(BlockKind.Mdd, name, status)) return
+        val claimable = newlyBlocked(BlockKind.Mdd, listOf(name), status)
         DPM.setMeteredDataDisabledPackages(DAR,
             DPM.getMeteredDataDisabledPackages(DAR).run { if (status) plus(name) else minus(name) })
-        recordOwnership(BlockKind.Mdd, listOf(name), status)
+        recordOwnership(BlockKind.Mdd, claimable, status)
         appStatus.update {
             it.copy(meteredDataDisabled = name in DPM.getMeteredDataDisabledPackages(DAR))
         }
@@ -754,7 +738,6 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     val appGroups = MutableStateFlow(emptyList<AppGroup>())
     init {
         getAppGroups()
-        getPolicyToggles()
     }
     fun getAppGroups() {
         appGroups.value = myRepo.getAppGroups()
@@ -785,6 +768,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
 
     val policyToggles = MutableStateFlow(emptyList<PolicyToggle>())
+    // Must stay below the property: initializers run in declaration order, so loading from an
+    // init block placed higher up would write to a field that is still null
+    init {
+        getPolicyToggles()
+    }
     fun getPolicyToggles() {
         policyToggles.value = myRepo.getPolicyToggles()
     }
@@ -814,20 +802,28 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun setPolicyToggle(id: Int?, name: String, policies: List<TogglePolicy>, userAllowed: Boolean): Boolean {
         if (restrictedMode.value) return false
         val existing = if (id == null) null else policyToggles.value.find { it.id == id }
+        if (id != null && existing != null && existing.enabled) {
+            // Put the old policy set back before saving the new one: policies dropped in this edit
+            // would otherwise stay enforced forever, and the new snapshot has to be taken from the
+            // app's own configuration rather than from the state the old policies left behind.
+            // If that fails, keep the stored policies and snapshot so the edit can be retried
+            // instead of stranding an enforced policy with no way back.
+            if (!PolicyToggleManager.apply(application, existing.policies, false, existing.backup)) {
+                getPolicyToggles()
+                return false
+            }
+            myRepo.setPolicyToggle(id, name, true, userAllowed, policies)
+            ShortcutUtils.updatePolicyToggleShortcut(application, id, name, true)
+            myRepo.setPolicyToggleEnabled(id, true, PolicyToggleManager.captureBackup(policies))
+            val result = PolicyToggleManager.apply(application, policies, true)
+            getPolicyToggles()
+            return result
+        }
         val enabled = existing?.enabled == true
         myRepo.setPolicyToggle(id, name, enabled, userAllowed, policies)
         if (id != null) ShortcutUtils.updatePolicyToggleShortcut(application, id, name, enabled)
-        var result = true
-        if (id != null && existing != null && existing.enabled) {
-            // Put the old policy set back first: policies dropped in this edit would otherwise stay
-            // enforced forever, and the new snapshot has to be taken from the app's own
-            // configuration rather than from the state the old policies had left behind
-            PolicyToggleManager.apply(application, existing.policies, false, existing.backup)
-            myRepo.setPolicyToggleEnabled(id, true, PolicyToggleManager.captureBackup(policies))
-            result = PolicyToggleManager.apply(application, policies, true)
-        }
         getPolicyToggles()
-        return result
+        return true
     }
     fun deletePolicyToggle(id: Int) {
         if (restrictedMode.value) return
@@ -1584,13 +1580,14 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun setUserRestriction(name: String, state: Boolean): Boolean {
         // The user profile may add restrictions, but not lift ones the admin set
         if (blockChangeDenied(BlockKind.UserRestriction, name, state)) return false
+        val claimable = newlyBlocked(BlockKind.UserRestriction, listOf(name), state)
         return try {
             if (state) {
                 DPM.addUserRestriction(DAR, name)
             } else {
                 DPM.clearUserRestriction(DAR, name)
             }
-            recordOwnership(BlockKind.UserRestriction, listOf(name), state)
+            recordOwnership(BlockKind.UserRestriction, claimable, state)
             userRestrictions.update { it.plus(name to state) }
             ShortcutUtils.updateUserRestrictionShortcut(application, name, !state, true)
             true

@@ -175,11 +175,14 @@ fun EditPolicyToggleScreen(
     var blockedWhenOn by rememberSaveable { mutableStateOf(true) }
     var restrictionDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val pkg = chosenPackage.receive()
-        if (type == TogglePolicyType.BlockMeteredData) {
-            excludedInput = (excludedInput.trim() + "\n" + pkg).trim()
-        } else {
-            packageInput = pkg
+        // The editor adds many policies in a row, so keep taking picker results for as long as
+        // it is on screen instead of consuming only the first one
+        for (pkg in chosenPackage) {
+            if (type == TogglePolicyType.BlockMeteredData) {
+                excludedInput = (excludedInput.trim() + "\n" + pkg).trim()
+            } else {
+                packageInput = pkg
+            }
         }
     }
     fun buildPolicy(): TogglePolicy? = when (type) {

@@ -56,17 +56,28 @@ class ShortcutsReceiverActivity : Activity() {
                             (!toggle.userAllowed && !SP.lockPasswordHash.isNullOrEmpty())) {
                             false
                         } else {
-                            val newState = !toggle.enabled
-                            val backup = if (newState) {
-                                PolicyToggleManager.captureBackup(toggle.policies)
-                            } else ""
-                            val result = PolicyToggleManager.apply(
-                                this, toggle.policies, newState,
-                                if (newState) "" else toggle.backup
-                            )
-                            repo.setPolicyToggleEnabled(id, newState, backup)
-                            ShortcutUtils.updatePolicyToggleShortcut(this, id, toggle.name, newState)
-                            result
+                            var persisted = toggle.enabled
+                            val applied = if (!toggle.enabled) {
+                                // Store the snapshot before applying, so even a partly applied
+                                // switch can be undone
+                                repo.setPolicyToggleEnabled(
+                                    id, true, PolicyToggleManager.captureBackup(toggle.policies)
+                                )
+                                persisted = true
+                                PolicyToggleManager.apply(this, toggle.policies, true)
+                            } else {
+                                // Give up the snapshot only once everything was restored
+                                val restored = PolicyToggleManager.apply(
+                                    this, toggle.policies, false, toggle.backup
+                                )
+                                if (restored) {
+                                    repo.setPolicyToggleEnabled(id, false, "")
+                                    persisted = false
+                                }
+                                restored
+                            }
+                            ShortcutUtils.updatePolicyToggleShortcut(this, id, toggle.name, persisted)
+                            applied
                         }
                     }
                     "LOCK_TASK_PROFILE" -> {

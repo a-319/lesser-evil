@@ -791,13 +791,23 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun switchPolicyToggle(id: Int, state: Boolean): Boolean {
         val toggle = policyToggles.value.find { it.id == id } ?: return false
         if (restrictedMode.value && !toggle.userAllowed) return false
-        // Turning on records what to come back to; turning off restores it and drops the snapshot
-        val backup = if (state) PolicyToggleManager.captureBackup(toggle.policies) else ""
-        val result = PolicyToggleManager.apply(
-            application, toggle.policies, state, if (state) "" else toggle.backup
-        )
-        myRepo.setPolicyToggleEnabled(id, state, backup)
-        ShortcutUtils.updatePolicyToggleShortcut(application, id, toggle.name, state)
+        var persisted = toggle.enabled
+        val result = if (state) {
+            // Store the snapshot before applying, so even a partly applied switch can be undone
+            myRepo.setPolicyToggleEnabled(id, true, PolicyToggleManager.captureBackup(toggle.policies))
+            persisted = true
+            PolicyToggleManager.apply(application, toggle.policies, true)
+        } else {
+            // Give up the snapshot only once everything was restored, so a failure can be retried
+            val restored =
+                PolicyToggleManager.apply(application, toggle.policies, false, toggle.backup)
+            if (restored) {
+                myRepo.setPolicyToggleEnabled(id, false, "")
+                persisted = false
+            }
+            restored
+        }
+        ShortcutUtils.updatePolicyToggleShortcut(application, id, toggle.name, persisted)
         getPolicyToggles()
         return result
     }
@@ -808,9 +818,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         myRepo.setPolicyToggle(id, name, enabled, userAllowed, policies)
         if (id != null) ShortcutUtils.updatePolicyToggleShortcut(application, id, name, enabled)
         var result = true
-        if (enabled && id != null) {
-            // Editing a switch that is already on re-snapshots, so newly added policies can be
-            // restored too, then applies the new policy set
+        if (id != null && existing != null && existing.enabled) {
+            // Put the old policy set back first: policies dropped in this edit would otherwise stay
+            // enforced forever, and the new snapshot has to be taken from the app's own
+            // configuration rather than from the state the old policies had left behind
+            PolicyToggleManager.apply(application, existing.policies, false, existing.backup)
             myRepo.setPolicyToggleEnabled(id, true, PolicyToggleManager.captureBackup(policies))
             result = PolicyToggleManager.apply(application, policies, true)
         }

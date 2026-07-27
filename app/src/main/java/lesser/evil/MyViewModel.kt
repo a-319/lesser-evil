@@ -152,8 +152,8 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
 
     /** Records who owns the blocks on [keys] after they were just set to [blocked] */
     private fun recordOwnership(kind: BlockKind, keys: List<String>, blocked: Boolean) {
-        // A key a mode switch drives stays with the switch, never claimed by the user profile
-        val claimable = if (blocked) keys.filter { !switchControlled(kind, it) } else keys
+        // A key driven by a mode switch, or lifted for lock task mode, keeps its existing owner
+        val claimable = if (blocked) keys.filter { controlledBy(kind, it) == null } else keys
         BlockOwnership.record(kind, claimable, blocked, restrictedMode.value)
     }
     /**
@@ -182,11 +182,30 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                 }
             }
         }
+    /**
+     * True if lock task mode has [key] temporarily lifted for the current session. The lift is
+     * undone on exit, so the block still belongs to whoever set it and the user profile must not
+     * be able to re-apply it in the meantime and claim it as its own.
+     */
+    private fun lockTaskLifted(kind: BlockKind, key: String): Boolean {
+        val lifted = when (kind) {
+            BlockKind.Hidden -> SP.lockTaskUnhiddenApps
+            BlockKind.Suspended -> SP.lockTaskUnsuspendedApps
+            else -> null
+        } ?: return false
+        return key in parsePackageNames(lifted)
+    }
+    /** The message to show when something other than a plain edit owns [key]'s state right now */
+    private fun controlledBy(kind: BlockKind, key: String): Int? = when {
+        switchControlled(kind, key) -> R.string.controlled_by_mode_switch
+        lockTaskLifted(kind, key) -> R.string.controlled_by_lock_task
+        else -> null
+    }
     /** True (and toasts) if the user profile may not set the block on [key] to [blocked] */
     private fun blockChangeDenied(kind: BlockKind, key: String, blocked: Boolean): Boolean {
         if (!restrictedMode.value) return false
-        if (switchControlled(kind, key)) {
-            application.popToast(R.string.controlled_by_mode_switch)
+        controlledBy(kind, key)?.let {
+            application.popToast(it)
             return true
         }
         if (!blocked && key !in getUserOwned(kind)) {
@@ -202,11 +221,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         if (!restrictedMode.value) return keys
         val userOwned = getUserOwned(kind)
         val allowed = keys.filter {
-            !switchControlled(kind, it) && (blocked || it in userOwned)
+            controlledBy(kind, it) == null && (blocked || it in userOwned)
         }
         if (allowed.size != keys.size) application.popToast(
-            if (keys.any { switchControlled(kind, it) }) R.string.controlled_by_mode_switch
-            else R.string.cannot_modify_admin_block
+            keys.firstNotNullOfOrNull { controlledBy(kind, it) }
+                ?: R.string.cannot_modify_admin_block
         )
         return allowed
     }
@@ -1085,6 +1104,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(26)
     fun setLockTaskPackage(name: String, status: Boolean) {
+        if (adminOnly()) return
         DPM.setLockTaskPackages(DAR,
             lockTaskPackages.value.map { it.name }
                 .run { if (status) plus(name) else minus(name) }
@@ -1097,6 +1117,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         packageName: String, activity: String, clearTask: Boolean, showNotification: Boolean,
         showNavigationButtons: Boolean
     ): Boolean {
+        if (adminOnly()) return false
         val result = LockTaskUtils.start(
             application, packageName, activity, clearTask, showNotification, showNavigationButtons
         )
@@ -1116,11 +1137,18 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         DPM.getLockTaskPackages(DAR).toList(), DPM.getLockTaskFeatures(DAR), showNavigationButtons
     )
     fun addLockTaskProfile(profile: LockTaskProfile): LockTaskProfile {
+        // Profiles decide which apps get lifted, so only the admin may define them; the user
+        // profile may start a saved one, the same way it may flip a switch the admin created
+        if (restrictedMode.value) {
+            application.popToast(R.string.permission_denied)
+            return profile
+        }
         val added = LockTaskUtils.addProfile(profile)
         getLockTaskProfiles()
         return added
     }
     fun deleteLockTaskProfile(id: Int) {
+        if (adminOnly()) return
         LockTaskUtils.deleteProfile(id)
         getLockTaskProfiles()
     }
@@ -1136,6 +1164,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(28)
     fun setLockTaskFeatures(flags: Int): String? {
+        if (adminOnly()) return application.getString(R.string.permission_denied)
         try {
             DPM.setLockTaskFeatures(DAR, flags)
             return null

@@ -774,4 +774,5 @@
     <string name="available_to_user_profile">Available to the user profile</string>
     <string name="cannot_modify_admin_block">Cannot undo a restriction set by the admin</string>
     <string name="controlled_by_mode_switch">Controlled by a mode switch - use the switch to change it</string>
+    <string name="controlled_by_lock_task">Temporarily lifted for lock task mode - it goes back when the session ends</string>
 </resources>

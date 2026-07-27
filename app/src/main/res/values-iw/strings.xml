@@ -87,6 +87,7 @@
 	<string name="bug_report_sharing_declined">שיתוף דוחות באג נדחה</string>
 	<string name="ca_cert">תעודות CA</string>
 	<string name="cannot_modify_admin_block">לא ניתן לבטל הגבלה שהוגדרה על ידי המנהל</string>
+	<string name="controlled_by_lock_task">הוסר זמנית עבור מצב נעילת משימה — יחזור בסיום ההפעלה</string>
 	<string name="controlled_by_mode_switch">נשלט על ידי מתג מצב — יש להשתמש במתג כדי לשנות</string>
 	<string name="camera_toggle">החלפת מצלמה</string>
 	<string name="cancel">לבטל</string>

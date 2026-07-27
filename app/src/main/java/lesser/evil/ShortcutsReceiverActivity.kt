@@ -37,6 +37,10 @@ class ShortcutsReceiverActivity : Activity() {
                         } else {
                             Privilege.DPM.clearUserRestriction(Privilege.DAR, id)
                         }
+                        // A shortcut runs outside any session and bypasses the app lock, so it
+                        // never claims ownership for the user profile - it only keeps the record
+                        // in step, so a restriction changed here does not look user-owned later
+                        BlockOwnership.record(BlockKind.UserRestriction, listOf(id), state, false)
                         ShortcutUtils.updateUserRestrictionShortcut(this, id, !state, false)
                     }
                     "USER_OPERATION" -> {
@@ -56,11 +60,28 @@ class ShortcutsReceiverActivity : Activity() {
                             (!toggle.userAllowed && !SP.lockPasswordHash.isNullOrEmpty())) {
                             false
                         } else {
-                            val newState = !toggle.enabled
-                            val result = PolicyToggleManager.apply(this, toggle.policies, newState)
-                            repo.setPolicyToggleEnabled(id, newState)
-                            ShortcutUtils.updatePolicyToggleShortcut(this, id, toggle.name, newState)
-                            result
+                            var persisted = toggle.enabled
+                            val applied = if (!toggle.enabled) {
+                                // Store the snapshot before applying, so even a partly applied
+                                // switch can be undone
+                                repo.setPolicyToggleEnabled(
+                                    id, true, PolicyToggleManager.captureBackup(toggle.policies)
+                                )
+                                persisted = true
+                                PolicyToggleManager.apply(this, toggle.policies, true)
+                            } else {
+                                // Give up the snapshot only once everything was restored
+                                val restored = PolicyToggleManager.apply(
+                                    this, toggle.policies, false, toggle.backup
+                                )
+                                if (restored) {
+                                    repo.setPolicyToggleEnabled(id, false, "")
+                                    persisted = false
+                                }
+                                restored
+                            }
+                            ShortcutUtils.updatePolicyToggleShortcut(this, id, toggle.name, persisted)
+                            applied
                         }
                     }
                     "LOCK_TASK_PROFILE" -> {

@@ -8,44 +8,52 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * A single policy controlled by a mode switch.
- *
- * [enforceWhenOn] - if true, the policy is enforced while the switch is on and released
- * while it is off. If false, the behavior is reversed.
+ * A single policy controlled by a mode switch. A policy only describes the state its target is
+ * put in while the switch is on: [blockedWhenOn] true blocks the target, false releases it.
+ * Turning the switch off does not dictate a state - it restores whatever was configured in the
+ * app before the switch was turned on, from the snapshot [PolicyToggleManager.captureBackup] took.
  */
 @Serializable
 sealed class TogglePolicy {
-    abstract val enforceWhenOn: Boolean
+    // Serialized under the old name so switches configured before the rename keep working:
+    // the meaning of the on state is unchanged, only the off state became a restore.
+    @SerialName("enforceWhenOn")
+    abstract val blockedWhenOn: Boolean
 
     @Serializable
     @SerialName("user_restriction")
     data class UserRestriction(
-        val restriction: String, override val enforceWhenOn: Boolean
+        val restriction: String,
+        @SerialName("enforceWhenOn") override val blockedWhenOn: Boolean
     ) : TogglePolicy()
 
     @Serializable
     @SerialName("hide_app")
     data class HideApp(
-        val packageName: String, override val enforceWhenOn: Boolean
+        val packageName: String,
+        @SerialName("enforceWhenOn") override val blockedWhenOn: Boolean
     ) : TogglePolicy()
 
     @Serializable
     @SerialName("suspend_app")
     data class SuspendApp(
-        val packageName: String, override val enforceWhenOn: Boolean
+        val packageName: String,
+        @SerialName("enforceWhenOn") override val blockedWhenOn: Boolean
     ) : TogglePolicy()
 
     @Serializable
     @SerialName("always_on_vpn")
     data class AlwaysOnVpn(
-        val packageName: String, val lockdown: Boolean, override val enforceWhenOn: Boolean
+        val packageName: String, val lockdown: Boolean,
+        @SerialName("enforceWhenOn") override val blockedWhenOn: Boolean
     ) : TogglePolicy()
 
-    /** While enforced, metered data is disabled for every app except [excludedPackages]. */
+    /** While blocked, metered data is disabled for every app except [excludedPackages]. */
     @Serializable
     @SerialName("block_metered_data")
     data class BlockMeteredData(
-        val excludedPackages: List<String>, override val enforceWhenOn: Boolean
+        val excludedPackages: List<String>,
+        @SerialName("enforceWhenOn") override val blockedWhenOn: Boolean
     ) : TogglePolicy()
 
     val requiresApi get() = when (this) {
@@ -59,7 +67,7 @@ sealed class TogglePolicy {
 
 class PolicyToggle(
     val id: Int, val name: String, val enabled: Boolean, val userAllowed: Boolean,
-    val policies: List<TogglePolicy>
+    val policies: List<TogglePolicy>, val backup: String = ""
 )
 
 object PolicyToggleManager {
@@ -74,15 +82,81 @@ object PolicyToggleManager {
         emptyList()
     }
 
+    /** Identifies a policy's target, so a snapshot survives the policies being reordered */
+    private fun backupKey(policy: TogglePolicy): String = when (policy) {
+        is TogglePolicy.UserRestriction -> "restriction:${policy.restriction}"
+        is TogglePolicy.HideApp -> "hide:${policy.packageName}"
+        is TogglePolicy.SuspendApp -> "suspend:${policy.packageName}"
+        is TogglePolicy.AlwaysOnVpn -> "vpn"
+        is TogglePolicy.BlockMeteredData -> "mdd"
+    }
+
     /**
-     * Apply all [policies] for the given switch [state].
+     * Records the state every policy target is in right now, to be restored when the switch is
+     * turned off. Call this before turning a switch on.
+     */
+    fun captureBackup(policies: List<TogglePolicy>): String {
+        val dpm = Privilege.DPM
+        val dar = Privilege.DAR
+        val snapshot = mutableMapOf<String, String>()
+        policies.forEach { policy ->
+            try {
+                val value = when (policy) {
+                    is TogglePolicy.UserRestriction ->
+                        if (VERSION.SDK_INT >= 24 &&
+                            dpm.getUserRestrictions(dar).getBoolean(policy.restriction)) "1" else "0"
+                    is TogglePolicy.HideApp ->
+                        if (dpm.isApplicationHidden(dar, policy.packageName)) "1" else "0"
+                    is TogglePolicy.SuspendApp ->
+                        if (VERSION.SDK_INT >= 24 &&
+                            dpm.isPackageSuspended(dar, policy.packageName)) "1" else "0"
+                    is TogglePolicy.AlwaysOnVpn -> if (VERSION.SDK_INT < 24) "" else {
+                        val current = dpm.getAlwaysOnVpnPackage(dar)
+                        val lockdown = VERSION.SDK_INT >= 29 && dpm.isAlwaysOnVpnLockdownEnabled(dar)
+                        if (current == null) "" else "$current|${if (lockdown) 1 else 0}"
+                    }
+                    is TogglePolicy.BlockMeteredData ->
+                        if (VERSION.SDK_INT >= 28)
+                            dpm.getMeteredDataDisabledPackages(dar).joinToString("\n") else ""
+                }
+                snapshot[backupKey(policy)] = value
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return json.encodeToString(snapshot)
+    }
+
+    private fun decodeBackup(data: String): Map<String, String> = try {
+        if (data.isEmpty()) emptyMap() else json.decodeFromString(data)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        emptyMap()
+    }
+
+    /**
+     * Turns a switch on ([state] true), putting every policy target into the state its policy
+     * describes, or off, restoring the targets from [backup].
      * @return true if every policy was applied successfully
      */
-    fun apply(context: Context, policies: List<TogglePolicy>, state: Boolean): Boolean {
+    fun apply(
+        context: Context, policies: List<TogglePolicy>, state: Boolean, backup: String = ""
+    ): Boolean {
+        val snapshot = if (state) emptyMap() else decodeBackup(backup)
         var success = true
         policies.forEach { policy ->
             try {
-                if (!applyPolicy(context, policy, policy.enforceWhenOn == state)) success = false
+                val applied = if (state) {
+                    applyPolicy(context, policy, policy.blockedWhenOn)
+                } else {
+                    val saved = snapshot[backupKey(policy)]
+                    if (saved != null) restorePolicy(context, policy, saved)
+                    // A switch turned on before snapshots existed has nothing to restore, so fall
+                    // back to the old behaviour and undo the on state - otherwise the switch would
+                    // report itself off while its policies stayed enforced
+                    else applyPolicy(context, policy, !policy.blockedWhenOn)
+                }
+                if (!applied) success = false
             } catch (e: Exception) {
                 e.printStackTrace()
                 success = false
@@ -91,69 +165,67 @@ object PolicyToggleManager {
         return success
     }
 
-    private fun applyPolicy(context: Context, policy: TogglePolicy, enforce: Boolean): Boolean {
+    private fun applyPolicy(context: Context, policy: TogglePolicy, blocked: Boolean): Boolean {
         val dpm = Privilege.DPM
         val dar = Privilege.DAR
         when (policy) {
             is TogglePolicy.UserRestriction ->
-                if (enforce) dpm.addUserRestriction(dar, policy.restriction)
+                if (blocked) dpm.addUserRestriction(dar, policy.restriction)
                 else dpm.clearUserRestriction(dar, policy.restriction)
             is TogglePolicy.HideApp ->
-                return dpm.setApplicationHidden(dar, policy.packageName, enforce) ||
-                        dpm.isApplicationHidden(dar, policy.packageName) == enforce
+                return dpm.setApplicationHidden(dar, policy.packageName, blocked) ||
+                        dpm.isApplicationHidden(dar, policy.packageName) == blocked
             is TogglePolicy.SuspendApp -> {
                 if (VERSION.SDK_INT < 24) return false
                 return dpm.setPackagesSuspended(
-                    dar, arrayOf(policy.packageName), enforce
+                    dar, arrayOf(policy.packageName), blocked
                 ).isEmpty()
             }
             is TogglePolicy.AlwaysOnVpn -> {
                 if (VERSION.SDK_INT < 24) return false
-                if (enforce) {
-                    if (SP.policyToggleVpnBackup == null) {
-                        val current = dpm.getAlwaysOnVpnPackage(dar)
-                        val lockdown = VERSION.SDK_INT >= 29 &&
-                                dpm.isAlwaysOnVpnLockdownEnabled(dar)
-                        SP.policyToggleVpnBackup =
-                            if (current == null) "" else "$current|${if (lockdown) 1 else 0}"
-                    }
-                    dpm.setAlwaysOnVpnPackage(dar, policy.packageName, policy.lockdown)
-                } else {
-                    // Restore the configuration that was active before enforcement; a missing
-                    // backup means enforcement never ran, so leave the current config alone
-                    val backup = SP.policyToggleVpnBackup ?: return true
-                    try {
-                        if (backup.isEmpty()) {
-                            dpm.setAlwaysOnVpnPackage(dar, null, false)
-                        } else {
-                            val parts = backup.split('|')
-                            dpm.setAlwaysOnVpnPackage(dar, parts[0], parts.getOrNull(1) == "1")
-                        }
-                    } catch (_: PackageManager.NameNotFoundException) {
+                if (blocked) dpm.setAlwaysOnVpnPackage(dar, policy.packageName, policy.lockdown)
+                else dpm.setAlwaysOnVpnPackage(dar, null, false)
+            }
+            is TogglePolicy.BlockMeteredData -> {
+                if (VERSION.SDK_INT < 28) return false
+                dpm.setMeteredDataDisabledPackages(
+                    dar,
+                    if (blocked) {
+                        context.packageManager.getInstalledApplications(0).map { it.packageName }
+                            .filter { it !in policy.excludedPackages && it != context.packageName }
+                    } else emptyList()
+                )
+            }
+        }
+        return true
+    }
+
+    /** Puts [policy]'s target back into the state [saved] recorded before the switch was turned on */
+    private fun restorePolicy(context: Context, policy: TogglePolicy, saved: String): Boolean {
+        val dpm = Privilege.DPM
+        val dar = Privilege.DAR
+        when (policy) {
+            is TogglePolicy.UserRestriction, is TogglePolicy.HideApp, is TogglePolicy.SuspendApp ->
+                return applyPolicy(context, policy, saved == "1")
+            is TogglePolicy.AlwaysOnVpn -> {
+                if (VERSION.SDK_INT < 24) return false
+                try {
+                    if (saved.isEmpty()) {
                         dpm.setAlwaysOnVpnPackage(dar, null, false)
+                    } else {
+                        val parts = saved.split('|')
+                        dpm.setAlwaysOnVpnPackage(dar, parts[0], parts.getOrNull(1) == "1")
                     }
-                    SP.policyToggleVpnBackup = null
+                } catch (_: PackageManager.NameNotFoundException) {
+                    // The app that was configured before is gone, so there is nothing to go back to
+                    dpm.setAlwaysOnVpnPackage(dar, null, false)
                 }
             }
             is TogglePolicy.BlockMeteredData -> {
                 if (VERSION.SDK_INT < 28) return false
-                if (enforce) {
-                    if (SP.policyToggleMddBackup == null) {
-                        SP.policyToggleMddBackup =
-                            dpm.getMeteredDataDisabledPackages(dar).joinToString("\n")
-                    }
-                    dpm.setMeteredDataDisabledPackages(
-                        dar,
-                        context.packageManager.getInstalledApplications(0).map { it.packageName }
-                            .filter { it !in policy.excludedPackages && it != context.packageName }
-                    )
-                } else {
-                    val backup = SP.policyToggleMddBackup ?: return true
-                    dpm.setMeteredDataDisabledPackages(
-                        dar, backup.split('\n').filter { it.isNotEmpty() }
-                    )
-                    SP.policyToggleMddBackup = null
-                }
+                dpm.setMeteredDataDisabledPackages(
+                    dar, saved.split('\n').filter { it.isNotEmpty() }
+                )
             }
         }
         return true

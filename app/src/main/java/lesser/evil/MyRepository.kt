@@ -255,7 +255,8 @@ class MyRepository(val dbHelper: MyDbHelper) {
             while (it.moveToNext()) {
                 list += PolicyToggle(
                     it.getInt(0), it.getString(1), it.getInt(2) != 0, it.getInt(4) != 0,
-                    PolicyToggleManager.decodePolicies(it.getString(3))
+                    PolicyToggleManager.decodePolicies(it.getString(3)),
+                    it.getStringOrNull(5) ?: ""
                 )
             }
         }
@@ -268,7 +269,8 @@ class MyRepository(val dbHelper: MyDbHelper) {
             if (it.moveToNext()) {
                 return PolicyToggle(
                     it.getInt(0), it.getString(1), it.getInt(2) != 0, it.getInt(4) != 0,
-                    PolicyToggleManager.decodePolicies(it.getString(3))
+                    PolicyToggleManager.decodePolicies(it.getString(3)),
+                    it.getStringOrNull(5) ?: ""
                 )
             }
         }
@@ -288,9 +290,11 @@ class MyRepository(val dbHelper: MyDbHelper) {
             dbHelper.writableDatabase.update("policy_toggles", cv, "id = ?", arrayOf(id.toString()))
         }
     }
-    fun setPolicyToggleEnabled(id: Int, enabled: Boolean) {
+    /** Stores the switch state together with the snapshot to restore when it is turned off */
+    fun setPolicyToggleEnabled(id: Int, enabled: Boolean, backup: String) {
         val cv = ContentValues()
         cv.put("enabled", if (enabled) 1 else 0)
+        cv.put("backup", backup)
         dbHelper.writableDatabase.update("policy_toggles", cv, "id = ?", arrayOf(id.toString()))
     }
     fun deletePolicyToggle(id: Int) {

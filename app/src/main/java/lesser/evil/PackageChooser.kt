@@ -170,10 +170,6 @@ fun AppChooserScreen(
                         val appsShown = tab != AppChooserTab.Groups
                         if(!searchMode) {
                             if (appsShown) {
-                                IconButton({ searchMode = true }) {
-                                    Icon(painter = painterResource(R.drawable.search_fill0), contentDescription = stringResource(R.string.search))
-                                }
-                                VerticalDivider(Modifier.height(24.dp).padding(horizontal = 4.dp))
                                 IconButton({
                                     gridView = !gridView
                                     SP.applicationsGridView = gridView
@@ -182,6 +178,10 @@ fun AppChooserScreen(
                                         painterResource(if(gridView) R.drawable.list_lines_fill0 else R.drawable.apps_fill0),
                                         stringResource(if(gridView) R.string.list_view else R.string.grid_view)
                                     )
+                                }
+                                VerticalDivider(Modifier.height(24.dp).padding(horizontal = 4.dp))
+                                IconButton({ searchMode = true }) {
+                                    Icon(painter = painterResource(R.drawable.search_fill0), contentDescription = stringResource(R.string.search))
                                 }
                             }
                             if (selectedPackages.isEmpty()) {

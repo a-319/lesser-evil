@@ -1401,6 +1401,7 @@ fun EditAppGroupScreen(
 
 @Serializable class ManagedConfiguration(val packageName: String)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManagedConfigurationScreen(
     params: ManagedConfiguration, appRestrictions: StateFlow<List<AppRestriction>>,

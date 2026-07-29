@@ -169,8 +169,20 @@ fun AppChooserScreen(
                     actions = {
                         val appsShown = tab != AppChooserTab.Groups
                         if(!searchMode) {
-                            if (appsShown) IconButton({ searchMode = true }) {
-                                Icon(painter = painterResource(R.drawable.search_fill0), contentDescription = stringResource(R.string.search))
+                            if (appsShown) {
+                                IconButton({ searchMode = true }) {
+                                    Icon(painter = painterResource(R.drawable.search_fill0), contentDescription = stringResource(R.string.search))
+                                }
+                                VerticalDivider(Modifier.height(24.dp).padding(horizontal = 4.dp))
+                                IconButton({
+                                    gridView = !gridView
+                                    SP.applicationsGridView = gridView
+                                }) {
+                                    Icon(
+                                        painterResource(if(gridView) R.drawable.list_lines_fill0 else R.drawable.apps_fill0),
+                                        stringResource(if(gridView) R.string.list_view else R.string.grid_view)
+                                    )
+                                }
                             }
                             if (selectedPackages.isEmpty()) {
                                 IconButton(onRefresh, enabled = progress == 1F) {
@@ -245,18 +257,6 @@ fun AppChooserScreen(
                                 }) {
                                     Icon(Icons.Default.Check, null)
                                 }
-                            }
-                        }
-                        if (!searchMode && appsShown) {
-                            VerticalDivider(Modifier.height(24.dp).padding(start = 4.dp))
-                            IconButton({
-                                gridView = !gridView
-                                SP.applicationsGridView = gridView
-                            }) {
-                                Icon(
-                                    painterResource(if(gridView) R.drawable.list_lines_fill0 else R.drawable.apps_fill0),
-                                    stringResource(if(gridView) R.string.list_view else R.string.grid_view)
-                                )
                             }
                         }
                     },

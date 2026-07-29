@@ -102,6 +102,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -1028,49 +1029,65 @@ fun ManageAppGroupsScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(Modifier.padding(paddingValues)) {
-            items(groups, { it.id }) {
+        AppGroupsList(groups, autoGroups, navigateToEditScreen, Modifier.padding(paddingValues))
+    }
+}
+
+/** The groups of [ManageAppGroupsScreen], also shown by the groups tab of the app chooser */
+@Composable
+fun AppGroupsList(
+    groups: List<AppGroup>, autoGroups: List<AutoAppGroup>,
+    navigateToEditScreen: (Int?, String, List<String>) -> Unit, modifier: Modifier = Modifier
+) {
+    LazyColumn(modifier) {
+        if (groups.isEmpty() && autoGroups.isEmpty()) item {
+            Text(
+                stringResource(R.string.no_app_groups),
+                Modifier.fillMaxWidth().padding(HorizontalPadding, 16.dp),
+                textAlign = TextAlign.Center
+            )
+        }
+        items(groups, { it.id }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        navigateToEditScreen(it.id, it.name, it.apps)
+                    }
+                    .padding(HorizontalPadding, 8.dp)
+            ) {
+                Text(it.name)
+                Text(
+                    stringResource(R.string.app_group_apps_count, it.apps.size),
+                    Modifier.alpha(0.7F), style = typography.bodyMedium
+                )
+            }
+        }
+        if (autoGroups.isNotEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.automatic_groups),
+                    Modifier.padding(HorizontalPadding, 12.dp), style = typography.titleMedium
+                )
+            }
+            items(autoGroups.size) { index ->
+                val group = autoGroups[index]
+                val name = stringResource(group.title)
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            navigateToEditScreen(it.id, it.name, it.apps)
-                        }
+                        .clickable { navigateToEditScreen(null, name, group.apps) }
                         .padding(HorizontalPadding, 8.dp)
                 ) {
-                    Text(it.name)
+                    Text(name)
                     Text(
-                        stringResource(R.string.app_group_apps_count, it.apps.size),
+                        stringResource(R.string.auto_group_apps_count, group.apps.size),
                         Modifier.alpha(0.7F), style = typography.bodyMedium
                     )
                 }
             }
-            if (autoGroups.isNotEmpty()) {
-                item {
-                    Text(
-                        stringResource(R.string.automatic_groups),
-                        Modifier.padding(HorizontalPadding, 12.dp), style = typography.titleMedium
-                    )
-                }
-                items(autoGroups.size) { index ->
-                    val group = autoGroups[index]
-                    val name = stringResource(group.title)
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { navigateToEditScreen(null, name, group.apps) }
-                            .padding(HorizontalPadding, 8.dp)
-                    ) {
-                        Text(name)
-                        Text(
-                            stringResource(R.string.auto_group_apps_count, group.apps.size),
-                            Modifier.alpha(0.7F), style = typography.bodyMedium
-                        )
-                    }
-                }
-            }
-            item { Spacer(Modifier.height(BottomPadding)) }
         }
+        item { Spacer(Modifier.height(BottomPadding)) }
     }
 }
 

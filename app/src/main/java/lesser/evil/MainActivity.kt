@@ -544,7 +544,8 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                     popUpTo(Home)
                 }
             }, vm::refreshPackageList, vm::setPackageSuspended, vm::setPackageHidden,
-                vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups)
+                vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups
+            ) { id, name, apps -> navController.navigate(EditAppGroup(id, name, apps)) }
         }
         composable<ApplicationsFeatures> {
             ApplicationsFeaturesScreen(::navigateUp, ::navigate) {

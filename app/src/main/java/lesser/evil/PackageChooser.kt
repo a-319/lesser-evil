@@ -7,9 +7,7 @@ import android.os.Build
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -39,6 +38,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -51,6 +51,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -81,9 +82,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import lesser.evil.dpm.AppGroup
+import lesser.evil.dpm.AppGroupsList
 import lesser.evil.dpm.AutoAppGroup
-import lesser.evil.dpm.SelectableAppGroup
-import lesser.evil.dpm.selectableGroups
 
 data class AppInfo(
     val name: String,
@@ -117,19 +117,17 @@ fun AppChooserScreen(
     setPackagesSuspend: (List<String>, Boolean) -> Unit,
     setPackagesHidden: (List<String>, Boolean) -> Unit,
     appGroups: StateFlow<List<AppGroup>>, autoAppGroups: StateFlow<List<AutoAppGroup>>,
-    onRefreshAutoGroups: () -> Unit
+    onRefreshAutoGroups: () -> Unit, onEditGroup: (Int?, String, List<String>) -> Unit
 ) {
     val packages by packageList.collectAsStateWithLifecycle()
     val hf = LocalHapticFeedback.current
     val progress by refreshProgress.collectAsStateWithLifecycle()
     val groups by appGroups.collectAsStateWithLifecycle()
     val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
-    val allGroups = selectableGroups(groups, autoGroups)
     var tabIndex by rememberSaveable { mutableIntStateOf(0) }
     var gridView by rememberSaveable { mutableStateOf(SP.applicationsGridView) }
     var query by rememberSaveable { mutableStateOf("") }
     var searchMode by rememberSaveable { mutableStateOf(false) }
-    var selectedGroup by remember { mutableStateOf<SelectableAppGroup?>(null) }
     val tab = AppChooserTab.entries[tabIndex]
     val filteredPackages = packages.filter {
         val inTab = when(tab) {
@@ -137,7 +135,7 @@ fun AppChooserScreen(
             AppChooserTab.Visual -> it.launchable
             AppChooserTab.Background -> !it.launchable
             AppChooserTab.All -> true
-            AppChooserTab.Groups -> selectedGroup?.apps?.contains(it.name) == true
+            AppChooserTab.Groups -> false
         }
         inTab && (query.isEmpty() || searchInString(query, it.label) || searchInString(query, it.name))
     }
@@ -169,18 +167,10 @@ fun AppChooserScreen(
             Column {
                 TopAppBar(
                     actions = {
+                        val appsShown = tab != AppChooserTab.Groups
                         if(!searchMode) {
-                            IconButton({ searchMode = true }) {
+                            if (appsShown) IconButton({ searchMode = true }) {
                                 Icon(painter = painterResource(R.drawable.search_fill0), contentDescription = stringResource(R.string.search))
-                            }
-                            IconButton({
-                                gridView = !gridView
-                                SP.applicationsGridView = gridView
-                            }) {
-                                Icon(
-                                    painterResource(if(gridView) R.drawable.list_fill0 else R.drawable.apps_fill0),
-                                    stringResource(if(gridView) R.string.list_view else R.string.grid_view)
-                                )
                             }
                             if (selectedPackages.isEmpty()) {
                                 IconButton(onRefresh, enabled = progress == 1F) {
@@ -257,6 +247,18 @@ fun AppChooserScreen(
                                 }
                             }
                         }
+                        if (!searchMode && appsShown) {
+                            VerticalDivider(Modifier.height(24.dp).padding(start = 4.dp))
+                            IconButton({
+                                gridView = !gridView
+                                SP.applicationsGridView = gridView
+                            }) {
+                                Icon(
+                                    painterResource(if(gridView) R.drawable.list_lines_fill0 else R.drawable.apps_fill0),
+                                    stringResource(if(gridView) R.string.list_view else R.string.grid_view)
+                                )
+                            }
+                        }
                     },
                     title = {
                         if (searchMode) {
@@ -301,7 +303,7 @@ fun AppChooserScreen(
                             index == tabIndex,
                             {
                                 tabIndex = index
-                                if (entry != AppChooserTab.Groups) selectedGroup = null
+                                if (entry == AppChooserTab.Groups) searchMode = false
                             },
                             text = { Text(stringResource(entry.title)) }
                         )
@@ -313,21 +315,17 @@ fun AppChooserScreen(
     ) { paddingValues ->
         Column(Modifier.fillMaxSize().padding(paddingValues)) {
             if (progress < 1F) LinearProgressIndicator({ progress }, Modifier.fillMaxWidth())
-            val group = selectedGroup
-            if (tab == AppChooserTab.Groups && group == null) {
-                GroupChooser(allGroups) { selectedGroup = it }
-            } else {
-                if (tab == AppChooserTab.Groups && group != null) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = HorizontalPadding, end = 4.dp),
-                        Arrangement.SpaceBetween, Alignment.CenterVertically
+            if (tab == AppChooserTab.Groups) {
+                Box(Modifier.fillMaxSize()) {
+                    AppGroupsList(groups, autoGroups, onEditGroup, Modifier.fillMaxSize())
+                    FloatingActionButton(
+                        { onEditGroup(null, "", emptyList()) },
+                        Modifier.align(Alignment.BottomEnd).padding(16.dp)
                     ) {
-                        Text(group.name, style = typography.titleMedium)
-                        IconButton({ selectedGroup = null }) {
-                            Icon(Icons.Outlined.Clear, null)
-                        }
+                        Icon(Icons.Default.Add, null)
                     }
                 }
+            } else {
                 if (gridView) LazyVerticalGrid(GridCells.Adaptive(88.dp), Modifier.fillMaxSize()) {
                     gridItems(filteredPackages, { it.name }) {
                         AppGridItem(
@@ -392,39 +390,6 @@ private fun AppGridItem(info: AppInfo, modifier: Modifier = Modifier) {
             info.label, Modifier.padding(top = 6.dp), style = typography.bodyMedium,
             textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis
         )
-    }
-}
-
-/** The list shown by the groups tab before a group is picked */
-@Composable
-private fun GroupChooser(groups: List<SelectableAppGroup>, onSelect: (SelectableAppGroup) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize()) {
-        if (groups.isEmpty()) item {
-            Text(
-                stringResource(R.string.no_app_groups),
-                Modifier.fillMaxWidth().padding(HorizontalPadding, 16.dp),
-                textAlign = TextAlign.Center
-            )
-        }
-        items(groups.size) { index ->
-            val group = groups[index]
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelect(group) }
-                    .padding(HorizontalPadding, 10.dp)
-            ) {
-                Text(group.name, style = typography.titleLarge)
-                Text(
-                    stringResource(
-                        if (group.auto) R.string.auto_group_apps_count else R.string.app_group_apps_count,
-                        group.apps.size
-                    ),
-                    Modifier.alpha(0.7F), style = typography.bodyMedium
-                )
-            }
-        }
-        item { Spacer(Modifier.height(BottomPadding)) }
     }
 }
 

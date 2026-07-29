@@ -12,9 +12,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.annotation.StringRes
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,6 +61,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -66,6 +71,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -99,12 +105,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -203,13 +213,28 @@ fun ApplicationsFeaturesScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Un
         Modifier.nestedScroll(sb.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                { Text(stringResource(R.string.applications)) },
-                navigationIcon = { NavIcon(onNavigateUp) },
-                actions = {
-                    IconButton(onSwitchView) {
-                        Icon(painterResource(R.drawable.android_fill0), null)
+                {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.applications),
+                            Modifier.weight(1F, false), maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        // The way to the application list sits by the title, as a button
+                        FilledTonalButton(
+                            onSwitchView, Modifier.padding(start = 12.dp),
+                            contentPadding = ButtonDefaults.TextButtonContentPadding
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.android_fill0), null,
+                                Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.app_list), style = typography.labelLarge)
+                        }
                     }
                 },
+                navigationIcon = { NavIcon(onNavigateUp) },
                 scrollBehavior = sb
             )
         },
@@ -230,6 +255,9 @@ fun ApplicationsFeaturesScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Un
                 FunctionItem(R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0) { onNavigate(DisableUserControl) }
             }
             FunctionItem(R.string.permissions, icon = R.drawable.shield_fill0) { onNavigate(PermissionsManager()) }
+            FunctionItem(R.string.add_managed_configuration, icon = R.drawable.description_fill0) {
+                onNavigate(ManualConfigurations(emptyList()))
+            }
             if(VERSION.SDK_INT >= 28) {
                 FunctionItem(R.string.disable_metered_data, icon = R.drawable.money_off_fill0) { onNavigate(DisableMeteredData) }
             }
@@ -355,6 +383,154 @@ fun ApplicationDetailsScreen(
     }
 }
 
+@Serializable data class ApplicationsDetails(val packages: List<String>)
+
+/** The functions of [ApplicationDetailsScreen], applied to every selected app at once */
+@Composable
+fun ApplicationsDetailsScreen(
+    param: ApplicationsDetails, vm: MyViewModel, onNavigateUp: () -> Unit,
+    onNavigate: (Any) -> Unit
+) {
+    val packages = param.packages
+    val privilege by Privilege.status.collectAsStateWithLifecycle()
+    val status by vm.appsStatus.collectAsStateWithLifecycle()
+    var dialog by rememberSaveable { mutableIntStateOf(0) } // 1: clear storage, 2: uninstall
+    val apps = remember(packages) { packages.map { vm.getAppInfo(it) } }
+    val appList = remember(apps) {
+        apps.take(10).joinToString(", ") { it.label } + if (apps.size > 10) "…" else ""
+    }
+    LaunchedEffect(Unit) {
+        vm.getAppsStatus(packages)
+    }
+    MySmallTitleScaffold(R.string.place_holder, onNavigateUp, 0.dp) {
+        Column(Modifier
+            .align(Alignment.CenterHorizontally)
+            .padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // The last spot becomes a plus once there are more apps than fit in the row
+                val shown = if (apps.size > 6) 5 else apps.size
+                apps.take(shown).forEach {
+                    Image(rememberDrawablePainter(it.icon), null,
+                        Modifier.padding(horizontal = 3.dp).size(40.dp))
+                }
+                if (apps.size > shown) Icon(
+                    Icons.Default.Add, null,
+                    Modifier.padding(horizontal = 3.dp).size(40.dp)
+                )
+            }
+            Text(
+                stringResource(R.string.selected_apps_count, packages.size),
+                Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+        }
+        FunctionItem(R.string.permissions, icon = R.drawable.shield_fill0) {
+            onNavigate(MultiplePermissions(packages))
+        }
+        if(VERSION.SDK_INT >= 24) SwitchItem(
+            R.string.suspend, icon = R.drawable.block_fill0, state = status.suspend,
+            onCheckedChange = { vm.adSetPackagesSuspended(packages, it) }
+        )
+        SwitchItem(
+            R.string.hide, icon = R.drawable.visibility_off_fill0, state = status.hide,
+            onCheckedChange = { vm.adSetPackagesHidden(packages, it) }
+        )
+        SwitchItem(
+            R.string.block_uninstall, icon = R.drawable.delete_forever_fill0,
+            state = status.uninstallBlocked,
+            onCheckedChange = { vm.adSetPackagesUb(packages, it) }
+        )
+        if(VERSION.SDK_INT >= 30) SwitchItem(
+            R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0,
+            state = status.userControlDisabled,
+            onCheckedChange = { vm.adSetPackagesUcd(packages, it) }
+        )
+        if(VERSION.SDK_INT >= 28) SwitchItem(
+            R.string.disable_metered_data, icon = R.drawable.money_off_fill0,
+            state = status.meteredDataDisabled,
+            onCheckedChange = { vm.adSetPackagesMdd(packages, it) }
+        )
+        if(privilege.device && VERSION.SDK_INT >= 28) SwitchItem(
+            R.string.keep_after_uninstall, icon = R.drawable.delete_fill0,
+            state = status.keepUninstalled,
+            onCheckedChange = { vm.adSetPackagesKu(packages, it) }
+        )
+        FunctionItem(R.string.add_managed_configuration, icon = R.drawable.description_fill0) {
+            onNavigate(ManualConfigurations(packages))
+        }
+        if(VERSION.SDK_INT >= 28) FunctionItem(R.string.clear_app_storage, icon = R.drawable.mop_fill0) { dialog = 1 }
+        FunctionItem(R.string.uninstall, icon = R.drawable.delete_fill0) { dialog = 2 }
+        Notes(R.string.info_multiple_apps, HorizontalPadding)
+        Spacer(Modifier.height(BottomPadding))
+    }
+    if(dialog == 1 && VERSION.SDK_INT >= 28) MultipleAppsActionDialog(
+        R.string.clear_app_storage,
+        stringResource(R.string.clear_apps_storage_confirmation, packages.size, appList),
+        { onDone -> vm.clearAppsData(packages) { onDone(it) } }
+    ) { dialog = 0 }
+    if(dialog == 2) MultipleAppsActionDialog(
+        R.string.uninstall,
+        stringResource(R.string.uninstall_apps_confirmation, packages.size, appList),
+        { onDone -> vm.uninstallPackages(packages) { onDone(it) } }
+    ) { done ->
+        dialog = 0
+        if (done) onNavigateUp()
+    }
+}
+
+/**
+ * Warns about what is about to happen to the selected apps, runs [action] once confirmed and
+ * reports back how many of them it failed for. [onClose] tells whether the action ran.
+ */
+@Composable
+private fun MultipleAppsActionDialog(
+    @StringRes title: Int, warning: String, action: (onDone: (Int) -> Unit) -> Unit,
+    onClose: (Boolean) -> Unit
+) {
+    var running by rememberSaveable { mutableStateOf(false) }
+    var failed by rememberSaveable { mutableStateOf<Int?>(null) }
+    AlertDialog(
+        title = { Text(stringResource(title)) },
+        text = {
+            Column {
+                val count = failed
+                Text(
+                    if (count == null) warning
+                    else stringResource(R.string.failed_apps_count, count)
+                )
+                if (running) LinearProgressIndicator(Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp))
+            }
+        },
+        confirmButton = {
+            TextButton(
+                {
+                    if (failed != null) {
+                        onClose(true)
+                    } else {
+                        running = true
+                        action {
+                            running = false
+                            if (it == 0) onClose(true) else failed = it
+                        }
+                    }
+                },
+                enabled = !running,
+                colors = ButtonDefaults.textButtonColors(contentColor = colorScheme.error)
+            ) {
+                Text(stringResource(R.string.confirm))
+            }
+        },
+        dismissButton = {
+            if (failed == null) TextButton({ onClose(false) }, enabled = !running) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+        onDismissRequest = {},
+        properties = DialogProperties(false, false)
+    )
+}
+
 @Serializable object Suspend
 
 @Serializable object Hide
@@ -363,39 +539,128 @@ fun ApplicationDetailsScreen(
 
 @Serializable object DisableUserControl
 
+/** The apps a setting is already applied to, with a way to take it off any of them */
+@Composable
+fun AppliedAppsDialog(apps: List<AppInfo>?, onRemove: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        title = { Text(stringResource(R.string.applied_apps)) },
+        text = {
+            when {
+                apps == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                apps.isEmpty() -> Text(stringResource(R.string.no_applied_apps))
+                else -> LazyColumn(Modifier.heightIn(max = 400.dp)) {
+                    items(apps, { it.name }) { ApplicationItem(it) { onRemove(it.name) } }
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text(stringResource(R.string.confirm)) } },
+        onDismissRequest = onDismiss
+    )
+}
+
+/**
+ * The package field with its add button: what is typed needs the button, what is picked from the
+ * application list is added as soon as the picker hands it back.
+ */
+@Composable
+fun AddPackagesField(
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, current: List<String>,
+    onAdd: (List<String>) -> Unit
+) {
+    var input by rememberSaveable { mutableStateOf("") }
+    val inputPackages = parsePackageNames(input)
+    LaunchedEffect(Unit) {
+        val chosen = parsePackageNames(chosenPackage.receive()).filter { it !in current }
+        if (chosen.isNotEmpty()) onAdd(chosen)
+    }
+    PackageNameTextField(input, onChoosePackage, Modifier.padding(HorizontalPadding, 8.dp)) {
+        input = it
+    }
+    Button(
+        {
+            onAdd(inputPackages.filter { it !in current })
+            input = ""
+        },
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = HorizontalPadding)
+            .padding(bottom = 10.dp),
+        inputPackages.isNotEmpty() && inputPackages.none { it in current }
+    ) {
+        Text(stringResource(R.string.add))
+    }
+}
+
 @Serializable data class PermissionsManager(val packageName: String? = null)
 
 @Composable
 fun PermissionsManagerScreen(
-    packagePermissions: MutableStateFlow<Map<String, Int>>, getPackagePermissions: (String) -> Unit,
-    setPackagePermission: (String, String, Int) -> Boolean, onNavigateUp: () -> Unit,
-    param: PermissionsManager, chosenPackage: Channel<String>, onChoosePackage: () -> Unit
+    packagePermissions: MutableStateFlow<Map<String, Int>>,
+    getPackagePermissions: (List<String>) -> Unit,
+    setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
+    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    removeApplied: (String) -> Unit, onNavigateUp: () -> Unit, param: PermissionsManager,
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit
+) = PermissionsContent(
+    listOfNotNull(param.packageName), packagePermissions, getPackagePermissions,
+    setPackagePermission, getAppInfo, appliedApps, getAppliedApps, removeApplied,
+    param.packageName == null, chosenPackage, onChoosePackage, onNavigateUp
+)
+
+@Serializable data class MultiplePermissions(val packages: List<String>)
+
+/** The permissions of several apps at once: a state is shown only when they all share it */
+@Composable
+fun MultiplePermissionsScreen(
+    param: MultiplePermissions, packagePermissions: MutableStateFlow<Map<String, Int>>,
+    getPackagePermissions: (List<String>) -> Unit,
+    setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
+    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    removeApplied: (String) -> Unit, chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
+    onNavigateUp: () -> Unit
+) = PermissionsContent(
+    param.packages, packagePermissions, getPackagePermissions, setPackagePermission, getAppInfo,
+    appliedApps, getAppliedApps, removeApplied, true, chosenPackage, onChoosePackage, onNavigateUp
+)
+
+@Composable
+private fun PermissionsContent(
+    initialPackages: List<String>, packagePermissions: MutableStateFlow<Map<String, Int>>,
+    getPackagePermissions: (List<String>) -> Unit,
+    setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
+    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    removeApplied: (String) -> Unit, canAddPackages: Boolean, chosenPackage: Channel<String>,
+    onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
-    val packageNameParam = param.packageName
     val privilege by Privilege.status.collectAsStateWithLifecycle()
-    var packageName by rememberSaveable { mutableStateOf(packageNameParam ?: "") }
     var selectedPermission by rememberSaveable { mutableIntStateOf(-1) }
     val permissions by packagePermissions.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        packageName = chosenPackage.receive()
-    }
-    LaunchedEffect(packageName) {
-        getPackagePermissions(packageName)
+    val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
+    val applied by appliedApps.collectAsStateWithLifecycle()
+    var appliedDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(packages.toList()) {
+        getPackagePermissions(packages)
     }
     MyLazyScaffold(R.string.permissions, onNavigateUp) {
         item {
-            if(packageNameParam == null) {
-                PackageNameTextField(packageName, onChoosePackage,
-                    Modifier.padding(HorizontalPadding, 8.dp)) { packageName = it }
-                Spacer(Modifier.padding(vertical = 4.dp))
+            FunctionItem(R.string.applied_apps, icon = R.drawable.list_fill0) {
+                appliedDialog = true
+                getAppliedApps()
             }
+            if (packages.size > 1) Notes(R.string.info_multiple_apps, HorizontalPadding)
+        }
+        items(packages.map { getAppInfo(it) }, { it.name }) {
+            ApplicationItem(it) { packages -= it.name }
+        }
+        if (canAddPackages) item {
+            AddPackagesField(chosenPackage, onChoosePackage, packages) { packages += it }
         }
         itemsIndexed(runtimePermissions, { _, it -> it.id }) { index, it ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
+                    .clickable(packages.isNotEmpty()) {
                         selectedPermission = index
                     }
                     .padding(8.dp)
@@ -417,10 +682,11 @@ fun PermissionsManagerScreen(
             Spacer(Modifier.height(BottomPadding))
         }
     }
+    if (appliedDialog) AppliedAppsDialog(applied, removeApplied) { appliedDialog = false }
     if(selectedPermission != -1) {
         val permission = runtimePermissions[selectedPermission]
         fun changeState(state: Int) {
-            val result = setPackagePermission(packageName, permission.id, state)
+            val result = setPackagePermission(packages, permission.id, state)
             if (result) selectedPermission = -1
         }
         @Composable
@@ -466,24 +732,52 @@ fun PermissionsManagerScreen(
 @Composable
 fun ClearAppStorageScreen(
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    onClear: (String, (Boolean) -> Unit) -> Unit, onNavigateUp: () -> Unit
+    onClear: (List<String>, (Int) -> Unit) -> Unit, getAppInfo: (String) -> AppInfo,
+    onNavigateUp: () -> Unit
+) = PackagesActionScreen(
+    R.string.clear_app_storage, R.string.clear, R.string.clear_apps_storage_confirmation,
+    chosenPackage, onChoosePackage, getAppInfo, onClear, onNavigateUp
+)
+
+/**
+ * Collects applications the way the other screens do and runs one action over all of them,
+ * behind a dialog that names them first.
+ */
+@Composable
+private fun PackagesActionScreen(
+    @StringRes title: Int, @StringRes action: Int, @StringRes warning: Int,
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, getAppInfo: (String) -> AppInfo,
+    onRun: (List<String>, (Int) -> Unit) -> Unit, onNavigateUp: () -> Unit
 ) {
+    val packages = rememberSaveable { mutableStateListOf<String>() }
     var dialog by rememberSaveable { mutableStateOf(false) }
-    var packageName by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(Unit) {
-        packageName = chosenPackage.receive()
-    }
-    MyScaffold(R.string.clear_app_storage, onNavigateUp) {
-        PackageNameTextField(packageName, onChoosePackage,
-            Modifier.padding(vertical = 8.dp)) { packageName = it }
-        Button(
-            { dialog = true },
-            Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.clear))
+    val apps = packages.map { getAppInfo(it) }
+    val appList = apps.take(10).joinToString(", ") { it.label } + if (apps.size > 10) "…" else ""
+    MyLazyScaffold(title, onNavigateUp) {
+        items(apps, { it.name }) {
+            ApplicationItem(it) { packages -= it.name }
+        }
+        item {
+            AddPackagesField(chosenPackage, onChoosePackage, packages) { packages += it }
+            Button(
+                { dialog = true },
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = HorizontalPadding),
+                packages.isNotEmpty()
+            ) {
+                Text(stringResource(action))
+            }
+            Spacer(Modifier.height(BottomPadding))
         }
     }
-    if(dialog) ClearAppStorageDialog(packageName, onClear) { dialog = false }
+    if (dialog) MultipleAppsActionDialog(
+        action, stringResource(warning, packages.size, appList),
+        { onDone -> onRun(packages.toList(), onDone) }
+    ) { done ->
+        dialog = false
+        if (done) packages.clear()
+    }
 }
 
 @RequiresApi(28)
@@ -530,28 +824,12 @@ private fun ClearAppStorageDialog(
 @Composable
 fun UninstallAppScreen(
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    onUninstall: (String, (String?) -> Unit) -> Unit, onNavigateUp: () -> Unit
-) {
-    var dialog by rememberSaveable { mutableStateOf(false) }
-    var packageName by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(Unit) {
-        packageName = chosenPackage.receive()
-    }
-    MyScaffold(R.string.uninstall_app, onNavigateUp) {
-        PackageNameTextField(packageName, onChoosePackage,
-            Modifier.padding(vertical = 8.dp)) { packageName = it }
-        Button(
-            { dialog = true },
-            Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.uninstall))
-        }
-    }
-    if(dialog) UninstallAppDialog(packageName, onUninstall) {
-        packageName = ""
-        dialog = false
-    }
-}
+    onUninstall: (List<String>, (Int) -> Unit) -> Unit, getAppInfo: (String) -> AppInfo,
+    onNavigateUp: () -> Unit
+) = PackagesActionScreen(
+    R.string.uninstall_app, R.string.uninstall, R.string.uninstall_apps_confirmation,
+    chosenPackage, onChoosePackage, getAppInfo, onUninstall, onNavigateUp
+)
 
 @Composable
 private fun UninstallAppDialog(
@@ -644,7 +922,9 @@ fun CredentialManagerPolicyScreen(
     var input by rememberSaveable { mutableStateOf("") }
     val inputPackages = parsePackageNames(input)
     LaunchedEffect(Unit) {
-        input = chosenPackage.receive()
+        // Apps picked from the list are added right away, only typing needs the button
+        val chosen = parsePackageNames(chosenPackage.receive())
+        if (chosen.isNotEmpty()) setCmPackage(chosen, true)
     }
     MyLazyScaffold(R.string.credential_manager_policy, onNavigateUp) {
         item {
@@ -671,7 +951,8 @@ fun CredentialManagerPolicyScreen(
                             setCmPackage(inputPackages, true)
                             input = ""
                         },
-                        Modifier.fillMaxWidth()
+                        Modifier.fillMaxWidth(),
+                        inputPackages.isNotEmpty()
                     ) {
                         Text(stringResource(R.string.add))
                     }
@@ -708,7 +989,9 @@ fun PermittedAsAndImPackages(
     val inputPackages = parsePackageNames(input)
     var allowAll by rememberSaveable { mutableStateOf(getPackages()) }
     LaunchedEffect(Unit) {
-        input = chosenPackage.receive()
+        // Apps picked from the list are added right away, only typing needs the button
+        val chosen = parsePackageNames(chosenPackage.receive())
+        if (chosen.isNotEmpty()) setPackage(chosen, true)
     }
     MyLazyScaffold(title, onNavigateUp) {
         item {
@@ -728,7 +1011,8 @@ fun PermittedAsAndImPackages(
                     },
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = HorizontalPadding)
+                        .padding(horizontal = HorizontalPadding),
+                    inputPackages.isNotEmpty()
                 ) {
                     Text(stringResource(R.string.add))
                 }
@@ -816,20 +1100,27 @@ fun PackageFunctionScreen(
     title: Int, packagesState: MutableStateFlow<List<AppInfo>>, onGet: () -> Unit,
     onSet: (List<String>, Boolean) -> Unit, onNavigateUp: () -> Unit,
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    navigateToGroups: () -> Unit, appGroups: StateFlow<List<AppGroup>>, notes: Int? = null
+    navigateToGroups: () -> Unit, appGroups: StateFlow<List<AppGroup>>,
+    autoAppGroups: StateFlow<List<AutoAppGroup>>, refreshAutoGroups: () -> Unit,
+    notes: Int? = null
 ) {
     val context = LocalContext.current
     val groups by appGroups.collectAsStateWithLifecycle()
+    val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
+    val allGroups = selectableGroups(groups, autoGroups)
     val packages by packagesState.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
     val inputPackages = parsePackageNames(input)
     var dialog by remember { mutableStateOf(false) }
-    var selectedGroup by remember { mutableStateOf<AppGroup?>(null) }
+    var selectedGroup by remember { mutableStateOf<SelectableAppGroup?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val coroutine = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         onGet()
-        input = chosenPackage.receive()
+        refreshAutoGroups()
+        // Apps picked from the list are added right away, only typing needs the button
+        val chosen = parsePackageNames(chosenPackage.receive())
+        if (chosen.isNotEmpty()) onSet(chosen, true)
     }
     Scaffold(
         topBar = {
@@ -845,17 +1136,20 @@ fun PackageFunctionScreen(
                             Icon(Icons.Default.MoreVert, null)
                         }
                         DropdownMenu(expand, { expand = false }) {
-                            groups.forEach {
+                            allGroups.forEach { group ->
                                 DropdownMenuItem(
-                                    { Text("(${it.apps.size}) ${it.name}") },
+                                    { Text("(${group.apps.size}) ${group.name}") },
                                     {
-                                        selectedGroup = it
+                                        selectedGroup = group
                                         dialog = true
                                         expand = false
+                                    },
+                                    leadingIcon = {
+                                        if (group.auto) Icon(painterResource(R.drawable.tune_fill0), null)
                                     }
                                 )
                             }
-                            if (groups.isNotEmpty()) HorizontalDivider()
+                            if (allGroups.isNotEmpty()) HorizontalDivider()
                             DropdownMenuItem(
                                 { Text(stringResource(R.string.manage_app_groups)) },
                                 {
@@ -900,7 +1194,7 @@ fun PackageFunctionScreen(
                         .fillMaxWidth()
                         .padding(horizontal = HorizontalPadding)
                         .padding(bottom = 10.dp),
-                    packages.none { it.name in inputPackages }
+                    inputPackages.isNotEmpty() && packages.none { it.name in inputPackages }
                 ) {
                     Text(stringResource(R.string.add))
                 }
@@ -944,15 +1238,37 @@ class AppGroup(
     val id: Int, override val name: String, override val apps: List<String>
 ) : BasicAppGroup(name, apps)
 
+/**
+ * A group created automatically from the apps a policy was applied to (hidden, suspended...).
+ * [title] is a string resource, the group itself is never stored - it always mirrors the policy.
+ */
+class AutoAppGroup(@StringRes val title: Int, val apps: List<String>)
+
+/** A group that can be picked from a list: either a stored [AppGroup] or an [AutoAppGroup] */
+class SelectableAppGroup(
+    val name: String, val apps: List<String>, val auto: Boolean, val id: Int? = null
+)
+
+/** The stored groups followed by the automatic ones, ready to be displayed */
+@Composable
+fun selectableGroups(
+    groups: List<AppGroup>, autoGroups: List<AutoAppGroup>
+): List<SelectableAppGroup> =
+    groups.map { SelectableAppGroup(it.name, it.apps, false, it.id) } +
+            autoGroups.map { SelectableAppGroup(stringResource(it.title), it.apps, true) }
+
 @Serializable object ManageAppGroups
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManageAppGroupsScreen(
-    appGroups: StateFlow<List<AppGroup>>, exportData: (Uri) -> Unit, importData: (Uri) -> Unit,
+    appGroups: StateFlow<List<AppGroup>>, autoAppGroups: StateFlow<List<AutoAppGroup>>,
+    refreshAutoGroups: () -> Unit, exportData: (Uri) -> Unit, importData: (Uri) -> Unit,
     navigateToEditScreen: (Int?, String, List<String>) -> Unit, navigateUp: () -> Unit
 ) {
     val groups by appGroups.collectAsStateWithLifecycle()
+    val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { refreshAutoGroups() }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) {
@@ -1009,24 +1325,93 @@ fun ManageAppGroupsScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(Modifier.padding(paddingValues)) {
-            items(groups, { it.id }) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            navigateToEditScreen(it.id, it.name, it.apps)
+        AppGroupsList(groups, autoGroups, navigateToEditScreen, Modifier.padding(paddingValues))
+    }
+}
+
+/** The keys [AppGroupsList] identifies its groups by, so a selection can name them too */
+fun appGroupKey(group: AppGroup) = "stored:${group.id}"
+fun autoAppGroupKey(group: AutoAppGroup) = "auto:${group.title}"
+
+/**
+ * The groups of [ManageAppGroupsScreen], also shown by the groups tab of the app chooser.
+ * When [onSelect] is given the groups can be selected the same way applications are: a long
+ * press starts the selection, a tap adds or removes a group while one is running.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun AppGroupsList(
+    groups: List<AppGroup>, autoGroups: List<AutoAppGroup>,
+    navigateToEditScreen: (Int?, String, List<String>) -> Unit, modifier: Modifier = Modifier,
+    selectedKeys: List<String> = emptyList(),
+    onSelect: ((key: String, apps: List<String>) -> Unit)? = null,
+    openAutoGroups: Boolean = false
+) {
+    val hf = LocalHapticFeedback.current
+    @Composable
+    fun GroupItem(
+        key: String, name: String, apps: List<String>, countRes: Int, onOpen: () -> Unit
+    ) {
+        val selected = key in selectedKeys
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onLongClick = {
+                        val select = onSelect
+                        if (select != null && !selected) {
+                            select(key, apps)
+                            hf.performHapticFeedback(HapticFeedbackType.LongPress)
                         }
-                        .padding(HorizontalPadding, 8.dp)
-                ) {
-                    Text(it.name)
-                    Text(
-                        it.apps.size.toString() + " apps", Modifier.alpha(0.7F),
-                        style = typography.bodyMedium
-                    )
+                    },
+                    onClick = {
+                        val select = onSelect
+                        if (select != null && selectedKeys.isNotEmpty()) select(key, apps)
+                        else onOpen()
+                    }
+                )
+                .background(if (selected) colorScheme.primaryContainer else Color.Transparent)
+                .padding(HorizontalPadding, 8.dp)
+        ) {
+            Text(name)
+            Text(
+                stringResource(countRes, apps.size), Modifier.alpha(0.7F),
+                style = typography.bodyMedium
+            )
+        }
+    }
+    LazyColumn(modifier) {
+        if (groups.isEmpty() && autoGroups.isEmpty()) item {
+            Text(
+                stringResource(R.string.no_app_groups),
+                Modifier.fillMaxWidth().padding(HorizontalPadding, 16.dp),
+                textAlign = TextAlign.Center
+            )
+        }
+        items(groups, { it.id }) {
+            GroupItem(appGroupKey(it), it.name, it.apps, R.string.app_group_apps_count) {
+                navigateToEditScreen(it.id, it.name, it.apps)
+            }
+        }
+        if (autoGroups.isNotEmpty()) {
+            item {
+                if (groups.isNotEmpty()) HorizontalDivider(Modifier.padding(top = 4.dp))
+                Text(
+                    stringResource(R.string.automatic_groups).uppercase(),
+                    Modifier.padding(HorizontalPadding, 12.dp), color = colorScheme.primary,
+                    style = typography.labelLarge, fontWeight = FontWeight.Bold
+                )
+            }
+            items(autoGroups.size) { index ->
+                val group = autoGroups[index]
+                val name = stringResource(group.title)
+                GroupItem(autoAppGroupKey(group), name, group.apps, R.string.auto_group_apps_count) {
+                    // An automatic group mirrors a policy: it can be opened, never edited
+                    if (openAutoGroups) navigateToEditScreen(null, name, group.apps)
                 }
             }
         }
+        item { Spacer(Modifier.height(BottomPadding)) }
     }
 }
 
@@ -1037,15 +1422,24 @@ fun ManageAppGroupsScreen(
 fun EditAppGroupScreen(
     params: EditAppGroup, getAppInfo: (String) -> AppInfo, navigateUp: () -> Unit,
     setGroup: (Int?, String, List<String>) -> Unit, deleteGroup: (Int) -> Unit,
-    onChoosePackage: () -> Unit, chosenPackage: Channel<String>
+    onChoosePackage: () -> Unit, chosenPackage: Channel<String>,
+    appGroups: StateFlow<List<AppGroup>>, autoAppGroups: StateFlow<List<AutoAppGroup>>,
+    refreshAutoGroups: () -> Unit
 ) {
     var name by rememberSaveable { mutableStateOf(params.name) }
     val list = rememberSaveable { mutableStateListOf(*params.apps.toTypedArray()) }
     val appInfoList = list.map { getAppInfo(it) }
     var input by rememberSaveable { mutableStateOf("") }
     val inputPackages = parsePackageNames(input)
+    val groups by appGroups.collectAsStateWithLifecycle()
+    val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
+    // Every other group, the automatic ones included, can hand over its applications
+    val otherGroups = selectableGroups(groups, autoGroups)
+        .filter { params.id == null || it.id != params.id }
     LaunchedEffect(Unit) {
-        input = chosenPackage.receive()
+        refreshAutoGroups()
+        // Apps picked from the list are added right away, only typing needs the button
+        list += parsePackageNames(chosenPackage.receive()).filter { it !in list }
     }
     Scaffold(
         topBar = {
@@ -1101,9 +1495,32 @@ fun EditAppGroupScreen(
                         .fillMaxWidth()
                         .padding(horizontal = HorizontalPadding)
                         .padding(bottom = 10.dp),
-                    inputPackages.all { it !in list }
+                    inputPackages.isNotEmpty() && inputPackages.all { it !in list }
                 ) {
                     Text(stringResource(R.string.add))
+                }
+                var groupMenu by remember { mutableStateOf(false) }
+                Box(Modifier.padding(horizontal = HorizontalPadding)) {
+                    OutlinedButton(
+                        { groupMenu = true }, Modifier.fillMaxWidth(),
+                        enabled = otherGroups.isNotEmpty()
+                    ) {
+                        Text(stringResource(R.string.add_from_group))
+                    }
+                    DropdownMenu(groupMenu, { groupMenu = false }) {
+                        otherGroups.forEach { group ->
+                            DropdownMenuItem(
+                                { Text("(${group.apps.size}) ${group.name}") },
+                                {
+                                    list += group.apps.filter { it !in list }
+                                    groupMenu = false
+                                },
+                                leadingIcon = {
+                                    if (group.auto) Icon(painterResource(R.drawable.tune_fill0), null)
+                                }
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(BottomPadding))
             }
@@ -1552,6 +1969,8 @@ enum class ManualRestrictionType(val label: Int, val minSdk: Int = 21) {
 
 @Serializable class ManualConfiguration(val packageName: String)
 
+@Serializable class ManualConfigurations(val packages: List<String>)
+
 /** A step down into a nested bundle: a key, plus an index when the key holds a `Bundle[]`. */
 private sealed class BundlePath {
     data class Key(val key: String) : BundlePath()
@@ -1629,19 +2048,23 @@ private fun replaceElements(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualConfigurationScreen(
-    params: ManualConfiguration, manualRestrictions: StateFlow<List<ManualRestriction>>,
-    getManualRestrictions: (String) -> Unit,
-    setManualRestriction: (String, String?, ManualRestriction) -> Unit,
-    removeManualRestriction: (String, String) -> Unit,
-    onNavigateUp: () -> Unit
+    initialPackages: List<String>, manualRestrictions: StateFlow<List<ManualRestriction>>,
+    getManualRestrictions: (List<String>) -> Unit,
+    setManualRestriction: (List<String>, String?, ManualRestriction) -> Unit,
+    removeManualRestriction: (List<String>, String) -> Unit, getAppInfo: (String) -> AppInfo,
+    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    removeApplied: (String) -> Unit, canAddPackages: Boolean, chosenPackage: Channel<String>,
+    onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
-    val packageName = params.packageName
+    val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
+    val applied by appliedApps.collectAsStateWithLifecycle()
+    var appliedDialog by remember { mutableStateOf(false) }
     val restrictions by manualRestrictions.collectAsStateWithLifecycle()
     var path by remember { mutableStateOf(emptyList<BundlePath>()) }
     var editDialog by remember { mutableStateOf<ManualRestriction?>(null) }
     var addDialog by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        getManualRestrictions(packageName)
+    LaunchedEffect(packages.toList()) {
+        getManualRestrictions(packages)
     }
     // A nested bundle can disappear underneath us if it's edited away; fall back to its parent
     val entries = entriesAt(restrictions, path)
@@ -1659,12 +2082,12 @@ fun ManualConfigurationScreen(
     fun persist(newRoot: List<ManualRestriction>) {
         val rootKey = (path.firstOrNull() as? BundlePath.Key)?.key ?: return
         newRoot.firstOrNull { it.key == rootKey }?.let {
-            setManualRestriction(packageName, rootKey, it)
+            setManualRestriction(packages, rootKey, it)
         }
     }
     fun setEntry(oldKey: String?, item: ManualRestriction) {
         if (path.isEmpty()) {
-            setManualRestriction(packageName, oldKey, item)
+            setManualRestriction(packages, oldKey, item)
         } else {
             val kept = (entries ?: return).filter { it.key != oldKey && it.key != item.key }
             persist(replaceEntries(restrictions, path, kept + item))
@@ -1672,7 +2095,7 @@ fun ManualConfigurationScreen(
     }
     fun removeEntry(key: String) {
         if (path.isEmpty()) {
-            removeManualRestriction(packageName, key)
+            removeManualRestriction(packages, key)
         } else {
             val kept = (entries ?: return).filter { it.key != key }
             persist(replaceEntries(restrictions, path, kept))
@@ -1706,7 +2129,8 @@ fun ManualConfigurationScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
+            // Nothing to write a configuration to until an app is picked
+            if (packages.isNotEmpty()) FloatingActionButton(
                 {
                     if (elements != null) {
                         persist(replaceElements(
@@ -1724,9 +2148,22 @@ fun ManualConfigurationScreen(
         contentWindowInsets = adaptiveInsets()
     ) { paddingValues ->
         LazyColumn(Modifier.padding(paddingValues)) {
-            if (path.isEmpty()) item {
-                Notes(R.string.info_manual_configurations, HorizontalPadding)
-                Spacer(Modifier.height(8.dp))
+            if (path.isEmpty()) {
+                item {
+                    FunctionItem(R.string.applied_apps, icon = R.drawable.list_fill0) {
+                        appliedDialog = true
+                        getAppliedApps()
+                    }
+                    Notes(R.string.info_manual_configurations, HorizontalPadding)
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(packages.map { getAppInfo(it) }, { "app:" + it.name }) {
+                    ApplicationItem(it) { packages -= it.name }
+                }
+                if (canAddPackages) item {
+                    AddPackagesField(chosenPackage, onChoosePackage, packages) { packages += it }
+                }
+                if (packages.isNotEmpty()) item { HorizontalDivider() }
             }
             // A Bundle[] lists its elements; anything else lists key/value entries
             if (elements != null) {
@@ -1817,6 +2254,7 @@ fun ManualConfigurationScreen(
         }
     }
     val siblingKeys = entries.orEmpty().map { it.key }
+    if (appliedDialog) AppliedAppsDialog(applied, removeApplied) { appliedDialog = false }
     if (addDialog) Dialog({ addDialog = false }) {
         Surface(
             color = AlertDialogDefaults.containerColor,

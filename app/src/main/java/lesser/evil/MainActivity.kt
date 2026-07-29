@@ -72,6 +72,8 @@ import lesser.evil.dpm.AlwaysOnVpnPackage
 import lesser.evil.dpm.AlwaysOnVpnPackageScreen
 import lesser.evil.dpm.ApplicationDetails
 import lesser.evil.dpm.ApplicationDetailsScreen
+import lesser.evil.dpm.ApplicationsDetails
+import lesser.evil.dpm.ApplicationsDetailsScreen
 import lesser.evil.dpm.ApplicationsFeatures
 import lesser.evil.dpm.ApplicationsFeaturesScreen
 import lesser.evil.dpm.AutoTimePolicy
@@ -141,8 +143,11 @@ import lesser.evil.dpm.ManagedConfiguration
 import lesser.evil.dpm.ManagedConfigurationScreen
 import lesser.evil.dpm.ManualConfiguration
 import lesser.evil.dpm.ManualConfigurationScreen
+import lesser.evil.dpm.ManualConfigurations
 import lesser.evil.dpm.MtePolicy
 import lesser.evil.dpm.MtePolicyScreen
+import lesser.evil.dpm.MultiplePermissions
+import lesser.evil.dpm.MultiplePermissionsScreen
 import lesser.evil.dpm.NearbyStreamingPolicy
 import lesser.evil.dpm.NearbyStreamingPolicyScreen
 import lesser.evil.dpm.Network
@@ -531,87 +536,94 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             AppChooserScreen(
                 params, vm.installedPackages, vm.refreshPackagesProgress, { name ->
                 if (params.canSwitchView) {
-                    if (name == null) {
-                        navigateUp()
-                    } else {
-                        navigate(ApplicationDetails(name))
+                    val chosen = name?.split('\n') ?: emptyList()
+                    when {
+                        chosen.isEmpty() -> navigateUp()
+                        chosen.size == 1 -> navigate(ApplicationDetails(chosen.first()))
+                        else -> navigate(ApplicationsDetails(chosen))
                     }
                 } else {
                     if (name != null) vm.chosenPackage.trySend(name)
                     navigateUp()
                 }
-            }, {
-                SP.applicationsListView = false
-                navController.navigate(ApplicationsFeatures) {
-                    popUpTo(Home)
-                }
-            }, vm::refreshPackageList, vm::setPackageSuspended, vm::setPackageHidden)
+            }, vm::refreshPackageList,
+                vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups
+            ) { id, name, apps -> navController.navigate(EditAppGroup(id, name, apps)) }
         }
         composable<ApplicationsFeatures> {
+            // Kept on the stack, so going back from the list lands on the functions again
             ApplicationsFeaturesScreen(::navigateUp, ::navigate) {
-                SP.applicationsListView = true
-                navController.navigate(ApplicationsList(true, true)) {
-                    popUpTo(Home)
-                }
+                navigate(ApplicationsList(true, true))
             }
         }
         composable<ApplicationDetails> {
             ApplicationDetailsScreen(it.toRoute(), vm, ::navigateUp, ::navigate)
         }
+        composable<ApplicationsDetails> {
+            ApplicationsDetailsScreen(it.toRoute(), vm, ::navigateUp, ::navigate)
+        }
         composable<Suspend> {
             PackageFunctionScreen(
                 R.string.suspend, vm.suspendedPackages, vm::getSuspendedPackaged,
                 vm::setPackageSuspended, ::navigateUp, vm.chosenPackage, ::choosePackage,
-                ::navigateToAppGroups, vm.appGroups, R.string.info_suspend_app
+                ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups,
+                R.string.info_suspend_app
             )
         }
         composable<Hide> {
             PackageFunctionScreen(
                 R.string.hide, vm.hiddenPackages, vm::getHiddenPackages, vm::setPackageHidden,
-                ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups, vm.appGroups
+                ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups, vm.appGroups,
+                vm.autoAppGroups, vm::refreshAutoAppGroups
             )
         }
         composable<BlockUninstall> {
             PackageFunctionScreen(
                 R.string.block_uninstall, vm.ubPackages, vm::getUbPackages, vm::setPackageUb,
-                ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups, vm.appGroups
+                ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups, vm.appGroups,
+                vm.autoAppGroups, vm::refreshAutoAppGroups
             )
         }
         composable<DisableUserControl> {
             PackageFunctionScreen(
                 R.string.disable_user_control, vm.ucdPackages, vm::getUcdPackages,
                 vm::setPackageUcd, ::navigateUp, vm.chosenPackage, ::choosePackage,
-                ::navigateToAppGroups, vm.appGroups, R.string.info_disable_user_control
+                ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups,
+                R.string.info_disable_user_control
             )
         }
         composable<PermissionsManager> {
             PermissionsManagerScreen(
                 vm.packagePermissions, vm::getPackagePermissions, vm::setPackagePermission,
-                ::navigateUp, it.toRoute(), vm.chosenPackage, ::chooseSinglePackage
+                vm::getAppInfo, vm.appsWithPermissions, vm::getAppsWithPermissions,
+                vm::clearPackagePermissions, ::navigateUp, it.toRoute(), vm.chosenPackage,
+                ::choosePackage
             )
         }
         composable<DisableMeteredData> {
             PackageFunctionScreen(
                 R.string.disable_metered_data, vm.mddPackages, vm::getMddPackages,
                 vm::setPackageMdd, ::navigateUp, vm.chosenPackage, ::choosePackage,
-                ::navigateToAppGroups, vm.appGroups
+                ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups
             )
         }
         composable<ClearAppStorage> {
             ClearAppStorageScreen(
-                vm.chosenPackage, ::chooseSinglePackage, vm::clearAppData, ::navigateUp
+                vm.chosenPackage, ::choosePackage, vm::clearAppsData, vm::getAppInfo, ::navigateUp
             )
         }
         composable<UninstallApp> {
             UninstallAppScreen(
-                vm.chosenPackage, ::chooseSinglePackage, vm::uninstallPackage, ::navigateUp
+                vm.chosenPackage, ::choosePackage, vm::uninstallPackages, vm::getAppInfo,
+                ::navigateUp
             )
         }
         composable<KeepUninstalledPackages> {
             PackageFunctionScreen(
                 R.string.keep_uninstalled_packages, vm.kuPackages, vm::getKuPackages,
                 vm::setPackageKu, ::navigateUp, vm.chosenPackage, ::choosePackage,
-                ::navigateToAppGroups, vm.appGroups, R.string.info_keep_uninstalled_apps
+                ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups,
+                R.string.info_keep_uninstalled_apps
             )
         }
         composable<InstallExistingApp> {
@@ -623,13 +635,15 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             PackageFunctionScreen(
                 R.string.cross_profile_apps, vm.cpPackages,
                 vm::getCpPackages, vm::setPackageCp, ::navigateUp, vm.chosenPackage,
-                ::choosePackage, ::navigateToAppGroups, vm.appGroups
+                ::choosePackage, ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups,
+                vm::refreshAutoAppGroups
             )
         }
         composable<CrossProfileWidgetProviders> {
             PackageFunctionScreen(R.string.cross_profile_widget, vm.cpwProviders,
                 vm::getCpwProviders, vm::setCpwProvider, ::navigateUp, vm.chosenPackage,
-                ::choosePackage, ::navigateToAppGroups, vm.appGroups)
+                ::choosePackage, ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups,
+                vm::refreshAutoAppGroups)
         }
         composable<CredentialManagerPolicy> {
             CredentialManagerPolicyScreen(
@@ -672,13 +686,32 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         }
         composable<ManualConfiguration> {
             ManualConfigurationScreen(
-                it.toRoute(), vm.manualRestrictions, vm::getManualRestrictions,
-                vm::setManualRestriction, vm::removeManualRestriction, ::navigateUp
+                listOf(it.toRoute<ManualConfiguration>().packageName), vm.manualRestrictions,
+                vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
+                vm::getAppInfo, vm.appsWithRestrictions, vm::getAppsWithRestrictions,
+                vm::clearAppRestrictionsOf, false, vm.chosenPackage, ::choosePackage, ::navigateUp
+            )
+        }
+        composable<ManualConfigurations> {
+            ManualConfigurationScreen(
+                it.toRoute<ManualConfigurations>().packages, vm.manualRestrictions,
+                vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
+                vm::getAppInfo, vm.appsWithRestrictions, vm::getAppsWithRestrictions,
+                vm::clearAppRestrictionsOf, true, vm.chosenPackage, ::choosePackage, ::navigateUp
+            )
+        }
+        composable<MultiplePermissions> {
+            MultiplePermissionsScreen(
+                it.toRoute(), vm.packagePermissions, vm::getPackagePermissions,
+                vm::setPackagePermission, vm::getAppInfo, vm.appsWithPermissions,
+                vm::getAppsWithPermissions, vm::clearPackagePermissions, vm.chosenPackage,
+                ::choosePackage, ::navigateUp
             )
         }
         composable<ManageAppGroups> {
             ManageAppGroupsScreen(
-                vm.appGroups, vm::exportAppGroups, vm::importAppGroups,
+                vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups,
+                vm::exportAppGroups, vm::importAppGroups,
                 { id, name, apps -> navController.navigate(EditAppGroup(id, name, apps)) },
                 ::navigateUp
             )
@@ -686,7 +719,8 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         composable<EditAppGroup> {
             EditAppGroupScreen(
                 it.toRoute(), vm::getAppInfo, ::navigateUp, vm::setAppGroup,
-                vm::deleteAppGroup, ::choosePackage, vm.chosenPackage
+                vm::deleteAppGroup, ::choosePackage, vm.chosenPackage, vm.appGroups,
+                vm.autoAppGroups, vm::refreshAutoAppGroups
             )
         }
 
@@ -846,10 +880,7 @@ private fun HomeScreen(restricted: Boolean, onNavigate: (Any) -> Unit, onLock: (
             }
             if(privilege.device || privilege.profile) {
                 HomePageItem(R.string.applications, R.drawable.apps_fill0) {
-                    onNavigate(
-                        if (SP.applicationsListView) ApplicationsList(true, true)
-                        else ApplicationsFeatures
-                    )
+                    onNavigate(ApplicationsFeatures)
                 }
                 if(VERSION.SDK_INT >= 24) {
                     HomePageItem(R.string.user_restriction, R.drawable.person_off) { onNavigate(UserRestriction) }

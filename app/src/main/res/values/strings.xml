@@ -390,6 +390,7 @@
 
     <!--Applications-->
     <string name="applications">Applications</string>
+    <string name="app_list">App list</string>
     <string name="show_user_app">Show user apps</string>
     <string name="show_system_app">Show system apps</string>
     <string name="suspend">Suspend</string>
@@ -423,9 +424,39 @@
     <string name="keep_after_uninstall">Keep after uninstall</string>
     <string name="search">Search</string>
     <string name="app_group">App group</string>
+    <string name="app_group_apps_count">%1$d apps</string>
+    <string name="no_app_groups">No groups yet</string>
+    <string name="automatic_groups">Automatic groups</string>
+    <string name="auto_group_apps_count">%1$d apps \u00B7 automatic</string>
+    <string name="auto_group_hidden">Hidden</string>
+    <string name="auto_group_suspended">Suspended</string>
+    <string name="auto_group_uninstall_blocked">Uninstall blocked</string>
+    <string name="auto_group_user_control_disabled">User control disabled</string>
+    <string name="auto_group_metered_data_disabled">Data disabled</string>
+    <string name="auto_group_keep_uninstalled">Kept after uninstall</string>
+    <string name="apps_tab_user">User</string>
+    <string name="select_all">Select all</string>
+    <string name="applied_apps">Apps it is applied to</string>
+    <string name="no_applied_apps">No app holds it</string>
+    <string name="select_all_hint_before">Tap</string>
+    <string name="select_all_hint_after">to select all</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="multi_select_hint">Long press an app to select several of them</string>
+    <string name="selected_apps_count">%1$d apps selected</string>
+    <string name="info_multiple_apps">A switch is on only when the policy applies to every selected app. Changing it applies to all of them.</string>
+    <string name="clear_apps_storage_confirmation">You are about to delete the data of %1$d apps, this cannot be undone:\n%2$s</string>
+    <string name="uninstall_apps_confirmation">You are about to uninstall %1$d apps:\n%2$s</string>
+    <string name="failed_apps_count">Failed for %1$d apps</string>
+    <string name="apps_tab_visual">Visual</string>
+    <string name="apps_tab_background">Background</string>
+    <string name="apps_tab_all">All</string>
+    <string name="apps_tab_groups">Groups</string>
+    <string name="grid_view">Grid view</string>
+    <string name="list_view">List view</string>
     <string name="manage_app_groups">Manage groups</string>
     <string name="import_str">Import</string>
     <string name="edit_app_group">Edit group</string>
+    <string name="add_from_group">Add from a group</string>
     <string name="add_to_list">Add to list</string>
     <string name="remove_from_list">Remove from list</string>
     <string name="managed_configuration">Managed configuration</string>

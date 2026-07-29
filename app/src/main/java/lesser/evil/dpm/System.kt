@@ -120,6 +120,7 @@ import lesser.evil.adaptiveInsets
 import lesser.evil.clickableTextField
 import lesser.evil.fabInsetsPadding
 import lesser.evil.formatDate
+import lesser.evil.parsePackageNames
 import lesser.evil.popToast
 import lesser.evil.showOperationResultToast
 import lesser.evil.ui.CheckBoxItem
@@ -1391,7 +1392,8 @@ private fun LockTaskPackages(
     val packages by lockTaskPackages.collectAsStateWithLifecycle()
     var packageName by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) {
-        packageName = chosenPackage.receive()
+        // Apps picked from the list are added right away, only typing needs the button
+        parsePackageNames(chosenPackage.receive()).forEach { setLockTaskPackage(it, true) }
     }
     LazyColumn {
         items(packages, { it.name }) {

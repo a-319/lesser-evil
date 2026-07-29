@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.app.admin.DeviceAdminInfo
 import android.app.admin.DeviceAdminReceiver
 import android.app.admin.DevicePolicyManager
+import android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_DEFAULT
 import android.app.admin.DevicePolicyManager.InstallSystemUpdateCallback
 import android.app.admin.FactoryResetProtectionPolicy
 import android.app.admin.IDevicePolicyManager
@@ -65,6 +66,7 @@ import lesser.evil.dpm.ApnProtocol
 import lesser.evil.dpm.AppGroup
 import lesser.evil.dpm.AppRestriction
 import lesser.evil.dpm.AppStatus
+import lesser.evil.dpm.AutoAppGroup
 import lesser.evil.dpm.BasicAppGroup
 import lesser.evil.dpm.CaCertInfo
 import lesser.evil.dpm.CreateUserResult
@@ -135,6 +137,8 @@ import java.security.cert.X509Certificate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import kotlin.reflect.jvm.jvmErasure
 
 private const val DHIZUKU_PERMISSION = "com.rosan.dhizuku.permission.API"
@@ -261,11 +265,28 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
 
     val chosenPackage = Channel<String>(1, BufferOverflow.DROP_LATEST)
 
+    /** Packages with a launcher entry, i.e. the apps the user actually sees */
+    private var launcherPackages: Set<String>? = null
+    fun getLauncherPackages(refresh: Boolean = false): Set<String> {
+        launcherPackages?.let { if (!refresh) return it }
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val result: Set<String> = try {
+            PM.queryIntentActivities(intent, getInstalledAppsFlags).mapNotNullTo(mutableSetOf()) {
+                it.activityInfo?.packageName
+            }
+        } catch (_: Exception) {
+            emptySet()
+        }
+        launcherPackages = result
+        return result
+    }
+
     val installedPackages = MutableStateFlow(emptyList<AppInfo>())
     val refreshPackagesProgress = MutableStateFlow(0F)
     fun refreshPackageList() {
         viewModelScope.launch(Dispatchers.IO) {
             installedPackages.value = emptyList()
+            getLauncherPackages(true)
             val apps = PM.getInstalledApplications(getInstalledAppsFlags)
             apps.forEachIndexed { index, info ->
                 installedPackages.update {
@@ -280,8 +301,10 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             list.filter { it.name != name }
         }
     }
-    fun getAppInfo(info: ApplicationInfo) =
-        AppInfo(info.packageName, info.loadLabel(PM).toString(), info.loadIcon(PM), info.flags)
+    fun getAppInfo(info: ApplicationInfo) = AppInfo(
+        info.packageName, info.loadLabel(PM).toString(), info.loadIcon(PM), info.flags,
+        info.packageName in getLauncherPackages()
+    )
     fun getAppInfo(name: String): AppInfo {
         return try {
             getAppInfo(PM.getApplicationInfo(name, getInstalledAppsFlags))
@@ -360,18 +383,37 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
 
     val packagePermissions = MutableStateFlow(emptyMap<String, Int>())
-    fun getPackagePermissions(name: String) {
-        if (name.isValidPackageName) {
-            packagePermissions.value = runtimePermissions.associate {
-                it.id to DPM.getPermissionGrantState(DAR, name, it.id)
-            }
-        } else {
+    /** The grant state [packages] share, or none for a permission they don't agree on */
+    fun getPackagePermissions(packages: List<String>) {
+        val names = packages.filter { it.isValidPackageName }
+        if (names.isEmpty()) {
             packagePermissions.value = emptyMap()
+            return
         }
+        packagePermissions.value = runtimePermissions.mapNotNull { permission ->
+            val states = names.map {
+                try {
+                    DPM.getPermissionGrantState(DAR, it, permission.id)
+                } catch (_: Exception) {
+                    null
+                }
+            }.distinct()
+            val shared = states.singleOrNull()
+            if (shared == null) null else permission.id to shared
+        }.toMap()
     }
-    fun setPackagePermission(name: String, permission: String, status: Int): Boolean {
-        val result = DPM.setPermissionGrantState(DAR, name, permission, status)
-        getPackagePermissions(name)
+    /** Grants or denies [permission] on every app of [packages], reporting whether all took it */
+    fun setPackagePermission(packages: List<String>, permission: String, status: Int): Boolean {
+        var result = packages.isNotEmpty()
+        for (name in packages) {
+            result = try {
+                DPM.setPermissionGrantState(DAR, name, permission, status) && result
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
+        getPackagePermissions(packages)
         return result
     }
 
@@ -448,6 +490,24 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             callback(result)
         }
     }
+    @RequiresApi(28)
+    private suspend fun clearAppDataAwait(name: String): Boolean = suspendCoroutine { continuation ->
+        try {
+            clearAppData(name) { continuation.resume(it) }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            continuation.resume(false)
+        }
+    }
+    /** Clears the data of every app of [packages] one after the other, reporting the failures */
+    @RequiresApi(28)
+    fun clearAppsData(packages: List<String>, callback: (Int) -> Unit) {
+        viewModelScope.launch {
+            var failed = 0
+            for (name in packages) if (!clearAppDataAwait(name)) failed++
+            callback(failed)
+        }
+    }
 
     fun uninstallPackage(packageName: String, onComplete: (String?) -> Unit) {
         val action = "lesser.evil.action.PACKAGE_UNINSTALLED"
@@ -481,6 +541,25 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             PendingIntent.getBroadcast(application, 0, intent, PendingIntent.FLAG_MUTABLE).intentSender
         }
         application.getPackageInstaller().uninstall(packageName, pi)
+    }
+
+    /** Uninstalls every app of [packages] one after the other, reporting the failures */
+    fun uninstallPackages(packages: List<String>, callback: (Int) -> Unit) {
+        viewModelScope.launch {
+            var failed = 0
+            for (name in packages) {
+                val error: String? = suspendCoroutine { continuation ->
+                    try {
+                        uninstallPackage(name) { continuation.resume(it) }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        continuation.resume(e.message ?: name)
+                    }
+                }
+                if (error != null) failed++
+            }
+            callback(failed)
+        }
     }
 
     @RequiresApi(28)
@@ -623,6 +702,80 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
+    /** Status of several apps at once: a policy counts as applied only when it covers all of them */
+    val appsStatus = MutableStateFlow(AppStatus(false, false, false, false, false, false))
+    @SuppressLint("NewApi")
+    fun getAppsStatus(packages: List<String>) {
+        val ucd = policyPackages {
+            if (VERSION.SDK_INT >= 30) DPM.getUserControlDisabledPackages(DAR) else null
+        }
+        val mdd = policyPackages {
+            if (VERSION.SDK_INT >= 28) DPM.getMeteredDataDisabledPackages(DAR) else null
+        }
+        val ku = policyPackages {
+            if (VERSION.SDK_INT >= 28 && Privilege.status.value.device) DPM.getKeepUninstalledPackages(DAR)
+            else null
+        }
+        appsStatus.value = AppStatus(
+            VERSION.SDK_INT >= 24 && allPackages(packages) { DPM.isPackageSuspended(DAR, it) },
+            allPackages(packages) { DPM.isApplicationHidden(DAR, it) },
+            allPackages(packages) { DPM.isUninstallBlocked(DAR, it) },
+            allPackages(packages) { it in ucd },
+            allPackages(packages) { it in mdd },
+            allPackages(packages) { it in ku }
+        )
+    }
+    /** True when [applied] holds for every one of [packages], which must not be empty */
+    private fun allPackages(packages: List<String>, applied: (String) -> Boolean) =
+        packages.isNotEmpty() && filterPackages(packages, applied).size == packages.size
+    // Details of several applications
+    @RequiresApi(24)
+    fun adSetPackagesSuspended(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.suspended, packages)
+        try {
+            if (effective.isNotEmpty()) DPM.setPackagesSuspended(DAR, effective.toTypedArray(), status)
+        } catch (_: Exception) {}
+        getAppsStatus(packages)
+    }
+    fun adSetPackagesHidden(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.hidden, packages)
+        for (name in effective) DPM.setApplicationHidden(DAR, name, status)
+        getAppsStatus(packages)
+    }
+    fun adSetPackagesUb(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.uninstallBlocked, packages)
+        for (name in effective) DPM.setUninstallBlocked(DAR, name, status)
+        getAppsStatus(packages)
+    }
+    @RequiresApi(30)
+    fun adSetPackagesUcd(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.userControlDisabled, packages)
+        DPM.setUserControlDisabledPackages(DAR, DPM.getUserControlDisabledPackages(DAR).run {
+            if (status) plus(effective).distinct() else minus(effective.toSet())
+        })
+        getAppsStatus(packages)
+    }
+    @RequiresApi(28)
+    fun adSetPackagesMdd(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.meteredDataDisabled, packages)
+        DPM.setMeteredDataDisabledPackages(DAR, DPM.getMeteredDataDisabledPackages(DAR).run {
+            if (status) plus(effective).distinct() else minus(effective.toSet())
+        })
+        getAppsStatus(packages)
+    }
+    @RequiresApi(28)
+    fun adSetPackagesKu(packages: List<String>, status: Boolean) {
+        DPM.setKeepUninstalledPackages(DAR, (DPM.getKeepUninstalledPackages(DAR) ?: emptyList()).run {
+            if (status) plus(packages).distinct() else minus(packages.toSet())
+        })
+        getAppsStatus(packages)
+    }
+
     @RequiresApi(34)
     fun setDefaultDialer(name: String): Boolean {
         return try {
@@ -717,15 +870,81 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         return b
     }
 
+    /** The apps a runtime permission was granted or denied on; null while the scan runs */
+    val appsWithPermissions = MutableStateFlow<List<AppInfo>?>(null)
+    fun getAppsWithPermissions() {
+        appsWithPermissions.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            val permissions = runtimePermissions.filter { VERSION.SDK_INT >= it.requiresApi }
+            appsWithPermissions.value = installedPackageNames().filter { name ->
+                permissions.any {
+                    try {
+                        DPM.getPermissionGrantState(DAR, name, it.id) != PERMISSION_GRANT_STATE_DEFAULT
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+            }.map { getAppInfo(it) }
+        }
+    }
+    /** Puts every runtime permission of [name] back to the default, taking it off the list */
+    fun clearPackagePermissions(name: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runtimePermissions.filter { VERSION.SDK_INT >= it.requiresApi }.forEach {
+                try {
+                    DPM.setPermissionGrantState(DAR, name, it.id, PERMISSION_GRANT_STATE_DEFAULT)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            appsWithPermissions.update { list -> list?.filter { it.name != name } }
+        }
+    }
+    /** The apps holding a configuration; null while the scan runs */
+    val appsWithRestrictions = MutableStateFlow<List<AppInfo>?>(null)
+    fun getAppsWithRestrictions() {
+        appsWithRestrictions.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            appsWithRestrictions.value = installedPackageNames().filter { name ->
+                try {
+                    !DPM.getApplicationRestrictions(DAR, name).isEmpty
+                } catch (_: Exception) {
+                    false
+                }
+            }.map { getAppInfo(it) }
+        }
+    }
+    /** Drops the whole configuration of [name], taking it off the list */
+    fun clearAppRestrictionsOf(name: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            restrictionsMutex.withLock {
+                try {
+                    DPM.setApplicationRestrictions(DAR, name, Bundle())
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            appsWithRestrictions.update { list -> list?.filter { it.name != name } }
+        }
+    }
+    private fun installedPackageNames() = policyPackages {
+        PM.getInstalledApplications(getInstalledAppsFlags).map { it.packageName }
+    }
+
     val manualRestrictions = MutableStateFlow(emptyList<ManualRestriction>())
 
-    fun getManualRestrictions(name: String) {
-        try {
-            manualRestrictions.value = parseRestrictions(DPM.getApplicationRestrictions(DAR, name))
-        } catch (e: Exception) {
-            e.printStackTrace()
-            manualRestrictions.value = emptyList()
+    /** The configuration [packages] have in common: an entry every one of them holds alike */
+    fun getManualRestrictions(packages: List<String>) {
+        val lists = packages.map { name ->
+            try {
+                parseRestrictions(DPM.getApplicationRestrictions(DAR, name))
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
+            }
         }
+        manualRestrictions.value =
+            lists.firstOrNull()?.filter { entry -> lists.all { entry in it } } ?: emptyList()
     }
 
     private fun parseRestrictions(bundle: Bundle): List<ManualRestriction> =
@@ -755,29 +974,38 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             }
         }.sortedBy { it.key }
 
-    fun setManualRestriction(name: String, oldKey: String?, item: ManualRestriction) {
+    /** Writes [item] to every app of [packages], leaving the rest of their configuration alone */
+    fun setManualRestriction(packages: List<String>, oldKey: String?, item: ManualRestriction) {
         viewModelScope.launch(Dispatchers.IO) {
             restrictionsMutex.withLock {
-                // Mutate the live bundle in place so keys of unsupported types (e.g. Bundle,
-                // Bundle[]) that getManualRestrictions can't represent are left untouched
-                // instead of being dropped when the bundle is rebuilt.
-                val bundle = DPM.getApplicationRestrictions(DAR, name)
-                if (oldKey != null) bundle.remove(oldKey)
-                bundle.remove(item.key)
-                putManualRestriction(bundle, item)
-                DPM.setApplicationRestrictions(DAR, name, bundle)
-                getManualRestrictions(name)
+                for (name in packages) try {
+                    // Mutate the live bundle in place so keys of unsupported types (e.g. Bundle,
+                    // Bundle[]) that getManualRestrictions can't represent are left untouched
+                    // instead of being dropped when the bundle is rebuilt.
+                    val bundle = DPM.getApplicationRestrictions(DAR, name)
+                    if (oldKey != null) bundle.remove(oldKey)
+                    bundle.remove(item.key)
+                    putManualRestriction(bundle, item)
+                    DPM.setApplicationRestrictions(DAR, name, bundle)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                getManualRestrictions(packages)
             }
         }
     }
 
-    fun removeManualRestriction(name: String, key: String) {
+    fun removeManualRestriction(packages: List<String>, key: String) {
         viewModelScope.launch(Dispatchers.IO) {
             restrictionsMutex.withLock {
-                val bundle = DPM.getApplicationRestrictions(DAR, name)
-                bundle.remove(key)
-                DPM.setApplicationRestrictions(DAR, name, bundle)
-                getManualRestrictions(name)
+                for (name in packages) try {
+                    val bundle = DPM.getApplicationRestrictions(DAR, name)
+                    bundle.remove(key)
+                    DPM.setApplicationRestrictions(DAR, name, bundle)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                getManualRestrictions(packages)
             }
         }
     }
@@ -831,6 +1059,45 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             myRepo.setAppGroup(null, it.name, it.apps)
         }
         getAppGroups()
+    }
+
+    /**
+     * Groups built from the apps a policy was applied to (hidden, suspended, data disabled...).
+     * They are never stored: every refresh mirrors what is currently applied.
+     */
+    val autoAppGroups = MutableStateFlow(emptyList<AutoAppGroup>())
+    /** A policy list, or an empty one when the policy is unavailable for the current privilege */
+    private fun policyPackages(block: () -> List<String>?): List<String> =
+        try { block()?.distinct() ?: emptyList() } catch (_: Exception) { emptyList() }
+    /** The packages of [packages] the policy [applied] to, skipping the ones it cannot answer for */
+    private fun filterPackages(packages: List<String>, applied: (String) -> Boolean) =
+        packages.filter { try { applied(it) } catch (_: Exception) { false } }
+    @SuppressLint("NewApi")
+    fun refreshAutoAppGroups() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val installed = policyPackages {
+                PM.getInstalledApplications(getInstalledAppsFlags).map { it.packageName }
+            }
+            autoAppGroups.value = listOf(
+                AutoAppGroup(R.string.auto_group_hidden, filterPackages(installed) {
+                    DPM.isApplicationHidden(DAR, it)
+                }),
+                AutoAppGroup(R.string.auto_group_suspended, if (VERSION.SDK_INT < 24) emptyList()
+                else filterPackages(installed) { DPM.isPackageSuspended(DAR, it) }),
+                AutoAppGroup(R.string.auto_group_uninstall_blocked, filterPackages(installed) {
+                    DPM.isUninstallBlocked(DAR, it)
+                }),
+                AutoAppGroup(R.string.auto_group_user_control_disabled, policyPackages {
+                    if (VERSION.SDK_INT >= 30) DPM.getUserControlDisabledPackages(DAR) else null
+                }),
+                AutoAppGroup(R.string.auto_group_metered_data_disabled, policyPackages {
+                    if (VERSION.SDK_INT >= 28) DPM.getMeteredDataDisabledPackages(DAR) else null
+                }),
+                AutoAppGroup(R.string.auto_group_keep_uninstalled, policyPackages {
+                    if (VERSION.SDK_INT >= 28) DPM.getKeepUninstalledPackages(DAR) else null
+                })
+            ).filter { it.apps.isNotEmpty() }
+        }
     }
 
     val policyToggles = MutableStateFlow(emptyList<PolicyToggle>())

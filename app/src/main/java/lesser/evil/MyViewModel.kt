@@ -382,7 +382,6 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
 
     val packagePermissions = MutableStateFlow(emptyMap<String, Int>())
-    fun getPackagePermissions(name: String) = getPackagePermissions(listOf(name))
     /** The grant state [packages] share, or none for a permission they don't agree on */
     fun getPackagePermissions(packages: List<String>) {
         val names = packages.filter { it.isValidPackageName }
@@ -402,8 +401,6 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             if (shared == null) null else permission.id to shared
         }.toMap()
     }
-    fun setPackagePermission(name: String, permission: String, status: Int) =
-        setPackagePermission(listOf(name), permission, status)
     /** Grants or denies [permission] on every app of [packages], reporting whether all took it */
     fun setPackagePermission(packages: List<String>, permission: String, status: Int): Boolean {
         var result = packages.isNotEmpty()
@@ -874,8 +871,6 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
 
     val manualRestrictions = MutableStateFlow(emptyList<ManualRestriction>())
 
-    fun getManualRestrictions(name: String) = getManualRestrictions(listOf(name))
-
     /** The configuration [packages] have in common: an entry every one of them holds alike */
     fun getManualRestrictions(packages: List<String>) {
         val lists = packages.map { name ->
@@ -917,9 +912,6 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             }
         }.sortedBy { it.key }
 
-    fun setManualRestriction(name: String, oldKey: String?, item: ManualRestriction) =
-        setManualRestriction(listOf(name), oldKey, item)
-
     /** Writes [item] to every app of [packages], leaving the rest of their configuration alone */
     fun setManualRestriction(packages: List<String>, oldKey: String?, item: ManualRestriction) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -940,9 +932,6 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             }
         }
     }
-
-    fun removeManualRestriction(name: String, key: String) =
-        removeManualRestriction(listOf(name), key)
 
     fun removeManualRestriction(packages: List<String>, key: String) {
         viewModelScope.launch(Dispatchers.IO) {

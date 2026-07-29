@@ -102,6 +102,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -1065,9 +1066,11 @@ fun AppGroupsList(
         }
         if (autoGroups.isNotEmpty()) {
             item {
+                if (groups.isNotEmpty()) HorizontalDivider(Modifier.padding(top = 4.dp))
                 Text(
-                    stringResource(R.string.automatic_groups),
-                    Modifier.padding(HorizontalPadding, 12.dp), style = typography.titleMedium
+                    stringResource(R.string.automatic_groups).uppercase(),
+                    Modifier.padding(HorizontalPadding, 12.dp), color = colorScheme.primary,
+                    style = typography.labelLarge, fontWeight = FontWeight.Bold
                 )
             }
             items(autoGroups.size) { index ->

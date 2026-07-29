@@ -48,6 +48,7 @@
 	<string name="apn_setting">הגדרת APN</string>
 	<string name="app_group">קבוצת אפליקציות</string>
 	<string name="app_group_apps_count">%1$d אפליקציות</string>
+	<string name="app_list">רשימת אפליקציות</string>
 	<string name="app_name_user_profile">OwnDroid (משתמש)</string>
 	<string name="app_installer">מתקין אפליקציה</string>
 	<string name="app_lock">נעילת אפליקציה</string>

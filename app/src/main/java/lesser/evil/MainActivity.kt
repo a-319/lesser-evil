@@ -546,19 +546,14 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                     if (name != null) vm.chosenPackage.trySend(name)
                     navigateUp()
                 }
-            }, {
-                navController.navigate(ApplicationsFeatures) {
-                    popUpTo(Home)
-                }
             }, vm::refreshPackageList,
                 vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups
             ) { id, name, apps -> navController.navigate(EditAppGroup(id, name, apps)) }
         }
         composable<ApplicationsFeatures> {
+            // Kept on the stack, so going back from the list lands on the functions again
             ApplicationsFeaturesScreen(::navigateUp, ::navigate) {
-                navController.navigate(ApplicationsList(true, true)) {
-                    popUpTo(Home)
-                }
+                navigate(ApplicationsList(true, true))
             }
         }
         composable<ApplicationDetails> {

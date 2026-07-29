@@ -29,7 +29,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -117,7 +116,7 @@ private enum class AppChooserTab(val title: Int) {
 fun AppChooserScreen(
     params: ApplicationsList, packageList: MutableStateFlow<List<AppInfo>>,
     refreshProgress: MutableStateFlow<Float>, onChoosePackage: (String?) -> Unit,
-    onSwitchView: () -> Unit, onRefresh: () -> Unit,
+    onRefresh: () -> Unit,
     appGroups: StateFlow<List<AppGroup>>, autoAppGroups: StateFlow<List<AutoAppGroup>>,
     onRefreshAutoGroups: () -> Unit, onEditGroup: (Int?, String, List<String>) -> Unit
 ) {
@@ -213,9 +212,6 @@ fun AppChooserScreen(
                             if (selection.isEmpty()) {
                                 IconButton(onRefresh, enabled = progress == 1F) {
                                     Icon(Icons.Default.Refresh, null)
-                                }
-                                if (params.canSwitchView) IconButton(onSwitchView) {
-                                    Icon(Icons.AutoMirrored.Default.List, null)
                                 }
                             }
                         }

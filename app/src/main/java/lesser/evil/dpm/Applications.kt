@@ -61,6 +61,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -212,13 +213,28 @@ fun ApplicationsFeaturesScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Un
         Modifier.nestedScroll(sb.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                { Text(stringResource(R.string.applications)) },
-                navigationIcon = { NavIcon(onNavigateUp) },
-                actions = {
-                    IconButton(onSwitchView) {
-                        Icon(painterResource(R.drawable.android_fill0), null)
+                {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.applications),
+                            Modifier.weight(1F, false), maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        // The way to the application list sits by the title, as a button
+                        FilledTonalButton(
+                            onSwitchView, Modifier.padding(start = 12.dp),
+                            contentPadding = ButtonDefaults.TextButtonContentPadding
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.android_fill0), null,
+                                Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.app_list), style = typography.labelLarge)
+                        }
                     }
                 },
+                navigationIcon = { NavIcon(onNavigateUp) },
                 scrollBehavior = sb
             )
         },

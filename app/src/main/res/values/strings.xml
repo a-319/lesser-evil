@@ -436,6 +436,16 @@
     <string name="apps_tab_user">User</string>
     <string name="selected_apps_count">%1$d apps selected</string>
     <string name="info_multiple_apps">A switch is on only when the policy applies to every selected app. Changing it applies to all of them.</string>
+    <string name="clear_apps_storage_confirmation">You are about to delete the data of %1$d apps, this cannot be undone:\n%2$s</string>
+    <string name="uninstall_apps_confirmation">You are about to uninstall %1$d apps:\n%2$s</string>
+    <string name="failed_apps_count">Failed for %1$d apps</string>
+    <string name="custom_configuration">Custom configuration</string>
+    <string name="configuration_key">Key</string>
+    <string name="value_type_text">Text</string>
+    <string name="value_type_list">Text list</string>
+    <string name="value_type_boolean">Yes / no</string>
+    <string name="value_type_number">Number</string>
+    <string name="one_value_per_line">One value per line</string>
     <string name="apps_tab_visual">Visual</string>
     <string name="apps_tab_background">Background</string>
     <string name="apps_tab_all">All</string>

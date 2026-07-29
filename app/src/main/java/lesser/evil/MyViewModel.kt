@@ -132,6 +132,8 @@ import java.security.cert.X509Certificate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import kotlin.reflect.jvm.jvmErasure
 
 private const val DHIZUKU_PERMISSION = "com.rosan.dhizuku.permission.API"
@@ -464,6 +466,24 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             callback(result)
         }
     }
+    @RequiresApi(28)
+    private suspend fun clearAppDataAwait(name: String): Boolean = suspendCoroutine { continuation ->
+        try {
+            clearAppData(name) { continuation.resume(it) }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            continuation.resume(false)
+        }
+    }
+    /** Clears the data of every app of [packages] one after the other, reporting the failures */
+    @RequiresApi(28)
+    fun clearAppsData(packages: List<String>, callback: (Int) -> Unit) {
+        viewModelScope.launch {
+            var failed = 0
+            for (name in packages) if (!clearAppDataAwait(name)) failed++
+            callback(failed)
+        }
+    }
 
     fun uninstallPackage(packageName: String, onComplete: (String?) -> Unit) {
         val action = "lesser.evil.action.PACKAGE_UNINSTALLED"
@@ -497,6 +517,25 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             PendingIntent.getBroadcast(application, 0, intent, PendingIntent.FLAG_MUTABLE).intentSender
         }
         application.getPackageInstaller().uninstall(packageName, pi)
+    }
+
+    /** Uninstalls every app of [packages] one after the other, reporting the failures */
+    fun uninstallPackages(packages: List<String>, callback: (Int) -> Unit) {
+        viewModelScope.launch {
+            var failed = 0
+            for (name in packages) {
+                val error: String? = suspendCoroutine { continuation ->
+                    try {
+                        uninstallPackage(name) { continuation.resume(it) }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        continuation.resume(e.message ?: name)
+                    }
+                }
+                if (error != null) failed++
+            }
+            callback(failed)
+        }
     }
 
     @RequiresApi(28)
@@ -730,20 +769,13 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         val rm = application.getSystemService(RestrictionsManager::class.java)
         try {
             val bundle = DPM.getApplicationRestrictions(DAR, name)
-            appRestrictions.value = rm.getManifestRestrictions(name)?.mapNotNull {
+            val declared = rm.getManifestRestrictions(name)?.mapNotNull {
                 transformRestrictionEntry(it)
             }?.map {
-                if (bundle.containsKey(it.key)) {
-                    when (it) {
-                        is AppRestriction.BooleanItem -> it.value = bundle.getBoolean(it.key)
-                        is AppRestriction.StringItem -> it.value = bundle.getString(it.key)
-                        is AppRestriction.IntItem -> it.value = bundle.getInt(it.key)
-                        is AppRestriction.ChoiceItem -> it.value = bundle.getString(it.key)
-                        is AppRestriction.MultiSelectItem -> it.value = bundle.getStringArray(it.key)
-                    }
-                }
+                readRestrictionValue(it, bundle)
                 it
             } ?: emptyList()
+            appRestrictions.value = declared + undeclaredRestrictions(bundle, declared)
         } catch (e: Exception) {
             e.printStackTrace()
             appRestrictions.value = emptyList()
@@ -752,10 +784,13 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
 
     fun setAppRestrictions(name: String, item: AppRestriction) {
         viewModelScope.launch(Dispatchers.IO) {
-            val bundle = transformAppRestriction(
-                appRestrictions.value.filter { it.key != item.key }.plus(item)
-            )
-            DPM.setApplicationRestrictions(DAR, name, bundle)
+            try {
+                val bundle = DPM.getApplicationRestrictions(DAR, name)
+                writeRestrictionValue(item, bundle)
+                DPM.setApplicationRestrictions(DAR, name, bundle)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             getAppRestrictions(name)
         }
     }
@@ -764,6 +799,126 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             DPM.setApplicationRestrictions(DAR, name, Bundle())
             getAppRestrictions(name)
+        }
+    }
+
+    /** Copies the value [bundle] holds for [item], leaving it alone when it holds none */
+    private fun readRestrictionValue(item: AppRestriction, bundle: Bundle) {
+        if (!bundle.containsKey(item.key)) return
+        when (item) {
+            is AppRestriction.BooleanItem -> item.value = bundle.getBoolean(item.key)
+            is AppRestriction.StringItem -> item.value = bundle.getString(item.key)
+            is AppRestriction.IntItem -> item.value = bundle.getInt(item.key)
+            is AppRestriction.ChoiceItem -> item.value = bundle.getString(item.key)
+            is AppRestriction.MultiSelectItem -> item.value = bundle.getStringArray(item.key)
+        }
+    }
+    /** The value of [item] as text, to tell whether two apps hold the same one */
+    private fun restrictionValueText(item: AppRestriction): String? = when (item) {
+        is AppRestriction.BooleanItem -> item.value?.toString()
+        is AppRestriction.StringItem -> item.value
+        is AppRestriction.IntItem -> item.value?.toString()
+        is AppRestriction.ChoiceItem -> item.value
+        is AppRestriction.MultiSelectItem -> item.value?.joinToString(" ")
+    }
+    private fun clearRestrictionValue(item: AppRestriction) {
+        when (item) {
+            is AppRestriction.BooleanItem -> item.value = null
+            is AppRestriction.StringItem -> item.value = null
+            is AppRestriction.IntItem -> item.value = null
+            is AppRestriction.ChoiceItem -> item.value = null
+            is AppRestriction.MultiSelectItem -> item.value = null
+        }
+    }
+    /**
+     * The keys [bundle] holds that [declared] does not, so a configuration set by hand - the way
+     * the WebView URL lists are - stays visible and editable.
+     */
+    private fun undeclaredRestrictions(
+        bundle: Bundle, declared: List<AppRestriction>
+    ): List<AppRestriction> {
+        val declaredKeys = declared.map { it.key }
+        return bundle.keySet().filter { it !in declaredKeys }.mapNotNull { key ->
+            @Suppress("DEPRECATION") when (val value = bundle.get(key)) {
+                is Boolean -> AppRestriction.BooleanItem(key, null, null, value)
+                is Int -> AppRestriction.IntItem(key, null, null, value)
+                is String -> AppRestriction.StringItem(key, null, null, value)
+                is Array<*> -> AppRestriction.MultiSelectItem(
+                    key, null, null, emptyArray(), emptyArray(),
+                    value.filterIsInstance<String>().toTypedArray()
+                )
+                else -> null
+            }
+        }
+    }
+    /** Writes [item] into [bundle], dropping the key when it holds no value */
+    private fun writeRestrictionValue(item: AppRestriction, bundle: Bundle) {
+        bundle.remove(item.key)
+        when (item) {
+            is AppRestriction.BooleanItem -> item.value?.let { bundle.putBoolean(item.key, it) }
+            is AppRestriction.StringItem -> item.value?.let { bundle.putString(item.key, it) }
+            is AppRestriction.IntItem -> item.value?.let { bundle.putInt(item.key, it) }
+            is AppRestriction.ChoiceItem -> item.value?.let { bundle.putString(item.key, it) }
+            is AppRestriction.MultiSelectItem -> item.value?.let { bundle.putStringArray(item.key, it) }
+        }
+    }
+
+    /**
+     * The configuration keys the selected apps declare, merged by key. A value is shown only
+     * when every app that declares the key holds the same one.
+     */
+    val appsRestrictions = MutableStateFlow(emptyList<AppRestriction>())
+    fun getAppsRestrictions(packages: List<String>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val rm = application.getSystemService(RestrictionsManager::class.java)
+            val merged = LinkedHashMap<String, AppRestriction>()
+            val differing = mutableSetOf<String>()
+            for (name in packages) {
+                val bundle = try {
+                    DPM.getApplicationRestrictions(DAR, name)
+                } catch (_: Exception) { Bundle() }
+                val declared: List<AppRestriction> = try {
+                    rm.getManifestRestrictions(name)?.mapNotNull { transformRestrictionEntry(it) }
+                        ?: emptyList()
+                } catch (_: Exception) { emptyList() }
+                declared.forEach { readRestrictionValue(it, bundle) }
+                for (entry in declared + undeclaredRestrictions(bundle, declared)) {
+                    val first = merged[entry.key]
+                    if (first == null) merged[entry.key] = entry
+                    else if (restrictionValueText(first) != restrictionValueText(entry)) {
+                        differing += entry.key
+                    }
+                }
+            }
+            for (key in differing) merged[key]?.let { clearRestrictionValue(it) }
+            appsRestrictions.value = merged.values.toList()
+        }
+    }
+    /** Sets [item] on every app of [packages], leaving the rest of their configuration alone */
+    fun setAppsRestriction(packages: List<String>, item: AppRestriction) {
+        viewModelScope.launch(Dispatchers.IO) {
+            for (name in packages) {
+                try {
+                    val bundle = DPM.getApplicationRestrictions(DAR, name)
+                    writeRestrictionValue(item, bundle)
+                    DPM.setApplicationRestrictions(DAR, name, bundle)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            getAppsRestrictions(packages)
+        }
+    }
+    fun clearAppsRestrictions(packages: List<String>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            for (name in packages) {
+                try {
+                    DPM.setApplicationRestrictions(DAR, name, Bundle())
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            getAppsRestrictions(packages)
         }
     }
 

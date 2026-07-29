@@ -141,6 +141,8 @@ import lesser.evil.dpm.ManageAppGroups
 import lesser.evil.dpm.ManageAppGroupsScreen
 import lesser.evil.dpm.ManagedConfiguration
 import lesser.evil.dpm.ManagedConfigurationScreen
+import lesser.evil.dpm.ManagedConfigurations
+import lesser.evil.dpm.ManagedConfigurationsScreen
 import lesser.evil.dpm.MtePolicy
 import lesser.evil.dpm.MtePolicyScreen
 import lesser.evil.dpm.NearbyStreamingPolicy
@@ -562,7 +564,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             ApplicationDetailsScreen(it.toRoute(), vm, ::navigateUp, ::navigate)
         }
         composable<ApplicationsDetails> {
-            ApplicationsDetailsScreen(it.toRoute(), vm, ::navigateUp)
+            ApplicationsDetailsScreen(it.toRoute(), vm, ::navigateUp, ::navigate)
         }
         composable<Suspend> {
             PackageFunctionScreen(
@@ -679,6 +681,12 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             ManagedConfigurationScreen(
                 it.toRoute(), vm.appRestrictions, vm::setAppRestrictions,
                 vm::clearAppRestrictions, ::navigateUp
+            )
+        }
+        composable<ManagedConfigurations> {
+            ManagedConfigurationsScreen(
+                it.toRoute(), vm.appsRestrictions, vm::setAppsRestriction,
+                vm::clearAppsRestrictions, ::navigateUp
             )
         }
         composable<ManageAppGroups> {

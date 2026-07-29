@@ -357,21 +357,28 @@ fun ApplicationDetailsScreen(
 /** The functions of [ApplicationDetailsScreen], applied to every selected app at once */
 @Composable
 fun ApplicationsDetailsScreen(
-    param: ApplicationsDetails, vm: MyViewModel, onNavigateUp: () -> Unit
+    param: ApplicationsDetails, vm: MyViewModel, onNavigateUp: () -> Unit,
+    onNavigate: (Any) -> Unit
 ) {
     val packages = param.packages
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     val status by vm.appsStatus.collectAsStateWithLifecycle()
-    val icons = remember(packages) { packages.take(6).map { vm.getAppInfo(it) } }
+    val restrictions by vm.appsRestrictions.collectAsStateWithLifecycle()
+    var dialog by rememberSaveable { mutableIntStateOf(0) } // 1: clear storage, 2: uninstall
+    val apps = remember(packages) { packages.map { vm.getAppInfo(it) } }
+    val appList = remember(apps) {
+        apps.take(10).joinToString(", ") { it.label } + if (apps.size > 10) "…" else ""
+    }
     LaunchedEffect(Unit) {
         vm.getAppsStatus(packages)
+        vm.getAppsRestrictions(packages)
     }
     MySmallTitleScaffold(R.string.place_holder, onNavigateUp, 0.dp) {
         Column(Modifier
             .align(Alignment.CenterHorizontally)
             .padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                icons.forEach {
+                apps.take(6).forEach {
                     Image(rememberDrawablePainter(it.icon), null,
                         Modifier.padding(horizontal = 3.dp).size(40.dp))
                 }
@@ -409,9 +416,83 @@ fun ApplicationsDetailsScreen(
             state = status.keepUninstalled,
             onCheckedChange = { vm.adSetPackagesKu(packages, it) }
         )
+        if (restrictions.isNotEmpty()) {
+            FunctionItem(R.string.managed_configuration, icon = R.drawable.description_fill0) {
+                onNavigate(ManagedConfigurations(packages))
+            }
+        }
+        if(VERSION.SDK_INT >= 28) FunctionItem(R.string.clear_app_storage, icon = R.drawable.mop_fill0) { dialog = 1 }
+        FunctionItem(R.string.uninstall, icon = R.drawable.delete_fill0) { dialog = 2 }
         Notes(R.string.info_multiple_apps, HorizontalPadding)
         Spacer(Modifier.height(BottomPadding))
     }
+    if(dialog == 1 && VERSION.SDK_INT >= 28) MultipleAppsActionDialog(
+        R.string.clear_app_storage,
+        stringResource(R.string.clear_apps_storage_confirmation, packages.size, appList),
+        { onDone -> vm.clearAppsData(packages) { onDone(it) } }
+    ) { dialog = 0 }
+    if(dialog == 2) MultipleAppsActionDialog(
+        R.string.uninstall,
+        stringResource(R.string.uninstall_apps_confirmation, packages.size, appList),
+        { onDone -> vm.uninstallPackages(packages) { onDone(it) } }
+    ) { done ->
+        dialog = 0
+        if (done) onNavigateUp()
+    }
+}
+
+/**
+ * Warns about what is about to happen to the selected apps, runs [action] once confirmed and
+ * reports back how many of them it failed for. [onClose] tells whether the action ran.
+ */
+@Composable
+private fun MultipleAppsActionDialog(
+    @StringRes title: Int, warning: String, action: (onDone: (Int) -> Unit) -> Unit,
+    onClose: (Boolean) -> Unit
+) {
+    var running by rememberSaveable { mutableStateOf(false) }
+    var failed by rememberSaveable { mutableStateOf<Int?>(null) }
+    AlertDialog(
+        title = { Text(stringResource(title)) },
+        text = {
+            Column {
+                val count = failed
+                Text(
+                    if (count == null) warning
+                    else stringResource(R.string.failed_apps_count, count)
+                )
+                if (running) LinearProgressIndicator(Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp))
+            }
+        },
+        confirmButton = {
+            TextButton(
+                {
+                    if (failed != null) {
+                        onClose(true)
+                    } else {
+                        running = true
+                        action {
+                            running = false
+                            if (it == 0) onClose(true) else failed = it
+                        }
+                    }
+                },
+                enabled = !running,
+                colors = ButtonDefaults.textButtonColors(contentColor = colorScheme.error)
+            ) {
+                Text(stringResource(R.string.confirm))
+            }
+        },
+        dismissButton = {
+            if (failed == null) TextButton({ onClose(false) }, enabled = !running) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+        onDismissRequest = {},
+        properties = DialogProperties(false, false)
+    )
 }
 
 @Serializable object Suspend
@@ -1263,12 +1344,34 @@ fun EditAppGroupScreen(
 
 @Serializable class ManagedConfiguration(val packageName: String)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManagedConfigurationScreen(
     params: ManagedConfiguration, appRestrictions: StateFlow<List<AppRestriction>>,
     setRestriction: (String, AppRestriction) -> Unit, clearRestriction: (String) -> Unit,
     navigateUp: () -> Unit
+) = ManagedConfigurationContent(
+    appRestrictions, { setRestriction(params.packageName, it) },
+    { clearRestriction(params.packageName) }, navigateUp
+)
+
+@Serializable class ManagedConfigurations(val packages: List<String>)
+
+/** The managed configuration of several apps at once, written to every one of them */
+@Composable
+fun ManagedConfigurationsScreen(
+    params: ManagedConfigurations, appsRestrictions: StateFlow<List<AppRestriction>>,
+    setRestriction: (List<String>, AppRestriction) -> Unit,
+    clearRestriction: (List<String>) -> Unit, navigateUp: () -> Unit
+) = ManagedConfigurationContent(
+    appsRestrictions, { setRestriction(params.packages, it) },
+    { clearRestriction(params.packages) }, navigateUp
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManagedConfigurationContent(
+    appRestrictions: StateFlow<List<AppRestriction>>, setRestriction: (AppRestriction) -> Unit,
+    clearRestriction: () -> Unit, navigateUp: () -> Unit
 ) {
     val restrictions by appRestrictions.collectAsStateWithLifecycle()
     var searchMode by remember { mutableStateOf(false) }
@@ -1282,6 +1385,8 @@ fun ManagedConfigurationScreen(
         }
     }
     var dialog by remember { mutableStateOf<AppRestriction?>(null) }
+    var customDialog by remember { mutableStateOf(false) }
+    var customOrigin by remember { mutableStateOf<AppRestriction?>(null) }
     var clearRestrictionDialog by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -1322,6 +1427,12 @@ fun ManagedConfigurationScreen(
                             Icon(Icons.Outlined.Search, null)
                         }
                         IconButton({
+                            customOrigin = null
+                            customDialog = true
+                        }) {
+                            Icon(Icons.Default.Add, stringResource(R.string.custom_configuration))
+                        }
+                        IconButton({
                             clearRestrictionDialog = true
                         }) {
                             Icon(Icons.Outlined.Delete, null)
@@ -1338,7 +1449,13 @@ fun ManagedConfigurationScreen(
                     Modifier
                         .fillMaxWidth()
                         .clickable {
-                            dialog = entry
+                            // A list without declared entries was set by hand, not by the manifest
+                            if (entry is AppRestriction.MultiSelectItem && entry.entryValues.isEmpty()) {
+                                customOrigin = entry
+                                customDialog = true
+                            } else {
+                                dialog = entry
+                            }
                         }
                         .padding(HorizontalPadding, 8.dp)
                         .animateItem(),
@@ -1389,11 +1506,15 @@ fun ManagedConfigurationScreen(
         ) {
             ManagedConfigurationDialog(dialog!!) {
                 if (it != null) {
-                    setRestriction(params.packageName, it)
+                    setRestriction(it)
                 }
                 dialog = null
             }
         }
+    }
+    if (customDialog) CustomConfigurationDialog(customOrigin, { customDialog = false }) {
+        setRestriction(it)
+        customDialog = false
     }
     if (clearRestrictionDialog) AlertDialog(
         text = {
@@ -1401,7 +1522,7 @@ fun ManagedConfigurationScreen(
         },
         confirmButton = {
             TextButton({
-                clearRestriction(params.packageName)
+                clearRestriction()
                 clearRestrictionDialog = false
             }) {
                 Text(stringResource(R.string.confirm))
@@ -1417,6 +1538,106 @@ fun ManagedConfigurationScreen(
         onDismissRequest = {
             clearRestrictionDialog = false
         }
+    )
+}
+
+/**
+ * Sets a configuration key by hand, for the keys an app reads without declaring them in its
+ * manifest - the WebView URL lists (com.android.browser:URLBlacklist and URLWhitelist) among them.
+ * Confirming with an empty value removes the key.
+ */
+@Composable
+private fun CustomConfigurationDialog(
+    origin: AppRestriction?, onDismiss: () -> Unit, onConfirm: (AppRestriction) -> Unit
+) {
+    var key by rememberSaveable { mutableStateOf(origin?.key ?: "") }
+    var type by rememberSaveable {
+        mutableIntStateOf(
+            when (origin) {
+                is AppRestriction.MultiSelectItem -> 1
+                is AppRestriction.BooleanItem -> 2
+                is AppRestriction.IntItem -> 3
+                else -> 0
+            }
+        )
+    }
+    var text by rememberSaveable {
+        mutableStateOf(
+            when (origin) {
+                is AppRestriction.MultiSelectItem -> origin.value?.joinToString("\n") ?: ""
+                is AppRestriction.StringItem -> origin.value ?: ""
+                is AppRestriction.IntItem -> origin.value?.toString() ?: ""
+                else -> ""
+            }
+        )
+    }
+    var state by rememberSaveable {
+        mutableStateOf((origin as? AppRestriction.BooleanItem)?.value == true)
+    }
+    AlertDialog(
+        title = { Text(stringResource(R.string.custom_configuration)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    key, { key = it }, Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.configuration_key)) },
+                    enabled = origin == null, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                )
+                Spacer(Modifier.height(8.dp))
+                FullWidthRadioButtonItem(R.string.value_type_text, type == 0) { type = 0 }
+                FullWidthRadioButtonItem(R.string.value_type_list, type == 1) { type = 1 }
+                FullWidthRadioButtonItem(R.string.value_type_boolean, type == 2) { type = 2 }
+                FullWidthRadioButtonItem(R.string.value_type_number, type == 3) { type = 3 }
+                Spacer(Modifier.height(8.dp))
+                if (type == 2) {
+                    Row(
+                        Modifier.fillMaxWidth(), Arrangement.SpaceBetween,
+                        Alignment.CenterVertically
+                    ) {
+                        Text(stringResource(R.string.specify_value))
+                        Switch(state, { state = it })
+                    }
+                } else OutlinedTextField(
+                    text, { text = it }, Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.specify_value)) },
+                    supportingText = {
+                        if (type == 1) Text(stringResource(R.string.one_value_per_line))
+                    },
+                    singleLine = type != 1,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = if (type == 3) KeyboardType.Number else KeyboardType.Ascii
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                {
+                    val lines = text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+                    onConfirm(
+                        when (type) {
+                            1 -> AppRestriction.MultiSelectItem(
+                                key, null, null, emptyArray(), emptyArray(),
+                                lines.toTypedArray().takeIf { it.isNotEmpty() }
+                            )
+                            2 -> AppRestriction.BooleanItem(key, null, null, state)
+                            3 -> AppRestriction.IntItem(key, null, null, text.trim().toIntOrNull())
+                            else -> AppRestriction.StringItem(
+                                key, null, null, text.ifBlank { null }
+                            )
+                        }
+                    )
+                },
+                enabled = key.isNotBlank()
+            ) {
+                Text(stringResource(R.string.confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+        onDismissRequest = onDismiss
     )
 }
 

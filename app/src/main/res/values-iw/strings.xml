@@ -114,6 +114,7 @@
 	<string name="clear">נקה</string>
 	<string name="clear_app_storage">נקה את אחסון האפליקציה</string>
 	<string name="clear_app_storage_confirmation">האם אתה בטוח שברצונך למחוק את נתוני האפליקציה?</string>
+	<string name="clear_apps_storage_confirmation">אתה עומד למחוק את הנתונים של %1$d אפליקציות, לא ניתן לבטל פעולה זו:\n%2$s</string>
 	<string name="clear_configurations">נקה תצורות</string>
 	<string name="clear_cross_profile_filters">נקה את כל המסננים</string>
 	<string name="clear_current_config">נקה את התצורה הנוכחית</string>
@@ -132,6 +133,7 @@
 	<string name="config_tethering">הגדר שיתוף אינטרנט בין ניידים</string>
 	<string name="config_vpn">הגדר VPN</string>
 	<string name="config_wifi">הגדר Wi-Fi</string>
+	<string name="configuration_key">מפתח</string>
 	<string name="confirm">לאשר</string>
 	<string name="confirm_bug_report">לבקש דוח באג?</string>
 	<string name="confirm_password">אשר את הסיסמה</string>
@@ -161,6 +163,7 @@
 	<string name="current_password_complexity">מורכבות הסיסמה הנוכחית</string>
 	<string name="current_state">סטטוס נוכחי: %1$s</string>
 	<string name="custom">מותאם אישית </string>
+	<string name="custom_configuration">תצורה מותאמת</string>
 	<string name="dark_theme">נושא אפל</string>
 	<string name="data_roaming">נדידת נתונים</string>
 	<string name="date">תאֲריך</string>
@@ -255,6 +258,7 @@
 	<string name="fail_current_user">נכשל: המשתמש הנוכחי</string>
 	<string name="fail_managed_profile">נכשל: פרופיל מנוהל</string>
 	<string name="failed">נכשל</string>
+	<string name="failed_apps_count">נכשל עבור %1$d אפליקציות</string>
 	<string name="failed_to_init_dhizuku">אתחול דיזוקו נכשל</string>
 	<string name="failure">כשל</string>
 	<string name="fan_speeds">מהירויות מאוורר</string>
@@ -487,6 +491,7 @@
 	<string name="offline_provisioning">מצב לא מקוון</string>
 	<string name="on">על</string>
 	<string name="one_uid_per_line">UID אחד לכל שורה</string>
+	<string name="one_value_per_line">ערך אחד בכל שורה</string>
 	<string name="options">אפשרויות</string>
 	<string name="org_id">מזהה ארגון</string>
 	<string name="org_name">שם הארגון</string>
@@ -713,6 +718,7 @@
 	<string name="uninstall">הסר את ההתקנה</string>
 	<string name="uninstall_all_user_ca_cert">הסר את כל אישורי ה-CA של המשתמש</string>
 	<string name="uninstall_app">הסר את ההתקנה של האפליקציה</string>
+	<string name="uninstall_apps_confirmation">אתה עומד להסיר %1$d אפליקציות:\n%2$s</string>
 	<string name="uninstalled">הוסר</string>
 	<string name="unknown">לא ידוע</string>
 	<string name="unknown_error">שגיאה לא ידועה</string>
@@ -746,6 +752,10 @@
 	<string name="user_switched">המשתמש התחלף</string>
 	<string name="username">שם משתמש</string>
 	<string name="users">משתמשים</string>
+	<string name="value_type_boolean">כן / לא</string>
+	<string name="value_type_list">רשימת טקסט</string>
+	<string name="value_type_number">מספר</string>
+	<string name="value_type_text">טקסט</string>
 	<string name="vpn">VPN</string>
 	<string name="warning">אזהרה</string>
 	<string name="whitelist">רשימת הלבנים</string>

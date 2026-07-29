@@ -6,6 +6,7 @@ import android.os.Build.VERSION
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,10 +35,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -145,20 +149,38 @@ fun SettingsOptionsScreen(
 ) {
     var dangerousFeatures by remember { mutableStateOf(getDisplayDangerousFeatures()) }
     var shortcuts by remember { mutableStateOf(getShortcutsEnabled()) }
+    var dialog by rememberSaveable { mutableIntStateOf(0) }
     MyScaffold(R.string.options, onNavigateUp, 0.dp) {
         SwitchItem(
-            R.string.show_dangerous_features, dangerousFeatures, {
+            title = R.string.show_dangerous_features, icon = R.drawable.warning_fill0,
+            state = dangerousFeatures,
+            onCheckedChange = {
                 setDisplayDangerousFeatures(it)
                 dangerousFeatures = it
-            }, R.drawable.warning_fill0
+            },
+            onClickBlank = { dialog = 1 }
         )
         SwitchItem(
-            R.string.shortcuts, shortcuts, {
+            title = R.string.shortcuts, icon = R.drawable.open_in_new,
+            state = shortcuts,
+            onCheckedChange = {
                 setShortcutsEnabled(it)
                 shortcuts = it
-            }, R.drawable.open_in_new
+            },
+            onClickBlank = { dialog = 2 }
         )
     }
+    if (dialog != 0) AlertDialog(
+        text = {
+            Text(stringResource(
+                if (dialog == 1) R.string.info_show_dangerous_features else R.string.info_shortcuts
+            ))
+        },
+        confirmButton = {
+            TextButton(onClick = { dialog = 0 }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = 0 }
+    )
 }
 
 @Serializable object Appearance
@@ -169,6 +191,7 @@ fun AppearanceScreen(
     setTheme: (ThemeSettings) -> Unit
 ) {
     var darkThemeMenu by remember { mutableStateOf(false) }
+    var dialog by rememberSaveable { mutableIntStateOf(0) }
     val theme by currentTheme.collectAsStateWithLifecycle()
     val darkThemeTextID = when(theme.darkTheme) {
         1 -> R.string.on
@@ -180,7 +203,8 @@ fun AppearanceScreen(
             SwitchItem(
                 R.string.material_you_color,
                 state = theme.materialYou,
-                onCheckedChange = { setTheme(theme.copy(materialYou = it)) }
+                onCheckedChange = { setTheme(theme.copy(materialYou = it)) },
+                onClickBlank = { dialog = 1 }
             )
         }
         Box {
@@ -215,10 +239,22 @@ fun AppearanceScreen(
         AnimatedVisibility(theme.darkTheme == 1 || (theme.darkTheme == -1 && isSystemInDarkTheme())) {
             SwitchItem(
                 R.string.black_theme, state = theme.blackTheme,
-                onCheckedChange = { setTheme(theme.copy(blackTheme = it)) }
+                onCheckedChange = { setTheme(theme.copy(blackTheme = it)) },
+                onClickBlank = { dialog = 2 }
             )
         }
     }
+    if (dialog != 0) AlertDialog(
+        text = {
+            Text(stringResource(
+                if (dialog == 1) R.string.info_material_you_color else R.string.info_black_theme
+            ))
+        },
+        confirmButton = {
+            TextButton(onClick = { dialog = 0 }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = 0 }
+    )
 }
 
 data class AppLockConfig(
@@ -232,7 +268,9 @@ data class AppLockConfig(
 fun AppLockSettingsScreen(
     config: AppLockConfig, setConfig: (AppLockConfig) -> Unit,
     onNavigateUp: () -> Unit
-) = MyScaffold(R.string.app_lock, onNavigateUp) {
+) {
+    var dialog by rememberSaveable { mutableIntStateOf(0) }
+    MyScaffold(R.string.app_lock, onNavigateUp) {
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
     var allowBiometrics by rememberSaveable { mutableStateOf(config.biometrics) }
@@ -253,14 +291,14 @@ fun AppLockSettingsScreen(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)
     )
     if (VERSION.SDK_INT >= 28) Row(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable { dialog = 1 },
         Arrangement.SpaceBetween, Alignment.CenterVertically
     ) {
         Text(stringResource(R.string.allow_biometrics))
         Switch(allowBiometrics, { allowBiometrics = it })
     }
     Row(
-        Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        Modifier.fillMaxWidth().padding(bottom = 6.dp).clickable { dialog = 2 },
         Arrangement.SpaceBetween, Alignment.CenterVertically
     ) {
         Text(stringResource(R.string.lock_when_leaving))
@@ -285,6 +323,18 @@ fun AppLockSettingsScreen(
     ) {
         Text(stringResource(R.string.disable))
     }
+    }
+    if (dialog != 0) AlertDialog(
+        text = {
+            Text(stringResource(
+                if (dialog == 1) R.string.info_allow_biometrics else R.string.info_lock_when_leaving
+            ))
+        },
+        confirmButton = {
+            TextButton(onClick = { dialog = 0 }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = 0 }
+    )
 }
 
 @Serializable object ApiSettings
@@ -295,12 +345,15 @@ fun ApiSettings(
 ) {
     val context = LocalContext.current
     var alreadyEnabled by remember { mutableStateOf(getEnabled()) }
+    var dialog by rememberSaveable { mutableStateOf(false) }
     MyScaffold(R.string.api, onNavigateUp) {
         var enabled by remember { mutableStateOf(alreadyEnabled) }
         var key by rememberSaveable { mutableStateOf("") }
-        SwitchItem(R.string.enable, state = enabled, onCheckedChange = {
-            enabled = it
-        }, padding = false)
+        SwitchItem(
+            title = R.string.enable, state = enabled,
+            onCheckedChange = { enabled = it },
+            padding = false, onClickBlank = { dialog = true }
+        )
         if (enabled) {
             OutlinedTextField(
                 key, { key = it }, Modifier.fillMaxWidth().padding(bottom = 4.dp),
@@ -325,6 +378,13 @@ fun ApiSettings(
         }
         if (enabled && alreadyEnabled) Notes(R.string.api_key_exist)
     }
+    if (dialog) AlertDialog(
+        text = { Text(stringResource(R.string.info_api_enable)) },
+        confirmButton = {
+            TextButton(onClick = { dialog = false }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = false }
+    )
 }
 
 @Serializable object Notifications

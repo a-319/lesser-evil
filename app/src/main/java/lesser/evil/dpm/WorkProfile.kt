@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -201,6 +202,7 @@ fun SuspendPersonalAppScreen(
     val focusMgr = LocalFocusManager.current
     var reason by remember { mutableIntStateOf(DevicePolicyManager.PERSONAL_APPS_NOT_SUSPENDED) }
     var time by remember { mutableStateOf("") }
+    var dialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         reason = getSuspendedReasons()
         time = getMaxTime().toString()
@@ -211,7 +213,8 @@ fun SuspendPersonalAppScreen(
                 setSuspended(it)
                 reason = if (it) DevicePolicyManager.PERSONAL_APPS_SUSPENDED_EXPLICITLY
                 else DevicePolicyManager.PERSONAL_APPS_NOT_SUSPENDED
-            }, padding = false
+            }, padding = false,
+            onClickBlank = { dialog = true }
         )
         Spacer(Modifier.padding(vertical = 10.dp))
         Text(text = stringResource(R.string.profile_max_time_off), style = typography.titleLarge)
@@ -238,6 +241,13 @@ fun SuspendPersonalAppScreen(
         }
         Notes(R.string.info_profile_maximum_time_off)
     }
+    if (dialog) AlertDialog(
+        text = { Text(stringResource(R.string.info_suspend_personal_app)) },
+        confirmButton = {
+            TextButton(onClick = { dialog = false }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = false }
+    )
 }
 
 data class IntentFilterOptions(

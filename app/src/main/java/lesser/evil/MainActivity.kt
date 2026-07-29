@@ -574,14 +574,16 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             PackageFunctionScreen(
                 R.string.hide, vm.hiddenPackages, vm::getHiddenPackages, vm::setPackageHidden,
                 ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups, vm.appGroups,
-                vm.autoAppGroups, vm::refreshAutoAppGroups
+                vm.autoAppGroups, vm::refreshAutoAppGroups,
+                R.string.info_hide
             )
         }
         composable<BlockUninstall> {
             PackageFunctionScreen(
                 R.string.block_uninstall, vm.ubPackages, vm::getUbPackages, vm::setPackageUb,
                 ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups, vm.appGroups,
-                vm.autoAppGroups, vm::refreshAutoAppGroups
+                vm.autoAppGroups, vm::refreshAutoAppGroups,
+                R.string.info_block_uninstall
             )
         }
         composable<DisableUserControl> {
@@ -604,7 +606,8 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             PackageFunctionScreen(
                 R.string.disable_metered_data, vm.mddPackages, vm::getMddPackages,
                 vm::setPackageMdd, ::navigateUp, vm.chosenPackage, ::choosePackage,
-                ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups
+                ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups,
+                R.string.info_disable_metered_data
             )
         }
         composable<ClearAppStorage> {
@@ -636,14 +639,15 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 R.string.cross_profile_apps, vm.cpPackages,
                 vm::getCpPackages, vm::setPackageCp, ::navigateUp, vm.chosenPackage,
                 ::choosePackage, ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups,
-                vm::refreshAutoAppGroups
+                vm::refreshAutoAppGroups,
+                R.string.info_cross_profile_apps
             )
         }
         composable<CrossProfileWidgetProviders> {
             PackageFunctionScreen(R.string.cross_profile_widget, vm.cpwProviders,
                 vm::getCpwProviders, vm::setCpwProvider, ::navigateUp, vm.chosenPackage,
                 ::choosePackage, ::navigateToAppGroups, vm.appGroups, vm.autoAppGroups,
-                vm::refreshAutoAppGroups)
+                vm::refreshAutoAppGroups, R.string.info_cross_profile_widget)
         }
         composable<CredentialManagerPolicy> {
             CredentialManagerPolicyScreen(

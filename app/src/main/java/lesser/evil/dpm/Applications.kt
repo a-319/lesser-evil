@@ -335,32 +335,38 @@ fun ApplicationDetailsScreen(
         FunctionItem(R.string.permissions, icon = R.drawable.shield_fill0) { onNavigate(PermissionsManager(packageName)) }
         if(VERSION.SDK_INT >= 24) SwitchItem(
             R.string.suspend, icon = R.drawable.block_fill0, state = status.suspend,
-            onCheckedChange = { vm.adSetPackageSuspended(packageName, it) }
+            onCheckedChange = { vm.adSetPackageSuspended(packageName, it) },
+            onClickBlank = { dialog = 3 }
         )
         SwitchItem(
             R.string.hide, icon = R.drawable.visibility_off_fill0,
             state = status.hide,
-            onCheckedChange = { vm.adSetPackageHidden(packageName, it) }
+            onCheckedChange = { vm.adSetPackageHidden(packageName, it) },
+            onClickBlank = { dialog = 4 }
         )
         SwitchItem(
             R.string.block_uninstall, icon = R.drawable.delete_forever_fill0,
             state = status.uninstallBlocked,
-            onCheckedChange = { vm.adSetPackageUb(packageName, it) }
+            onCheckedChange = { vm.adSetPackageUb(packageName, it) },
+            onClickBlank = { dialog = 5 }
         )
         if(VERSION.SDK_INT >= 30) SwitchItem(
             R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0,
             state = status.userControlDisabled,
-            onCheckedChange = { vm.adSetPackageUcd(packageName, it) }
+            onCheckedChange = { vm.adSetPackageUcd(packageName, it) },
+            onClickBlank = { dialog = 6 }
         )
         if(VERSION.SDK_INT >= 28) SwitchItem(
             R.string.disable_metered_data, icon = R.drawable.money_off_fill0,
             state = status.meteredDataDisabled,
-            onCheckedChange = { vm.adSetPackageMdd(packageName, it) }
+            onCheckedChange = { vm.adSetPackageMdd(packageName, it) },
+            onClickBlank = { dialog = 7 }
         )
         if(privilege.device && VERSION.SDK_INT >= 28) SwitchItem(
             R.string.keep_after_uninstall, icon = R.drawable.delete_fill0,
             state = status.keepUninstalled,
-            onCheckedChange = { vm.adSetPackageKu(packageName, it) }
+            onCheckedChange = { vm.adSetPackageKu(packageName, it) },
+            onClickBlank = { dialog = 8 }
         )
         if (appRestrictions.isNotEmpty()) {
             FunctionItem(R.string.managed_configuration, icon = R.drawable.description_fill0) {
@@ -381,6 +387,24 @@ fun ApplicationDetailsScreen(
         dialog = 0
         if (it) onNavigateUp()
     }
+    if(dialog in 3..8) AlertDialog(
+        text = {
+            Text(stringResource(
+                when(dialog) {
+                    3 -> R.string.info_suspend_app
+                    4 -> R.string.info_hide
+                    5 -> R.string.info_block_uninstall
+                    6 -> R.string.info_disable_user_control
+                    7 -> R.string.info_disable_metered_data
+                    else -> R.string.info_keep_uninstalled_apps
+                }
+            ))
+        },
+        confirmButton = {
+            TextButton(onClick = { dialog = 0 }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = 0 }
+    )
 }
 
 @Serializable data class ApplicationsDetails(val packages: List<String>)
@@ -428,31 +452,37 @@ fun ApplicationsDetailsScreen(
         }
         if(VERSION.SDK_INT >= 24) SwitchItem(
             R.string.suspend, icon = R.drawable.block_fill0, state = status.suspend,
-            onCheckedChange = { vm.adSetPackagesSuspended(packages, it) }
+            onCheckedChange = { vm.adSetPackagesSuspended(packages, it) },
+            onClickBlank = { dialog = 3 }
         )
         SwitchItem(
             R.string.hide, icon = R.drawable.visibility_off_fill0, state = status.hide,
-            onCheckedChange = { vm.adSetPackagesHidden(packages, it) }
+            onCheckedChange = { vm.adSetPackagesHidden(packages, it) },
+            onClickBlank = { dialog = 4 }
         )
         SwitchItem(
             R.string.block_uninstall, icon = R.drawable.delete_forever_fill0,
             state = status.uninstallBlocked,
-            onCheckedChange = { vm.adSetPackagesUb(packages, it) }
+            onCheckedChange = { vm.adSetPackagesUb(packages, it) },
+            onClickBlank = { dialog = 5 }
         )
         if(VERSION.SDK_INT >= 30) SwitchItem(
             R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0,
             state = status.userControlDisabled,
-            onCheckedChange = { vm.adSetPackagesUcd(packages, it) }
+            onCheckedChange = { vm.adSetPackagesUcd(packages, it) },
+            onClickBlank = { dialog = 6 }
         )
         if(VERSION.SDK_INT >= 28) SwitchItem(
             R.string.disable_metered_data, icon = R.drawable.money_off_fill0,
             state = status.meteredDataDisabled,
-            onCheckedChange = { vm.adSetPackagesMdd(packages, it) }
+            onCheckedChange = { vm.adSetPackagesMdd(packages, it) },
+            onClickBlank = { dialog = 7 }
         )
         if(privilege.device && VERSION.SDK_INT >= 28) SwitchItem(
             R.string.keep_after_uninstall, icon = R.drawable.delete_fill0,
             state = status.keepUninstalled,
-            onCheckedChange = { vm.adSetPackagesKu(packages, it) }
+            onCheckedChange = { vm.adSetPackagesKu(packages, it) },
+            onClickBlank = { dialog = 8 }
         )
         FunctionItem(R.string.add_managed_configuration, icon = R.drawable.description_fill0) {
             onNavigate(ManualConfigurations(packages))
@@ -475,6 +505,24 @@ fun ApplicationsDetailsScreen(
         dialog = 0
         if (done) onNavigateUp()
     }
+    if(dialog in 3..8) AlertDialog(
+        text = {
+            Text(stringResource(
+                when(dialog) {
+                    3 -> R.string.info_suspend_app
+                    4 -> R.string.info_hide
+                    5 -> R.string.info_block_uninstall
+                    6 -> R.string.info_disable_user_control
+                    7 -> R.string.info_disable_metered_data
+                    else -> R.string.info_keep_uninstalled_apps
+                }
+            ))
+        },
+        confirmButton = {
+            TextButton(onClick = { dialog = 0 }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = 0 }
+    )
 }
 
 /**

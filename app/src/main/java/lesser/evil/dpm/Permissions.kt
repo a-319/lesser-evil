@@ -369,13 +369,18 @@ fun DhizukuServerSettingsScreen(
 ) {
     var enabled by rememberSaveable { mutableStateOf(getServerEnabled()) }
     val clients by dhizukuClients.collectAsStateWithLifecycle()
+    var dialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { getDhizukuClients() }
     MyLazyScaffold(R.string.dhizuku_server, onNavigateUp) {
         item {
-            SwitchItem(R.string.enable, enabled, {
-                setServerEnabled(it)
-                enabled = it
-            })
+            SwitchItem(
+                title = R.string.enable, state = enabled,
+                onCheckedChange = {
+                    setServerEnabled(it)
+                    enabled = it
+                },
+                onClickBlank = { dialog = true }
+            )
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
         }
         if (enabled) items(clients) { (client, app) ->
@@ -444,6 +449,13 @@ fun DhizukuServerSettingsScreen(
             }
         }
     }
+    if (dialog) AlertDialog(
+        text = { Text(stringResource(R.string.info_dhizuku_server)) },
+        confirmButton = {
+            TextButton(onClick = { dialog = false }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = false }
+    )
 }
 
 @Serializable object LockScreenInfo

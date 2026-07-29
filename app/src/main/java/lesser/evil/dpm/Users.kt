@@ -158,15 +158,27 @@ fun UsersOptionsScreen(
     getLogoutEnabled: () -> Boolean, setLogoutEnabled: (Boolean) -> Unit, onNavigateUp: () -> Unit
 ) {
     var logoutEnabled by remember { mutableStateOf(false) }
+    var dialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { logoutEnabled = getLogoutEnabled() }
     MyScaffold(R.string.options, onNavigateUp, 0.dp) {
         if(VERSION.SDK_INT >= 28) {
-            SwitchItem(R.string.enable_logout, logoutEnabled, {
-                setLogoutEnabled(it)
-                logoutEnabled = it
-            })
+            SwitchItem(
+                title = R.string.enable_logout, state = logoutEnabled,
+                onCheckedChange = {
+                    setLogoutEnabled(it)
+                    logoutEnabled = it
+                },
+                onClickBlank = { dialog = true }
+            )
         }
     }
+    if (dialog) AlertDialog(
+        text = { Text(stringResource(R.string.info_logout)) },
+        confirmButton = {
+            TextButton(onClick = { dialog = false }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = false }
+    )
 }
 
 data class UserInformation(

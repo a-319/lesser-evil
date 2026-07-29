@@ -336,35 +336,43 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
     val status by vm.systemOptionsStatus.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.getSystemOptionsStatus() }
     MyScaffold(R.string.options, onNavigateUp, 0.dp) {
-        SwitchItem(R.string.disable_cam, status.cameraDisabled, vm::setCameraDisabled,
-            R.drawable.no_photography_fill0)
-        SwitchItem(R.string.disable_screen_capture, status.screenCaptureDisabled,
-            vm::setScreenCaptureDisabled, R.drawable.screenshot_fill0)
+        SwitchItem(R.string.disable_cam, icon = R.drawable.no_photography_fill0,
+            state = status.cameraDisabled, onCheckedChange = vm::setCameraDisabled,
+            onClickBlank = { dialog = 3 })
+        SwitchItem(R.string.disable_screen_capture, icon = R.drawable.screenshot_fill0,
+            state = status.screenCaptureDisabled, onCheckedChange = vm::setScreenCaptureDisabled,
+            onClickBlank = { dialog = 4 })
         if (VERSION.SDK_INT >= 34 && privilege.run { device || (profile && affiliated) }) {
-            SwitchItem(R.string.disable_status_bar, status.statusBarDisabled,
-                vm::setStatusBarDisabled, R.drawable.notifications_fill0)
+            SwitchItem(R.string.disable_status_bar, icon = R.drawable.notifications_fill0,
+                state = status.statusBarDisabled, onCheckedChange = vm::setStatusBarDisabled,
+                onClickBlank = { dialog = 5 })
         }
         if (privilege.device || privilege.org) {
             if(VERSION.SDK_INT >= 30) {
-                SwitchItem(R.string.auto_time, status.autoTimeEnabled, vm::setAutoTimeEnabled,
-                    R.drawable.schedule_fill0)
-                SwitchItem(R.string.auto_timezone, status.autoTimeZoneEnabled,
-                    vm::setAutoTimeZoneEnabled, R.drawable.globe_fill0)
+                SwitchItem(R.string.auto_time, icon = R.drawable.schedule_fill0,
+                    state = status.autoTimeEnabled, onCheckedChange = vm::setAutoTimeEnabled,
+                    onClickBlank = { dialog = 6 })
+                SwitchItem(R.string.auto_timezone, icon = R.drawable.globe_fill0,
+                    state = status.autoTimeZoneEnabled, onCheckedChange = vm::setAutoTimeZoneEnabled,
+                    onClickBlank = { dialog = 7 })
             } else {
-                SwitchItem(R.string.require_auto_time, status.autoTimeRequired,
-                    vm::setAutoTimeRequired, R.drawable.schedule_fill0)
+                SwitchItem(R.string.require_auto_time, icon = R.drawable.schedule_fill0,
+                    state = status.autoTimeRequired, onCheckedChange = vm::setAutoTimeRequired,
+                    onClickBlank = { dialog = 8 })
             }
         }
-        if (!privilege.work) SwitchItem(R.string.master_mute,
-            status.masterVolumeMuted, vm::setMasterVolumeMuted, R.drawable.volume_off_fill0)
+        if (!privilege.work) SwitchItem(R.string.master_mute, icon = R.drawable.volume_off_fill0,
+            state = status.masterVolumeMuted, onCheckedChange = vm::setMasterVolumeMuted,
+            onClickBlank = { dialog = 9 })
         if (VERSION.SDK_INT >= 26) {
             SwitchItem(R.string.backup_service, icon = R.drawable.backup_fill0,
                 state = status.backupServiceEnabled, onCheckedChange = vm::setBackupServiceEnabled,
                 onClickBlank = { dialog = 1 })
         }
         if (VERSION.SDK_INT >= 24 && privilege.work) {
-            SwitchItem(R.string.disable_bt_contact_share, status.btContactSharingDisabled,
-                vm::setBtContactSharingDisabled, R.drawable.account_circle_fill0)
+            SwitchItem(R.string.disable_bt_contact_share, icon = R.drawable.account_circle_fill0,
+                state = status.btContactSharingDisabled, onCheckedChange = vm::setBtContactSharingDisabled,
+                onClickBlank = { dialog = 10 })
         }
         if(VERSION.SDK_INT >= 30 && (privilege.device || privilege.org)) {
             SwitchItem(R.string.common_criteria_mode, icon = R.drawable.security_fill0,
@@ -373,8 +381,9 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
                 onClickBlank = { dialog = 2 })
         }
         if (VERSION.SDK_INT >= 31 && (privilege.device || privilege.org) && status.canDisableUsbSignal) {
-            SwitchItem(R.string.enable_usb_signal, status.usbSignalEnabled,
-                vm::setUsbSignalEnabled, R.drawable.usb_fill0)
+            SwitchItem(R.string.enable_usb_signal, icon = R.drawable.usb_fill0,
+                state = status.usbSignalEnabled, onCheckedChange = vm::setUsbSignalEnabled,
+                onClickBlank = { dialog = 11 })
         }
         if (VERSION.SDK_INT < 34) {
             Row(
@@ -401,6 +410,15 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
                 when(dialog) {
                     1 -> R.string.info_backup_service
                     2 -> R.string.info_common_criteria_mode
+                    3 -> R.string.info_disable_cam
+                    4 -> R.string.info_disable_screen_capture
+                    5 -> R.string.info_disable_status_bar
+                    6 -> R.string.info_auto_time
+                    7 -> R.string.info_auto_timezone
+                    8 -> R.string.info_require_auto_time
+                    9 -> R.string.info_master_mute
+                    10 -> R.string.info_disable_bt_contact_share
+                    11 -> R.string.info_enable_usb_signal
                     else -> R.string.options
                 }
             ))

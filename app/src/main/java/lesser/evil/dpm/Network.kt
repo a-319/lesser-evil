@@ -1631,6 +1631,7 @@ fun PreferentialNetworkServiceScreen(
 ) {
     var masterEnabled by rememberSaveable { mutableStateOf(getEnabled()) }
     val configs by pnsConfigs.collectAsStateWithLifecycle()
+    var dialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         getConfigs()
     }
@@ -1638,7 +1639,7 @@ fun PreferentialNetworkServiceScreen(
         SwitchItem(R.string.enabled, state = masterEnabled, onCheckedChange = {
             setEnabled(it)
             masterEnabled = it
-        })
+        }, onClickBlank = { dialog = true })
         Spacer(Modifier.padding(vertical = 4.dp))
         configs.forEachIndexed { index, config ->
             Row(
@@ -1664,6 +1665,13 @@ fun PreferentialNetworkServiceScreen(
             Text(stringResource(R.string.add_config))
         }
     }
+    if (dialog) AlertDialog(
+        text = { Text(stringResource(R.string.info_preferential_network_service_enabled)) },
+        confirmButton = {
+            TextButton(onClick = { dialog = false }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = false }
+    )
 }
 
 data class PreferentialNetworkServiceInfo(
@@ -1693,8 +1701,12 @@ fun AddPreferentialNetworkServiceConfigScreen(
     var excludedUids by rememberSaveable { mutableStateOf(origin.excludedUids.joinToString("\n")) }
     var includedUids by rememberSaveable { mutableStateOf(origin.includedUids.joinToString("\n")) }
     var dropdown by remember { mutableStateOf(false) }
+    var dialog by rememberSaveable { mutableIntStateOf(0) }
     MySmallTitleScaffold(R.string.preferential_network_service, onNavigateUp) {
-        SwitchItem(title = R.string.enabled, state = enabled, onCheckedChange = { enabled = it }, padding = false)
+        SwitchItem(
+            title = R.string.enabled, state = enabled, onCheckedChange = { enabled = it },
+            padding = false, onClickBlank = { dialog = 1 }
+        )
         ExposedDropdownMenuBox(dropdown, { dropdown = it }) {
             OutlinedTextField(
                 if (id == -1) "" else id.toString(), {},
@@ -1716,11 +1728,13 @@ fun AddPreferentialNetworkServiceConfigScreen(
         }
         SwitchItem(
             title = R.string.allow_fallback_to_default_connection,
-            state = allowFallback, onCheckedChange = { allowFallback = it }, padding = false
+            state = allowFallback, onCheckedChange = { allowFallback = it }, padding = false,
+            onClickBlank = { dialog = 2 }
         )
         if(VERSION.SDK_INT >= 34) SwitchItem(
             title = R.string.block_non_matching_networks,
-            state = blockNonMatching, onCheckedChange = { blockNonMatching = it }, padding = false
+            state = blockNonMatching, onCheckedChange = { blockNonMatching = it }, padding = false,
+            onClickBlank = { dialog = 3 }
         )
         val includedUidsLegal = includedUids.lines().filter { it.isNotBlank() }.let { uid ->
             uid.isEmpty() || (uid.all { it.toIntOrNull() != null } && excludedUids.isBlank())
@@ -1767,6 +1781,21 @@ fun AddPreferentialNetworkServiceConfigScreen(
             Text(stringResource(R.string.delete))
         }
     }
+    if (dialog != 0) AlertDialog(
+        text = {
+            Text(stringResource(
+                when (dialog) {
+                    1 -> R.string.info_preferential_network_service_config_enabled
+                    2 -> R.string.info_allow_fallback_to_default_connection
+                    else -> R.string.info_block_non_matching_networks
+                }
+            ))
+        },
+        confirmButton = {
+            TextButton(onClick = { dialog = 0 }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = 0 }
+    )
 }
 
 @Serializable object OverrideApn
@@ -1779,14 +1808,16 @@ fun OverrideApnScreen(
 ) {
     var enabled by rememberSaveable { mutableStateOf(getEnabled()) }
     val configs by apnConfigs.collectAsStateWithLifecycle()
+    var dialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { getConfigs() }
     MyScaffold(R.string.override_apn, onNavigateUp, 0.dp) {
         SwitchItem(
-            R.string.enable, enabled,
-            {
+            title = R.string.enable, state = enabled,
+            onCheckedChange = {
                 setEnabled(it)
                 enabled = it
-            }
+            },
+            onClickBlank = { dialog = true }
         )
         configs.forEach {
             Row(
@@ -1817,6 +1848,13 @@ fun OverrideApnScreen(
             Text(stringResource(R.string.add_config), style = MaterialTheme.typography.labelLarge)
         }
     }
+    if (dialog) AlertDialog(
+        text = { Text(stringResource(R.string.info_override_apn)) },
+        confirmButton = {
+            TextButton(onClick = { dialog = false }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = false }
+    )
 }
 
 enum class ApnMenu {
@@ -1936,8 +1974,12 @@ fun AddApnSettingScreen(
     var persistent by rememberSaveable { mutableStateOf(origin?.persistent == true) }
     var alwaysOn by rememberSaveable { mutableStateOf(origin?.alwaysOn == true) }
     var errorMessage: String? by rememberSaveable { mutableStateOf(null) }
+    var dialog by rememberSaveable { mutableStateOf(false) }
     MySmallTitleScaffold(R.string.apn_setting, onNavigateUp) {
-        SwitchItem(R.string.enabled, state = enabled, onCheckedChange = { enabled = it }, padding = false)
+        SwitchItem(
+            title = R.string.enabled, state = enabled, onCheckedChange = { enabled = it },
+            padding = false, onClickBlank = { dialog = true }
+        )
         OutlinedTextField(
             entryName, { entryName = it }, Modifier.fillMaxWidth().padding(vertical = 4.dp),
             label = { Text("Name") },
@@ -2234,5 +2276,12 @@ fun AddApnSettingScreen(
         onDismissRequest = {
             menu = ApnMenu.None
         }
+    )
+    if (dialog) AlertDialog(
+        text = { Text(stringResource(R.string.info_apn_enabled)) },
+        confirmButton = {
+            TextButton(onClick = { dialog = false }) { Text(stringResource(R.string.confirm)) }
+        },
+        onDismissRequest = { dialog = false }
     )
 }

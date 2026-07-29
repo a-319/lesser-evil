@@ -609,12 +609,13 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         }
         composable<ClearAppStorage> {
             ClearAppStorageScreen(
-                vm.chosenPackage, ::chooseSinglePackage, vm::clearAppData, ::navigateUp
+                vm.chosenPackage, ::choosePackage, vm::clearAppsData, vm::getAppInfo, ::navigateUp
             )
         }
         composable<UninstallApp> {
             UninstallAppScreen(
-                vm.chosenPackage, ::chooseSinglePackage, vm::uninstallPackage, ::navigateUp
+                vm.chosenPackage, ::choosePackage, vm::uninstallPackages, vm::getAppInfo,
+                ::navigateUp
             )
         }
         composable<KeepUninstalledPackages> {

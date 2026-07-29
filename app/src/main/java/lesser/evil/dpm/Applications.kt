@@ -732,24 +732,52 @@ private fun PermissionsContent(
 @Composable
 fun ClearAppStorageScreen(
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    onClear: (String, (Boolean) -> Unit) -> Unit, onNavigateUp: () -> Unit
+    onClear: (List<String>, (Int) -> Unit) -> Unit, getAppInfo: (String) -> AppInfo,
+    onNavigateUp: () -> Unit
+) = PackagesActionScreen(
+    R.string.clear_app_storage, R.string.clear, R.string.clear_apps_storage_confirmation,
+    chosenPackage, onChoosePackage, getAppInfo, onClear, onNavigateUp
+)
+
+/**
+ * Collects applications the way the other screens do and runs one action over all of them,
+ * behind a dialog that names them first.
+ */
+@Composable
+private fun PackagesActionScreen(
+    @StringRes title: Int, @StringRes action: Int, @StringRes warning: Int,
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, getAppInfo: (String) -> AppInfo,
+    onRun: (List<String>, (Int) -> Unit) -> Unit, onNavigateUp: () -> Unit
 ) {
+    val packages = rememberSaveable { mutableStateListOf<String>() }
     var dialog by rememberSaveable { mutableStateOf(false) }
-    var packageName by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(Unit) {
-        packageName = chosenPackage.receive()
-    }
-    MyScaffold(R.string.clear_app_storage, onNavigateUp) {
-        PackageNameTextField(packageName, onChoosePackage,
-            Modifier.padding(vertical = 8.dp)) { packageName = it }
-        Button(
-            { dialog = true },
-            Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.clear))
+    val apps = packages.map { getAppInfo(it) }
+    val appList = apps.take(10).joinToString(", ") { it.label } + if (apps.size > 10) "…" else ""
+    MyLazyScaffold(title, onNavigateUp) {
+        items(apps, { it.name }) {
+            ApplicationItem(it) { packages -= it.name }
+        }
+        item {
+            AddPackagesField(chosenPackage, onChoosePackage, packages) { packages += it }
+            Button(
+                { dialog = true },
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = HorizontalPadding),
+                packages.isNotEmpty()
+            ) {
+                Text(stringResource(action))
+            }
+            Spacer(Modifier.height(BottomPadding))
         }
     }
-    if(dialog) ClearAppStorageDialog(packageName, onClear) { dialog = false }
+    if (dialog) MultipleAppsActionDialog(
+        action, stringResource(warning, packages.size, appList),
+        { onDone -> onRun(packages.toList(), onDone) }
+    ) { done ->
+        dialog = false
+        if (done) packages.clear()
+    }
 }
 
 @RequiresApi(28)
@@ -796,28 +824,12 @@ private fun ClearAppStorageDialog(
 @Composable
 fun UninstallAppScreen(
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    onUninstall: (String, (String?) -> Unit) -> Unit, onNavigateUp: () -> Unit
-) {
-    var dialog by rememberSaveable { mutableStateOf(false) }
-    var packageName by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(Unit) {
-        packageName = chosenPackage.receive()
-    }
-    MyScaffold(R.string.uninstall_app, onNavigateUp) {
-        PackageNameTextField(packageName, onChoosePackage,
-            Modifier.padding(vertical = 8.dp)) { packageName = it }
-        Button(
-            { dialog = true },
-            Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.uninstall))
-        }
-    }
-    if(dialog) UninstallAppDialog(packageName, onUninstall) {
-        packageName = ""
-        dialog = false
-    }
-}
+    onUninstall: (List<String>, (Int) -> Unit) -> Unit, getAppInfo: (String) -> AppInfo,
+    onNavigateUp: () -> Unit
+) = PackagesActionScreen(
+    R.string.uninstall_app, R.string.uninstall, R.string.uninstall_apps_confirmation,
+    chosenPackage, onChoosePackage, getAppInfo, onUninstall, onNavigateUp
+)
 
 @Composable
 private fun UninstallAppDialog(

@@ -12,9 +12,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,9 +98,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
@@ -345,6 +349,68 @@ fun ApplicationDetailsScreen(
     if(dialog == 2) UninstallAppDialog(packageName, vm::uninstallPackage) {
         dialog = 0
         if (it) onNavigateUp()
+    }
+}
+
+@Serializable data class ApplicationsDetails(val packages: List<String>)
+
+/** The functions of [ApplicationDetailsScreen], applied to every selected app at once */
+@Composable
+fun ApplicationsDetailsScreen(
+    param: ApplicationsDetails, vm: MyViewModel, onNavigateUp: () -> Unit
+) {
+    val packages = param.packages
+    val privilege by Privilege.status.collectAsStateWithLifecycle()
+    val status by vm.appsStatus.collectAsStateWithLifecycle()
+    val icons = remember(packages) { packages.take(6).map { vm.getAppInfo(it) } }
+    LaunchedEffect(Unit) {
+        vm.getAppsStatus(packages)
+    }
+    MySmallTitleScaffold(R.string.place_holder, onNavigateUp, 0.dp) {
+        Column(Modifier
+            .align(Alignment.CenterHorizontally)
+            .padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                icons.forEach {
+                    Image(rememberDrawablePainter(it.icon), null,
+                        Modifier.padding(horizontal = 3.dp).size(40.dp))
+                }
+            }
+            Text(
+                stringResource(R.string.selected_apps_count, packages.size),
+                Modifier.padding(top = 8.dp, bottom = 8.dp)
+            )
+        }
+        if(VERSION.SDK_INT >= 24) SwitchItem(
+            R.string.suspend, icon = R.drawable.block_fill0, state = status.suspend,
+            onCheckedChange = { vm.adSetPackagesSuspended(packages, it) }
+        )
+        SwitchItem(
+            R.string.hide, icon = R.drawable.visibility_off_fill0, state = status.hide,
+            onCheckedChange = { vm.adSetPackagesHidden(packages, it) }
+        )
+        SwitchItem(
+            R.string.block_uninstall, icon = R.drawable.delete_forever_fill0,
+            state = status.uninstallBlocked,
+            onCheckedChange = { vm.adSetPackagesUb(packages, it) }
+        )
+        if(VERSION.SDK_INT >= 30) SwitchItem(
+            R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0,
+            state = status.userControlDisabled,
+            onCheckedChange = { vm.adSetPackagesUcd(packages, it) }
+        )
+        if(VERSION.SDK_INT >= 28) SwitchItem(
+            R.string.disable_metered_data, icon = R.drawable.money_off_fill0,
+            state = status.meteredDataDisabled,
+            onCheckedChange = { vm.adSetPackagesMdd(packages, it) }
+        )
+        if(privilege.device && VERSION.SDK_INT >= 28) SwitchItem(
+            R.string.keep_after_uninstall, icon = R.drawable.delete_fill0,
+            state = status.keepUninstalled,
+            onCheckedChange = { vm.adSetPackagesKu(packages, it) }
+        )
+        Notes(R.string.info_multiple_apps, HorizontalPadding)
+        Spacer(Modifier.height(BottomPadding))
     }
 }
 
@@ -1034,12 +1100,52 @@ fun ManageAppGroupsScreen(
     }
 }
 
-/** The groups of [ManageAppGroupsScreen], also shown by the groups tab of the app chooser */
+/**
+ * The groups of [ManageAppGroupsScreen], also shown by the groups tab of the app chooser.
+ * When [onSelect] is given the groups can be selected the same way applications are: a long
+ * press starts the selection, a tap adds or removes a group while one is running.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppGroupsList(
     groups: List<AppGroup>, autoGroups: List<AutoAppGroup>,
-    navigateToEditScreen: (Int?, String, List<String>) -> Unit, modifier: Modifier = Modifier
+    navigateToEditScreen: (Int?, String, List<String>) -> Unit, modifier: Modifier = Modifier,
+    selectedKeys: List<String> = emptyList(),
+    onSelect: ((key: String, apps: List<String>) -> Unit)? = null
 ) {
+    val hf = LocalHapticFeedback.current
+    @Composable
+    fun GroupItem(
+        key: String, name: String, apps: List<String>, countRes: Int, onOpen: () -> Unit
+    ) {
+        val selected = key in selectedKeys
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onLongClick = {
+                        val select = onSelect
+                        if (select != null && !selected) {
+                            select(key, apps)
+                            hf.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
+                    },
+                    onClick = {
+                        val select = onSelect
+                        if (select != null && selectedKeys.isNotEmpty()) select(key, apps)
+                        else onOpen()
+                    }
+                )
+                .background(if (selected) colorScheme.primaryContainer else Color.Transparent)
+                .padding(HorizontalPadding, 8.dp)
+        ) {
+            Text(name)
+            Text(
+                stringResource(countRes, apps.size), Modifier.alpha(0.7F),
+                style = typography.bodyMedium
+            )
+        }
+    }
     LazyColumn(modifier) {
         if (groups.isEmpty() && autoGroups.isEmpty()) item {
             Text(
@@ -1049,19 +1155,8 @@ fun AppGroupsList(
             )
         }
         items(groups, { it.id }) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        navigateToEditScreen(it.id, it.name, it.apps)
-                    }
-                    .padding(HorizontalPadding, 8.dp)
-            ) {
-                Text(it.name)
-                Text(
-                    stringResource(R.string.app_group_apps_count, it.apps.size),
-                    Modifier.alpha(0.7F), style = typography.bodyMedium
-                )
+            GroupItem("stored:${it.id}", it.name, it.apps, R.string.app_group_apps_count) {
+                navigateToEditScreen(it.id, it.name, it.apps)
             }
         }
         if (autoGroups.isNotEmpty()) {
@@ -1076,17 +1171,8 @@ fun AppGroupsList(
             items(autoGroups.size) { index ->
                 val group = autoGroups[index]
                 val name = stringResource(group.title)
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { navigateToEditScreen(null, name, group.apps) }
-                        .padding(HorizontalPadding, 8.dp)
-                ) {
-                    Text(name)
-                    Text(
-                        stringResource(R.string.auto_group_apps_count, group.apps.size),
-                        Modifier.alpha(0.7F), style = typography.bodyMedium
-                    )
+                GroupItem("auto:${group.title}", name, group.apps, R.string.auto_group_apps_count) {
+                    navigateToEditScreen(null, name, group.apps)
                 }
             }
         }

@@ -72,6 +72,8 @@ import lesser.evil.dpm.AlwaysOnVpnPackage
 import lesser.evil.dpm.AlwaysOnVpnPackageScreen
 import lesser.evil.dpm.ApplicationDetails
 import lesser.evil.dpm.ApplicationDetailsScreen
+import lesser.evil.dpm.ApplicationsDetails
+import lesser.evil.dpm.ApplicationsDetailsScreen
 import lesser.evil.dpm.ApplicationsFeatures
 import lesser.evil.dpm.ApplicationsFeaturesScreen
 import lesser.evil.dpm.AutoTimePolicy
@@ -529,10 +531,11 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             AppChooserScreen(
                 params, vm.installedPackages, vm.refreshPackagesProgress, { name ->
                 if (params.canSwitchView) {
-                    if (name == null) {
-                        navigateUp()
-                    } else {
-                        navigate(ApplicationDetails(name))
+                    val chosen = name?.split('\n') ?: emptyList()
+                    when {
+                        chosen.isEmpty() -> navigateUp()
+                        chosen.size == 1 -> navigate(ApplicationDetails(chosen.first()))
+                        else -> navigate(ApplicationsDetails(chosen))
                     }
                 } else {
                     if (name != null) vm.chosenPackage.trySend(name)
@@ -543,7 +546,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 navController.navigate(ApplicationsFeatures) {
                     popUpTo(Home)
                 }
-            }, vm::refreshPackageList, vm::setPackageSuspended, vm::setPackageHidden,
+            }, vm::refreshPackageList,
                 vm.appGroups, vm.autoAppGroups, vm::refreshAutoAppGroups
             ) { id, name, apps -> navController.navigate(EditAppGroup(id, name, apps)) }
         }
@@ -557,6 +560,9 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         }
         composable<ApplicationDetails> {
             ApplicationDetailsScreen(it.toRoute(), vm, ::navigateUp, ::navigate)
+        }
+        composable<ApplicationsDetails> {
+            ApplicationsDetailsScreen(it.toRoute(), vm, ::navigateUp)
         }
         composable<Suspend> {
             PackageFunctionScreen(

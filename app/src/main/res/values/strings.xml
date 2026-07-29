@@ -434,6 +434,8 @@
     <string name="auto_group_metered_data_disabled">Data disabled</string>
     <string name="auto_group_keep_uninstalled">Kept after uninstall</string>
     <string name="apps_tab_user">User</string>
+    <string name="selected_apps_count">%1$d apps selected</string>
+    <string name="info_multiple_apps">A switch is on only when the policy applies to every selected app. Changing it applies to all of them.</string>
     <string name="apps_tab_visual">Visual</string>
     <string name="apps_tab_background">Background</string>
     <string name="apps_tab_all">All</string>

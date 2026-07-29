@@ -31,11 +31,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FloatingActionButton
@@ -57,6 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -114,8 +112,6 @@ fun AppChooserScreen(
     params: ApplicationsList, packageList: MutableStateFlow<List<AppInfo>>,
     refreshProgress: MutableStateFlow<Float>, onChoosePackage: (String?) -> Unit,
     onSwitchView: () -> Unit, onRefresh: () -> Unit,
-    setPackagesSuspend: (List<String>, Boolean) -> Unit,
-    setPackagesHidden: (List<String>, Boolean) -> Unit,
     appGroups: StateFlow<List<AppGroup>>, autoAppGroups: StateFlow<List<AutoAppGroup>>,
     onRefreshAutoGroups: () -> Unit, onEditGroup: (Int?, String, List<String>) -> Unit
 ) {
@@ -140,6 +136,9 @@ fun AppChooserScreen(
         inTab && (query.isEmpty() || searchInString(query, it.label) || searchInString(query, it.name))
     }
     val selectedPackages = remember { mutableStateListOf<AppInfo>() }
+    /** Selected groups, by the key the group list identifies them with, with their packages */
+    val selectedGroups = remember { mutableStateMapOf<String, List<String>>() }
+    val selection = (selectedPackages.map { it.name } + selectedGroups.values.flatten()).distinct()
     val focusMgr = LocalFocusManager.current
     LaunchedEffect(Unit) {
         if(packages.size <= 1) onRefresh()
@@ -148,7 +147,7 @@ fun AppChooserScreen(
         if(tab == AppChooserTab.Groups) onRefreshAutoGroups()
     }
     fun onItemClick(app: AppInfo) {
-        if (selectedPackages.isEmpty()) {
+        if (selection.isEmpty()) {
             focusMgr.clearFocus()
             onChoosePackage(app.name)
         } else {
@@ -161,6 +160,9 @@ fun AppChooserScreen(
             selectedPackages += app
             hf.performHapticFeedback(HapticFeedbackType.LongPress)
         }
+    }
+    fun onGroupSelect(key: String, apps: List<String>) {
+        if (key in selectedGroups) selectedGroups -= key else selectedGroups[key] = apps
     }
     Scaffold(
         topBar = {
@@ -184,7 +186,7 @@ fun AppChooserScreen(
                                     Icon(painter = painterResource(R.drawable.search_fill0), contentDescription = stringResource(R.string.search))
                                 }
                             }
-                            if (selectedPackages.isEmpty()) {
+                            if (selection.isEmpty()) {
                                 IconButton(onRefresh, enabled = progress == 1F) {
                                     Icon(Icons.Default.Refresh, null)
                                 }
@@ -193,70 +195,9 @@ fun AppChooserScreen(
                                 }
                             }
                         }
-                        if (selectedPackages.isNotEmpty()) {
-                            if (params.canSwitchView) {
-                                var dropdown by remember { mutableStateOf(false) }
-                                Box {
-                                    IconButton({
-                                        dropdown = !dropdown
-                                    }) {
-                                        Icon(Icons.Default.MoreVert, null)
-                                    }
-                                    DropdownMenu(dropdown, { dropdown = false }) {
-                                        if (Build.VERSION.SDK_INT >= 24) {
-                                            DropdownMenuItem(
-                                                { Text(stringResource(R.string.suspend)) },
-                                                {
-                                                    setPackagesSuspend(selectedPackages.map { it.name }, true)
-                                                    dropdown = false
-                                                    selectedPackages.clear()
-                                                },
-                                                leadingIcon = {
-                                                    Icon(painterResource(R.drawable.block_fill0), null)
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                { Text(stringResource(R.string.unsuspend)) },
-                                                {
-                                                    setPackagesSuspend(selectedPackages.map { it.name }, false)
-                                                    dropdown = false
-                                                    selectedPackages.clear()
-                                                },
-                                                leadingIcon = {
-                                                    Icon(painterResource(R.drawable.enable_fill0), null)
-                                                }
-                                            )
-                                        }
-                                        DropdownMenuItem(
-                                            { Text(stringResource(R.string.hide)) },
-                                            {
-                                                setPackagesHidden(selectedPackages.map { it.name }, true)
-                                                dropdown = false
-                                                selectedPackages.clear()
-                                            },
-                                            leadingIcon = {
-                                                Icon(painterResource(R.drawable.visibility_off_fill0), null)
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            { Text(stringResource(R.string.unhide)) },
-                                            {
-                                                setPackagesHidden(selectedPackages.map { it.name }, false)
-                                                dropdown = false
-                                                selectedPackages.clear()
-                                            },
-                                            leadingIcon = {
-                                                Icon(painterResource(R.drawable.visibility_fill0), null)
-                                            }
-                                        )
-                                    }
-                                }
-                            } else {
-                                FilledIconButton({
-                                    onChoosePackage(selectedPackages.joinToString("\n") { it.name })
-                                }) {
-                                    Icon(Icons.Default.Check, null)
-                                }
+                        if (selection.isNotEmpty()) {
+                            FilledIconButton({ onChoosePackage(selection.joinToString("\n")) }) {
+                                Icon(Icons.Default.Check, null)
                             }
                         }
                     },
@@ -282,8 +223,8 @@ fun AppChooserScreen(
                                 modifier = Modifier.fillMaxWidth().focusRequester(fr)
                             )
                         } else {
-                            if (selectedPackages.isNotEmpty()) {
-                                Text(selectedPackages.size.toString())
+                            if (selection.isNotEmpty()) {
+                                Text(selection.size.toString())
                             }
                         }
                     },
@@ -317,7 +258,11 @@ fun AppChooserScreen(
             if (progress < 1F) LinearProgressIndicator({ progress }, Modifier.fillMaxWidth())
             if (tab == AppChooserTab.Groups) {
                 Box(Modifier.fillMaxSize()) {
-                    AppGroupsList(groups, autoGroups, onEditGroup, Modifier.fillMaxSize())
+                    AppGroupsList(
+                        groups, autoGroups, onEditGroup, Modifier.fillMaxSize(),
+                        selectedGroups.keys.toList(),
+                        if (params.multiSelect) ::onGroupSelect else null
+                    )
                     FloatingActionButton(
                         { onEditGroup(null, "", emptyList()) },
                         Modifier.align(Alignment.BottomEnd).padding(16.dp)

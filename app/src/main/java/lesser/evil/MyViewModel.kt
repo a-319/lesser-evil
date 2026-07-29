@@ -639,6 +639,80 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
+    /** Status of several apps at once: a policy counts as applied only when it covers all of them */
+    val appsStatus = MutableStateFlow(AppStatus(false, false, false, false, false, false))
+    @SuppressLint("NewApi")
+    fun getAppsStatus(packages: List<String>) {
+        val ucd = policyPackages {
+            if (VERSION.SDK_INT >= 30) DPM.getUserControlDisabledPackages(DAR) else null
+        }
+        val mdd = policyPackages {
+            if (VERSION.SDK_INT >= 28) DPM.getMeteredDataDisabledPackages(DAR) else null
+        }
+        val ku = policyPackages {
+            if (VERSION.SDK_INT >= 28 && Privilege.status.value.device) DPM.getKeepUninstalledPackages(DAR)
+            else null
+        }
+        appsStatus.value = AppStatus(
+            VERSION.SDK_INT >= 24 && allPackages(packages) { DPM.isPackageSuspended(DAR, it) },
+            allPackages(packages) { DPM.isApplicationHidden(DAR, it) },
+            allPackages(packages) { DPM.isUninstallBlocked(DAR, it) },
+            allPackages(packages) { it in ucd },
+            allPackages(packages) { it in mdd },
+            allPackages(packages) { it in ku }
+        )
+    }
+    /** True when [applied] holds for every one of [packages], which must not be empty */
+    private fun allPackages(packages: List<String>, applied: (String) -> Boolean) =
+        packages.isNotEmpty() && filterPackages(packages, applied).size == packages.size
+    // Details of several applications
+    @RequiresApi(24)
+    fun adSetPackagesSuspended(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.suspended, packages)
+        try {
+            if (effective.isNotEmpty()) DPM.setPackagesSuspended(DAR, effective.toTypedArray(), status)
+        } catch (_: Exception) {}
+        getAppsStatus(packages)
+    }
+    fun adSetPackagesHidden(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.hidden, packages)
+        for (name in effective) DPM.setApplicationHidden(DAR, name, status)
+        getAppsStatus(packages)
+    }
+    fun adSetPackagesUb(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.uninstallBlocked, packages)
+        for (name in effective) DPM.setUninstallBlocked(DAR, name, status)
+        getAppsStatus(packages)
+    }
+    @RequiresApi(30)
+    fun adSetPackagesUcd(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.userControlDisabled, packages)
+        DPM.setUserControlDisabledPackages(DAR, DPM.getUserControlDisabledPackages(DAR).run {
+            if (status) plus(effective).distinct() else minus(effective.toSet())
+        })
+        getAppsStatus(packages)
+    }
+    @RequiresApi(28)
+    fun adSetPackagesMdd(packages: List<String>, status: Boolean) {
+        val effective = if (status) packages
+        else filterAdminProtected(adminBaseline?.meteredDataDisabled, packages)
+        DPM.setMeteredDataDisabledPackages(DAR, DPM.getMeteredDataDisabledPackages(DAR).run {
+            if (status) plus(effective).distinct() else minus(effective.toSet())
+        })
+        getAppsStatus(packages)
+    }
+    @RequiresApi(28)
+    fun adSetPackagesKu(packages: List<String>, status: Boolean) {
+        DPM.setKeepUninstalledPackages(DAR, (DPM.getKeepUninstalledPackages(DAR) ?: emptyList()).run {
+            if (status) plus(packages).distinct() else minus(packages.toSet())
+        })
+        getAppsStatus(packages)
+    }
+
     @RequiresApi(34)
     fun setDefaultDialer(name: String): Boolean {
         return try {

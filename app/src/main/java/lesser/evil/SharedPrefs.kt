@@ -26,6 +26,8 @@ class SharedPrefs(context: Context) {
     var applicationsListView by BooleanSharedPref("applications.list_view", true)
     /** Show the applications as a launcher-like grid instead of a list */
     var applicationsGridView by BooleanSharedPref("applications.grid_view")
+    /** The hint telling that a long press selects several apps was dismissed */
+    var multiSelectHintDismissed by BooleanSharedPref("applications.multi_select_hint_dismissed")
     var shortcuts by BooleanSharedPref("shortcuts")
     var dhizukuServer by BooleanSharedPref("dhizuku_server")
     var notifications by StringSharedPref("notifications")

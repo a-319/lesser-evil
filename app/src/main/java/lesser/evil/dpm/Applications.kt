@@ -1233,6 +1233,10 @@ fun ManageAppGroupsScreen(
     }
 }
 
+/** The keys [AppGroupsList] identifies its groups by, so a selection can name them too */
+fun appGroupKey(group: AppGroup) = "stored:${group.id}"
+fun autoAppGroupKey(group: AutoAppGroup) = "auto:${group.title}"
+
 /**
  * The groups of [ManageAppGroupsScreen], also shown by the groups tab of the app chooser.
  * When [onSelect] is given the groups can be selected the same way applications are: a long
@@ -1288,7 +1292,7 @@ fun AppGroupsList(
             )
         }
         items(groups, { it.id }) {
-            GroupItem("stored:${it.id}", it.name, it.apps, R.string.app_group_apps_count) {
+            GroupItem(appGroupKey(it), it.name, it.apps, R.string.app_group_apps_count) {
                 navigateToEditScreen(it.id, it.name, it.apps)
             }
         }
@@ -1304,7 +1308,7 @@ fun AppGroupsList(
             items(autoGroups.size) { index ->
                 val group = autoGroups[index]
                 val name = stringResource(group.title)
-                GroupItem("auto:${group.title}", name, group.apps, R.string.auto_group_apps_count) {
+                GroupItem(autoAppGroupKey(group), name, group.apps, R.string.auto_group_apps_count) {
                     navigateToEditScreen(null, name, group.apps)
                 }
             }

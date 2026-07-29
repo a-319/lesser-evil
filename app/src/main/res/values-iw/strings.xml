@@ -211,6 +211,7 @@
 	<string name="disable_user_control">השבת את בקרת המשתמש</string>
 	<string name="disabled">מושבת</string>
 	<string name="disconnect">לנתק</string>
+	<string name="dismiss">הסר</string>
 	<string name="dns_hostname">שם מארח DNS</string>
 	<string name="dns_servers">שרתי DNS</string>
 	<string name="do_not_ask_credentials_on_boot">אל תשאל אישורים באתחול</string>
@@ -440,6 +441,8 @@
 	<string name="add_configuration">הוספת תצורה</string>
 	<string name="edit_configuration">עריכת תצורה</string>
 	<string name="key">מפתח</string>
+	<string name="multi_select_hint">לחיצה ארוכה על אפליקציה תאפשר בחירה מרובה</string>
+	<string name="select_all">בחר הכל</string>
 	<string name="value">ערך</string>
 	<string name="key_empty_error">המפתח לא יכול להיות ריק</string>
 	<string name="key_already_exists">כבר קיימת תצורה עם מפתח זה</string>

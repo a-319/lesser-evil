@@ -434,6 +434,9 @@
     <string name="auto_group_metered_data_disabled">Data disabled</string>
     <string name="auto_group_keep_uninstalled">Kept after uninstall</string>
     <string name="apps_tab_user">User</string>
+    <string name="select_all">Select all</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="multi_select_hint">Long press an app to select several of them</string>
     <string name="selected_apps_count">%1$d apps selected</string>
     <string name="info_multiple_apps">A switch is on only when the policy applies to every selected app. Changing it applies to all of them.</string>
     <string name="clear_apps_storage_confirmation">You are about to delete the data of %1$d apps, this cannot be undone:\n%2$s</string>

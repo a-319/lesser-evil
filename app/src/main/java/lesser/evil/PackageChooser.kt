@@ -8,6 +8,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.OutlinedTextField
@@ -81,6 +83,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import lesser.evil.dpm.AppGroup
 import lesser.evil.dpm.AppGroupsList
+import lesser.evil.dpm.appGroupKey
+import lesser.evil.dpm.autoAppGroupKey
 import lesser.evil.dpm.AutoAppGroup
 
 data class AppInfo(
@@ -124,6 +128,7 @@ fun AppChooserScreen(
     var gridView by rememberSaveable { mutableStateOf(SP.applicationsGridView) }
     var query by rememberSaveable { mutableStateOf("") }
     var searchMode by rememberSaveable { mutableStateOf(false) }
+    var hintDismissed by rememberSaveable { mutableStateOf(SP.multiSelectHintDismissed) }
     val tab = AppChooserTab.entries[tabIndex]
     val filteredPackages = packages.filter {
         val inTab = when(tab) {
@@ -164,6 +169,21 @@ fun AppChooserScreen(
     fun onGroupSelect(key: String, apps: List<String>) {
         if (key in selectedGroups) selectedGroups -= key else selectedGroups[key] = apps
     }
+    /** Everything the groups tab currently offers, keyed the way the group list keys it */
+    val everyGroup = groups.associate { appGroupKey(it) to it.apps } +
+            autoGroups.associate { autoAppGroupKey(it) to it.apps }
+    val everythingSelected =
+        if (tab == AppChooserTab.Groups) everyGroup.isNotEmpty() && selectedGroups.keys.containsAll(everyGroup.keys)
+        else filteredPackages.isNotEmpty() && filteredPackages.all { it in selectedPackages }
+    fun toggleSelectAll() {
+        if (tab == AppChooserTab.Groups) {
+            selectedGroups.clear()
+            if (!everythingSelected) selectedGroups.putAll(everyGroup)
+        } else {
+            selectedPackages -= filteredPackages
+            if (!everythingSelected) selectedPackages += filteredPackages
+        }
+    }
     Scaffold(
         topBar = {
             Column {
@@ -193,6 +213,16 @@ fun AppChooserScreen(
                                 if (params.canSwitchView) IconButton(onSwitchView) {
                                     Icon(Icons.AutoMirrored.Default.List, null)
                                 }
+                            }
+                        }
+                        if (params.multiSelect && !searchMode) {
+                            IconButton(::toggleSelectAll) {
+                                Icon(
+                                    painterResource(R.drawable.check_box_fill0),
+                                    stringResource(R.string.select_all),
+                                    tint = if (everythingSelected) MaterialTheme.colorScheme.primary
+                                    else LocalContentColor.current
+                                )
                             }
                         }
                         if (selection.isNotEmpty()) {
@@ -256,6 +286,24 @@ fun AppChooserScreen(
     ) { paddingValues ->
         Column(Modifier.fillMaxSize().padding(paddingValues)) {
             if (progress < 1F) LinearProgressIndicator({ progress }, Modifier.fillMaxWidth())
+            if (params.multiSelect && !hintDismissed && selection.isEmpty()) Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(start = HorizontalPadding, end = 4.dp),
+                Arrangement.SpaceBetween, Alignment.CenterVertically
+            ) {
+                Text(
+                    stringResource(R.string.multi_select_hint), Modifier.weight(1F),
+                    style = typography.bodyMedium
+                )
+                IconButton({
+                    hintDismissed = true
+                    SP.multiSelectHintDismissed = true
+                }) {
+                    Icon(Icons.Outlined.Clear, stringResource(R.string.dismiss))
+                }
+            }
             if (tab == AppChooserTab.Groups) {
                 Box(Modifier.fillMaxSize()) {
                     AppGroupsList(

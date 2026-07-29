@@ -1422,7 +1422,8 @@ fun EditAppGroupScreen(
     val groups by appGroups.collectAsStateWithLifecycle()
     val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
     // Every other group, the automatic ones included, can hand over its applications
-    val otherGroups = selectableGroups(groups, autoGroups).filter { it.id != params.id }
+    val otherGroups = selectableGroups(groups, autoGroups)
+        .filter { params.id == null || it.id != params.id }
     LaunchedEffect(Unit) {
         refreshAutoGroups()
         // Apps picked from the list are added right away, only typing needs the button

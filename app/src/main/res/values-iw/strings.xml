@@ -447,7 +447,8 @@
 	<string name="multi_select_hint">לחיצה ארוכה על אפליקציה תאפשר בחירה מרובה</string>
 	<string name="no_applied_apps">אף אפליקציה לא מחזיקה בזה</string>
 	<string name="select_all">בחר הכל</string>
-	<string name="select_all_hint">לחץ כדי לבחור הכל</string>
+	<string name="select_all_hint_after">כדי לבחור הכל</string>
+	<string name="select_all_hint_before">לחץ</string>
 	<string name="value">ערך</string>
 	<string name="key_empty_error">המפתח לא יכול להיות ריק</string>
 	<string name="key_already_exists">כבר קיימת תצורה עם מפתח זה</string>

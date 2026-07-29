@@ -31,7 +31,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -298,11 +297,14 @@ fun AppChooserScreen(
                     .padding(horizontal = HorizontalPadding, vertical = 6.dp),
                 Arrangement.End, Alignment.CenterVertically
             ) {
-                Text(stringResource(R.string.select_all_hint), style = typography.bodyMedium)
+                // The button's own icon stands in the sentence, so it is easy to find
+                Text(stringResource(R.string.select_all_hint_before), style = typography.bodyMedium)
                 Icon(
-                    Icons.Default.KeyboardArrowUp, null,
-                    Modifier.padding(start = 4.dp), MaterialTheme.colorScheme.primary
+                    painterResource(R.drawable.check_box_fill0), null,
+                    Modifier.padding(horizontal = 4.dp).size(18.dp),
+                    MaterialTheme.colorScheme.primary
                 )
+                Text(stringResource(R.string.select_all_hint_after), style = typography.bodyMedium)
             }
             if (params.multiSelect && !hintDismissed && selection.isEmpty()) Row(
                 Modifier

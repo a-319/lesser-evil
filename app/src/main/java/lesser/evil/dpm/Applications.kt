@@ -237,6 +237,9 @@ fun ApplicationsFeaturesScreen(onNavigateUp: () -> Unit, onNavigate: (Any) -> Un
                 FunctionItem(R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0) { onNavigate(DisableUserControl) }
             }
             FunctionItem(R.string.permissions, icon = R.drawable.shield_fill0) { onNavigate(PermissionsManager()) }
+            FunctionItem(R.string.add_managed_configuration, icon = R.drawable.description_fill0) {
+                onNavigate(ManualConfigurations(emptyList()))
+            }
             if(VERSION.SDK_INT >= 28) {
                 FunctionItem(R.string.disable_metered_data, icon = R.drawable.money_off_fill0) { onNavigate(DisableMeteredData) }
             }
@@ -518,31 +521,53 @@ private fun MultipleAppsActionDialog(
 
 @Serializable object DisableUserControl
 
+/**
+ * The package field with its add button: what is typed needs the button, what is picked from the
+ * application list is added as soon as the picker hands it back.
+ */
+@Composable
+fun AddPackagesField(
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, current: List<String>,
+    onAdd: (List<String>) -> Unit
+) {
+    var input by rememberSaveable { mutableStateOf("") }
+    val inputPackages = parsePackageNames(input)
+    LaunchedEffect(Unit) {
+        val chosen = parsePackageNames(chosenPackage.receive()).filter { it !in current }
+        if (chosen.isNotEmpty()) onAdd(chosen)
+    }
+    PackageNameTextField(input, onChoosePackage, Modifier.padding(HorizontalPadding, 8.dp)) {
+        input = it
+    }
+    Button(
+        {
+            onAdd(inputPackages.filter { it !in current })
+            input = ""
+        },
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = HorizontalPadding)
+            .padding(bottom = 10.dp),
+        inputPackages.isNotEmpty() && inputPackages.none { it in current }
+    ) {
+        Text(stringResource(R.string.add))
+    }
+}
+
 @Serializable data class PermissionsManager(val packageName: String? = null)
 
 @Composable
 fun PermissionsManagerScreen(
     packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
-    setPackagePermission: (List<String>, String, Int) -> Boolean, onNavigateUp: () -> Unit,
-    param: PermissionsManager, chosenPackage: Channel<String>, onChoosePackage: () -> Unit
-) {
-    val packageNameParam = param.packageName
-    var packageName by rememberSaveable { mutableStateOf(packageNameParam ?: "") }
-    LaunchedEffect(Unit) {
-        packageName = chosenPackage.receive()
-    }
-    PermissionsContent(
-        listOf(packageName), packagePermissions, getPackagePermissions, setPackagePermission,
-        onNavigateUp
-    ) {
-        if(packageNameParam == null) {
-            PackageNameTextField(packageName, onChoosePackage,
-                Modifier.padding(HorizontalPadding, 8.dp)) { packageName = it }
-            Spacer(Modifier.padding(vertical = 4.dp))
-        }
-    }
-}
+    setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
+    onNavigateUp: () -> Unit, param: PermissionsManager, chosenPackage: Channel<String>,
+    onChoosePackage: () -> Unit
+) = PermissionsContent(
+    listOfNotNull(param.packageName), packagePermissions, getPackagePermissions,
+    setPackagePermission, getAppInfo, param.packageName == null, chosenPackage, onChoosePackage,
+    onNavigateUp
+)
 
 @Serializable data class MultiplePermissions(val packages: List<String>)
 
@@ -551,35 +576,44 @@ fun PermissionsManagerScreen(
 fun MultiplePermissionsScreen(
     param: MultiplePermissions, packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
-    setPackagePermission: (List<String>, String, Int) -> Boolean, onNavigateUp: () -> Unit
+    setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) = PermissionsContent(
-    param.packages, packagePermissions, getPackagePermissions, setPackagePermission, onNavigateUp
-) {}
+    param.packages, packagePermissions, getPackagePermissions, setPackagePermission, getAppInfo,
+    true, chosenPackage, onChoosePackage, onNavigateUp
+)
 
 @Composable
 private fun PermissionsContent(
-    packages: List<String>, packagePermissions: MutableStateFlow<Map<String, Int>>,
+    initialPackages: List<String>, packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
-    setPackagePermission: (List<String>, String, Int) -> Boolean, onNavigateUp: () -> Unit,
-    header: @Composable () -> Unit
+    setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
+    canAddPackages: Boolean, chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
+    onNavigateUp: () -> Unit
 ) {
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     var selectedPermission by rememberSaveable { mutableIntStateOf(-1) }
     val permissions by packagePermissions.collectAsStateWithLifecycle()
-    LaunchedEffect(packages) {
+    val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
+    LaunchedEffect(packages.toList()) {
         getPackagePermissions(packages)
     }
     MyLazyScaffold(R.string.permissions, onNavigateUp) {
         item {
-            header()
             if (packages.size > 1) Notes(R.string.info_multiple_apps, HorizontalPadding)
+        }
+        items(packages.map { getAppInfo(it) }, { it.name }) {
+            ApplicationItem(it) { packages -= it.name }
+        }
+        if (canAddPackages) item {
+            AddPackagesField(chosenPackage, onChoosePackage, packages) { packages += it }
         }
         itemsIndexed(runtimePermissions, { _, it -> it.id }) { index, it ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
+                    .clickable(packages.isNotEmpty()) {
                         selectedPermission = index
                     }
                     .padding(8.dp)
@@ -1919,17 +1953,19 @@ private fun replaceElements(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManualConfigurationScreen(
-    packages: List<String>, manualRestrictions: StateFlow<List<ManualRestriction>>,
+    initialPackages: List<String>, manualRestrictions: StateFlow<List<ManualRestriction>>,
     getManualRestrictions: (List<String>) -> Unit,
     setManualRestriction: (List<String>, String?, ManualRestriction) -> Unit,
-    removeManualRestriction: (List<String>, String) -> Unit,
+    removeManualRestriction: (List<String>, String) -> Unit, getAppInfo: (String) -> AppInfo,
+    canAddPackages: Boolean, chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
     onNavigateUp: () -> Unit
 ) {
+    val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
     val restrictions by manualRestrictions.collectAsStateWithLifecycle()
     var path by remember { mutableStateOf(emptyList<BundlePath>()) }
     var editDialog by remember { mutableStateOf<ManualRestriction?>(null) }
     var addDialog by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(packages.toList()) {
         getManualRestrictions(packages)
     }
     // A nested bundle can disappear underneath us if it's edited away; fall back to its parent
@@ -1995,7 +2031,8 @@ fun ManualConfigurationScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
+            // Nothing to write a configuration to until an app is picked
+            if (packages.isNotEmpty()) FloatingActionButton(
                 {
                     if (elements != null) {
                         persist(replaceElements(
@@ -2013,9 +2050,18 @@ fun ManualConfigurationScreen(
         contentWindowInsets = adaptiveInsets()
     ) { paddingValues ->
         LazyColumn(Modifier.padding(paddingValues)) {
-            if (path.isEmpty()) item {
-                Notes(R.string.info_manual_configurations, HorizontalPadding)
-                Spacer(Modifier.height(8.dp))
+            if (path.isEmpty()) {
+                item {
+                    Notes(R.string.info_manual_configurations, HorizontalPadding)
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(packages.map { getAppInfo(it) }, { "app:" + it.name }) {
+                    ApplicationItem(it) { packages -= it.name }
+                }
+                if (canAddPackages) item {
+                    AddPackagesField(chosenPackage, onChoosePackage, packages) { packages += it }
+                }
+                if (packages.isNotEmpty()) item { HorizontalDivider() }
             }
             // A Bundle[] lists its elements; anything else lists key/value entries
             if (elements != null) {

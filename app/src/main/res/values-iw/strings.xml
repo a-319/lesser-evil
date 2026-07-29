@@ -443,6 +443,7 @@
 	<string name="key">מפתח</string>
 	<string name="multi_select_hint">לחיצה ארוכה על אפליקציה תאפשר בחירה מרובה</string>
 	<string name="select_all">בחר הכל</string>
+	<string name="select_all_hint">לחץ כדי לבחור הכל</string>
 	<string name="value">ערך</string>
 	<string name="key_empty_error">המפתח לא יכול להיות ריק</string>
 	<string name="key_already_exists">כבר קיימת תצורה עם מפתח זה</string>

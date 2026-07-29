@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -129,6 +130,8 @@ fun AppChooserScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var searchMode by rememberSaveable { mutableStateOf(false) }
     var hintDismissed by rememberSaveable { mutableStateOf(SP.multiSelectHintDismissed) }
+    var selectAllHintsLeft by rememberSaveable { mutableIntStateOf(SP.selectAllHintsLeft) }
+    var selectAllHint by rememberSaveable { mutableStateOf(false) }
     val tab = AppChooserTab.entries[tabIndex]
     val filteredPackages = packages.filter {
         val inTab = when(tab) {
@@ -150,6 +153,16 @@ fun AppChooserScreen(
     }
     LaunchedEffect(tab) {
         if(tab == AppChooserTab.Groups) onRefreshAutoGroups()
+    }
+    // Point at the select all button the first few times a selection is started
+    LaunchedEffect(selection.isEmpty()) {
+        if (selection.isEmpty()) {
+            selectAllHint = false
+        } else if (selectAllHintsLeft > 0) {
+            selectAllHint = true
+            selectAllHintsLeft--
+            SP.selectAllHintsLeft = selectAllHintsLeft
+        }
     }
     fun onItemClick(app: AppInfo) {
         if (selection.isEmpty()) {
@@ -215,7 +228,7 @@ fun AppChooserScreen(
                                 }
                             }
                         }
-                        if (params.multiSelect && !searchMode) {
+                        if (selection.isNotEmpty() && !searchMode) {
                             IconButton(::toggleSelectAll) {
                                 Icon(
                                     painterResource(R.drawable.check_box_fill0),
@@ -286,6 +299,19 @@ fun AppChooserScreen(
     ) { paddingValues ->
         Column(Modifier.fillMaxSize().padding(paddingValues)) {
             if (progress < 1F) LinearProgressIndicator({ progress }, Modifier.fillMaxWidth())
+            if (selectAllHint) Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(horizontal = HorizontalPadding, vertical = 6.dp),
+                Arrangement.End, Alignment.CenterVertically
+            ) {
+                Text(stringResource(R.string.select_all_hint), style = typography.bodyMedium)
+                Icon(
+                    Icons.Default.KeyboardArrowUp, null,
+                    Modifier.padding(start = 4.dp), MaterialTheme.colorScheme.primary
+                )
+            }
             if (params.multiSelect && !hintDismissed && selection.isEmpty()) Row(
                 Modifier
                     .fillMaxWidth()

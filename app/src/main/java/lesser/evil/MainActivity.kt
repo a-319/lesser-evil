@@ -602,7 +602,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         composable<PermissionsManager> {
             PermissionsManagerScreen(
                 vm.packagePermissions, vm::getPackagePermissions, vm::setPackagePermission,
-                ::navigateUp, it.toRoute(), vm.chosenPackage, ::chooseSinglePackage
+                vm::getAppInfo, ::navigateUp, it.toRoute(), vm.chosenPackage, ::choosePackage
             )
         }
         composable<DisableMeteredData> {
@@ -692,20 +692,21 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             ManualConfigurationScreen(
                 listOf(it.toRoute<ManualConfiguration>().packageName), vm.manualRestrictions,
                 vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
-                ::navigateUp
+                vm::getAppInfo, false, vm.chosenPackage, ::choosePackage, ::navigateUp
             )
         }
         composable<ManualConfigurations> {
             ManualConfigurationScreen(
                 it.toRoute<ManualConfigurations>().packages, vm.manualRestrictions,
                 vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
-                ::navigateUp
+                vm::getAppInfo, true, vm.chosenPackage, ::choosePackage, ::navigateUp
             )
         }
         composable<MultiplePermissions> {
             MultiplePermissionsScreen(
                 it.toRoute(), vm.packagePermissions, vm::getPackagePermissions,
-                vm::setPackagePermission, ::navigateUp
+                vm::setPackagePermission, vm::getAppInfo, vm.chosenPackage, ::choosePackage,
+                ::navigateUp
             )
         }
         composable<ManageAppGroups> {

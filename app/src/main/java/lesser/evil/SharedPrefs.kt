@@ -28,6 +28,8 @@ class SharedPrefs(context: Context) {
     var applicationsGridView by BooleanSharedPref("applications.grid_view")
     /** The hint telling that a long press selects several apps was dismissed */
     var multiSelectHintDismissed by BooleanSharedPref("applications.multi_select_hint_dismissed")
+    /** How many more times to point at the select all button when a selection starts */
+    var selectAllHintsLeft by IntSharedPref("applications.select_all_hints_left", 3)
     var shortcuts by BooleanSharedPref("shortcuts")
     var dhizukuServer by BooleanSharedPref("dhizuku_server")
     var notifications by StringSharedPref("notifications")

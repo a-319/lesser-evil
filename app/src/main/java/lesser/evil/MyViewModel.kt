@@ -42,6 +42,7 @@ import android.os.Binder
 import android.os.Build.VERSION
 import android.os.Bundle
 import android.os.HardwarePropertiesManager
+import android.os.Parcelable
 import android.os.UserHandle
 import android.os.UserManager
 import android.telephony.data.ApnSetting
@@ -78,6 +79,7 @@ import lesser.evil.dpm.IntentFilterOptions
 import lesser.evil.dpm.IpMode
 import lesser.evil.dpm.KeyguardDisableConfig
 import lesser.evil.dpm.KeyguardDisableMode
+import lesser.evil.dpm.ManualRestriction
 import lesser.evil.dpm.NetworkStatsData
 import lesser.evil.dpm.NetworkStatsTarget
 import lesser.evil.dpm.PasswordComplexity
@@ -119,6 +121,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.addJsonObject
@@ -378,18 +382,40 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
 
     val packagePermissions = MutableStateFlow(emptyMap<String, Int>())
-    fun getPackagePermissions(name: String) {
-        if (name.isValidPackageName) {
-            packagePermissions.value = runtimePermissions.associate {
-                it.id to DPM.getPermissionGrantState(DAR, name, it.id)
-            }
-        } else {
+    fun getPackagePermissions(name: String) = getPackagePermissions(listOf(name))
+    /** The grant state [packages] share, or none for a permission they don't agree on */
+    fun getPackagePermissions(packages: List<String>) {
+        val names = packages.filter { it.isValidPackageName }
+        if (names.isEmpty()) {
             packagePermissions.value = emptyMap()
+            return
         }
+        packagePermissions.value = runtimePermissions.mapNotNull { permission ->
+            val states = names.map {
+                try {
+                    DPM.getPermissionGrantState(DAR, it, permission.id)
+                } catch (_: Exception) {
+                    null
+                }
+            }.distinct()
+            val shared = states.singleOrNull()
+            if (shared == null) null else permission.id to shared
+        }.toMap()
     }
-    fun setPackagePermission(name: String, permission: String, status: Int): Boolean {
-        val result = DPM.setPermissionGrantState(DAR, name, permission, status)
-        getPackagePermissions(name)
+    fun setPackagePermission(name: String, permission: String, status: Int) =
+        setPackagePermission(listOf(name), permission, status)
+    /** Grants or denies [permission] on every app of [packages], reporting whether all took it */
+    fun setPackagePermission(packages: List<String>, permission: String, status: Int): Boolean {
+        var result = packages.isNotEmpty()
+        for (name in packages) {
+            result = try {
+                DPM.setPermissionGrantState(DAR, name, permission, status) && result
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
+        getPackagePermissions(packages)
         return result
     }
 
@@ -769,156 +795,50 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         val rm = application.getSystemService(RestrictionsManager::class.java)
         try {
             val bundle = DPM.getApplicationRestrictions(DAR, name)
-            val declared = rm.getManifestRestrictions(name)?.mapNotNull {
+            appRestrictions.value = rm.getManifestRestrictions(name)?.mapNotNull {
                 transformRestrictionEntry(it)
             }?.map {
-                readRestrictionValue(it, bundle)
+                if (bundle.containsKey(it.key)) {
+                    when (it) {
+                        is AppRestriction.BooleanItem -> it.value = bundle.getBoolean(it.key)
+                        is AppRestriction.StringItem -> it.value = bundle.getString(it.key)
+                        is AppRestriction.IntItem -> it.value = bundle.getInt(it.key)
+                        is AppRestriction.ChoiceItem -> it.value = bundle.getString(it.key)
+                        is AppRestriction.MultiSelectItem -> it.value = bundle.getStringArray(it.key)
+                    }
+                }
                 it
             } ?: emptyList()
-            appRestrictions.value = declared + undeclaredRestrictions(bundle, declared)
         } catch (e: Exception) {
             e.printStackTrace()
             appRestrictions.value = emptyList()
         }
     }
 
+    // Guards every read-modify-write of a package's restrictions bundle, declared or manual,
+    // so concurrent edits can't race on a stale read and silently undo each other.
+    private val restrictionsMutex = Mutex()
+
     fun setAppRestrictions(name: String, item: AppRestriction) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
+            restrictionsMutex.withLock {
+                val declared = appRestrictions.value.filter { it.key != item.key }.plus(item)
+                // Start from what is currently applied so manually added keys are kept
                 val bundle = DPM.getApplicationRestrictions(DAR, name)
-                writeRestrictionValue(item, bundle)
+                declared.forEach { bundle.remove(it.key) }
+                bundle.putAll(transformAppRestriction(declared))
                 DPM.setApplicationRestrictions(DAR, name, bundle)
-            } catch (e: Exception) {
-                e.printStackTrace()
+                getAppRestrictions(name)
             }
-            getAppRestrictions(name)
         }
     }
 
     fun clearAppRestrictions(name: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            DPM.setApplicationRestrictions(DAR, name, Bundle())
-            getAppRestrictions(name)
-        }
-    }
-
-    /** Copies the value [bundle] holds for [item], leaving it alone when it holds none */
-    private fun readRestrictionValue(item: AppRestriction, bundle: Bundle) {
-        if (!bundle.containsKey(item.key)) return
-        when (item) {
-            is AppRestriction.BooleanItem -> item.value = bundle.getBoolean(item.key)
-            is AppRestriction.StringItem -> item.value = bundle.getString(item.key)
-            is AppRestriction.IntItem -> item.value = bundle.getInt(item.key)
-            is AppRestriction.ChoiceItem -> item.value = bundle.getString(item.key)
-            is AppRestriction.MultiSelectItem -> item.value = bundle.getStringArray(item.key)
-        }
-    }
-    /** The value of [item] as text, to tell whether two apps hold the same one */
-    private fun restrictionValueText(item: AppRestriction): String? = when (item) {
-        is AppRestriction.BooleanItem -> item.value?.toString()
-        is AppRestriction.StringItem -> item.value
-        is AppRestriction.IntItem -> item.value?.toString()
-        is AppRestriction.ChoiceItem -> item.value
-        is AppRestriction.MultiSelectItem -> item.value?.joinToString(" ")
-    }
-    private fun clearRestrictionValue(item: AppRestriction) {
-        when (item) {
-            is AppRestriction.BooleanItem -> item.value = null
-            is AppRestriction.StringItem -> item.value = null
-            is AppRestriction.IntItem -> item.value = null
-            is AppRestriction.ChoiceItem -> item.value = null
-            is AppRestriction.MultiSelectItem -> item.value = null
-        }
-    }
-    /**
-     * The keys [bundle] holds that [declared] does not, so a configuration set by hand - the way
-     * the WebView URL lists are - stays visible and editable.
-     */
-    private fun undeclaredRestrictions(
-        bundle: Bundle, declared: List<AppRestriction>
-    ): List<AppRestriction> {
-        val declaredKeys = declared.map { it.key }
-        return bundle.keySet().filter { it !in declaredKeys }.mapNotNull { key ->
-            @Suppress("DEPRECATION") when (val value = bundle.get(key)) {
-                is Boolean -> AppRestriction.BooleanItem(key, null, null, value)
-                is Int -> AppRestriction.IntItem(key, null, null, value)
-                is String -> AppRestriction.StringItem(key, null, null, value)
-                is Array<*> -> AppRestriction.MultiSelectItem(
-                    key, null, null, emptyArray(), emptyArray(),
-                    value.filterIsInstance<String>().toTypedArray()
-                )
-                else -> null
+            restrictionsMutex.withLock {
+                DPM.setApplicationRestrictions(DAR, name, Bundle())
+                getAppRestrictions(name)
             }
-        }
-    }
-    /** Writes [item] into [bundle], dropping the key when it holds no value */
-    private fun writeRestrictionValue(item: AppRestriction, bundle: Bundle) {
-        bundle.remove(item.key)
-        when (item) {
-            is AppRestriction.BooleanItem -> item.value?.let { bundle.putBoolean(item.key, it) }
-            is AppRestriction.StringItem -> item.value?.let { bundle.putString(item.key, it) }
-            is AppRestriction.IntItem -> item.value?.let { bundle.putInt(item.key, it) }
-            is AppRestriction.ChoiceItem -> item.value?.let { bundle.putString(item.key, it) }
-            is AppRestriction.MultiSelectItem -> item.value?.let { bundle.putStringArray(item.key, it) }
-        }
-    }
-
-    /**
-     * The configuration keys the selected apps declare, merged by key. A value is shown only
-     * when every app that declares the key holds the same one.
-     */
-    val appsRestrictions = MutableStateFlow(emptyList<AppRestriction>())
-    fun getAppsRestrictions(packages: List<String>) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val rm = application.getSystemService(RestrictionsManager::class.java)
-            val merged = LinkedHashMap<String, AppRestriction>()
-            val differing = mutableSetOf<String>()
-            for (name in packages) {
-                val bundle = try {
-                    DPM.getApplicationRestrictions(DAR, name)
-                } catch (_: Exception) { Bundle() }
-                val declared: List<AppRestriction> = try {
-                    rm.getManifestRestrictions(name)?.mapNotNull { transformRestrictionEntry(it) }
-                        ?: emptyList()
-                } catch (_: Exception) { emptyList() }
-                declared.forEach { readRestrictionValue(it, bundle) }
-                for (entry in declared + undeclaredRestrictions(bundle, declared)) {
-                    val first = merged[entry.key]
-                    if (first == null) merged[entry.key] = entry
-                    else if (restrictionValueText(first) != restrictionValueText(entry)) {
-                        differing += entry.key
-                    }
-                }
-            }
-            for (key in differing) merged[key]?.let { clearRestrictionValue(it) }
-            appsRestrictions.value = merged.values.toList()
-        }
-    }
-    /** Sets [item] on every app of [packages], leaving the rest of their configuration alone */
-    fun setAppsRestriction(packages: List<String>, item: AppRestriction) {
-        viewModelScope.launch(Dispatchers.IO) {
-            for (name in packages) {
-                try {
-                    val bundle = DPM.getApplicationRestrictions(DAR, name)
-                    writeRestrictionValue(item, bundle)
-                    DPM.setApplicationRestrictions(DAR, name, bundle)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            getAppsRestrictions(packages)
-        }
-    }
-    fun clearAppsRestrictions(packages: List<String>) {
-        viewModelScope.launch(Dispatchers.IO) {
-            for (name in packages) {
-                try {
-                    DPM.setApplicationRestrictions(DAR, name, Bundle())
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            getAppsRestrictions(packages)
         }
     }
 
@@ -949,6 +869,112 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                 is AppRestriction.MultiSelectItem -> r.value?.let { b.putStringArray(r.key, r.value) }
             }
         }
+        return b
+    }
+
+    val manualRestrictions = MutableStateFlow(emptyList<ManualRestriction>())
+
+    fun getManualRestrictions(name: String) = getManualRestrictions(listOf(name))
+
+    /** The configuration [packages] have in common: an entry every one of them holds alike */
+    fun getManualRestrictions(packages: List<String>) {
+        val lists = packages.map { name ->
+            try {
+                parseRestrictions(DPM.getApplicationRestrictions(DAR, name))
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
+            }
+        }
+        manualRestrictions.value =
+            lists.firstOrNull()?.filter { entry -> lists.all { entry in it } } ?: emptyList()
+    }
+
+    private fun parseRestrictions(bundle: Bundle): List<ManualRestriction> =
+        bundle.keySet().mapNotNull { key ->
+            when (val value = bundle.get(key)) {
+                is Boolean -> ManualRestriction.BooleanItem(key, value)
+                is Int -> ManualRestriction.IntItem(key, value)
+                is String -> ManualRestriction.StringItem(key, value)
+                is Bundle -> ManualRestriction.BundleItem(key, parseRestrictions(value))
+                is Array<*> -> {
+                    // A bundle array comes back as Parcelable[] once it has been through a
+                    // parcel, so trust the elements and only fall back to the component type
+                    // when the array is empty and there's nothing to look at.
+                    val component: Class<*>? = value.javaClass.componentType
+                    when {
+                        value.any { it is Bundle } -> ManualRestriction.BundleArrayItem(
+                            key, value.map { parseRestrictions(it as? Bundle ?: Bundle()) }
+                        )
+                        value.any { it is String } ->
+                            ManualRestriction.StringArrayItem(key, value.filterIsInstance<String>())
+                        component != null && Parcelable::class.java.isAssignableFrom(component) ->
+                            ManualRestriction.BundleArrayItem(key, emptyList())
+                        else -> ManualRestriction.StringArrayItem(key, emptyList())
+                    }
+                }
+                else -> null
+            }
+        }.sortedBy { it.key }
+
+    fun setManualRestriction(name: String, oldKey: String?, item: ManualRestriction) =
+        setManualRestriction(listOf(name), oldKey, item)
+
+    /** Writes [item] to every app of [packages], leaving the rest of their configuration alone */
+    fun setManualRestriction(packages: List<String>, oldKey: String?, item: ManualRestriction) {
+        viewModelScope.launch(Dispatchers.IO) {
+            restrictionsMutex.withLock {
+                for (name in packages) try {
+                    // Mutate the live bundle in place so keys of unsupported types (e.g. Bundle,
+                    // Bundle[]) that getManualRestrictions can't represent are left untouched
+                    // instead of being dropped when the bundle is rebuilt.
+                    val bundle = DPM.getApplicationRestrictions(DAR, name)
+                    if (oldKey != null) bundle.remove(oldKey)
+                    bundle.remove(item.key)
+                    putManualRestriction(bundle, item)
+                    DPM.setApplicationRestrictions(DAR, name, bundle)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                getManualRestrictions(packages)
+            }
+        }
+    }
+
+    fun removeManualRestriction(name: String, key: String) =
+        removeManualRestriction(listOf(name), key)
+
+    fun removeManualRestriction(packages: List<String>, key: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            restrictionsMutex.withLock {
+                for (name in packages) try {
+                    val bundle = DPM.getApplicationRestrictions(DAR, name)
+                    bundle.remove(key)
+                    DPM.setApplicationRestrictions(DAR, name, bundle)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                getManualRestrictions(packages)
+            }
+        }
+    }
+
+    private fun putManualRestriction(bundle: Bundle, r: ManualRestriction) {
+        when (r) {
+            is ManualRestriction.StringItem -> bundle.putString(r.key, r.value)
+            is ManualRestriction.IntItem -> bundle.putInt(r.key, r.value)
+            is ManualRestriction.BooleanItem -> bundle.putBoolean(r.key, r.value)
+            is ManualRestriction.StringArrayItem ->
+                bundle.putStringArray(r.key, r.value.toTypedArray())
+            is ManualRestriction.BundleItem -> bundle.putBundle(r.key, buildBundle(r.value))
+            is ManualRestriction.BundleArrayItem ->
+                bundle.putParcelableArray(r.key, r.value.map { buildBundle(it) }.toTypedArray())
+        }
+    }
+
+    private fun buildBundle(list: List<ManualRestriction>): Bundle {
+        val b = Bundle()
+        list.forEach { putManualRestriction(b, it) }
         return b
     }
 

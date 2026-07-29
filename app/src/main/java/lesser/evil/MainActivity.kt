@@ -141,10 +141,13 @@ import lesser.evil.dpm.ManageAppGroups
 import lesser.evil.dpm.ManageAppGroupsScreen
 import lesser.evil.dpm.ManagedConfiguration
 import lesser.evil.dpm.ManagedConfigurationScreen
-import lesser.evil.dpm.ManagedConfigurations
-import lesser.evil.dpm.ManagedConfigurationsScreen
+import lesser.evil.dpm.ManualConfiguration
+import lesser.evil.dpm.ManualConfigurationScreen
+import lesser.evil.dpm.ManualConfigurations
 import lesser.evil.dpm.MtePolicy
 import lesser.evil.dpm.MtePolicyScreen
+import lesser.evil.dpm.MultiplePermissions
+import lesser.evil.dpm.MultiplePermissionsScreen
 import lesser.evil.dpm.NearbyStreamingPolicy
 import lesser.evil.dpm.NearbyStreamingPolicyScreen
 import lesser.evil.dpm.Network
@@ -678,15 +681,31 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             )
         }
         composable<ManagedConfiguration> {
+            val params: ManagedConfiguration = it.toRoute()
             ManagedConfigurationScreen(
-                it.toRoute(), vm.appRestrictions, vm::setAppRestrictions,
-                vm::clearAppRestrictions, ::navigateUp
+                params, vm.appRestrictions, vm::getAppRestrictions, vm::setAppRestrictions,
+                vm::clearAppRestrictions, { navigate(ManualConfiguration(params.packageName)) },
+                ::navigateUp
             )
         }
-        composable<ManagedConfigurations> {
-            ManagedConfigurationsScreen(
-                it.toRoute(), vm.appsRestrictions, vm::setAppsRestriction,
-                vm::clearAppsRestrictions, ::navigateUp
+        composable<ManualConfiguration> {
+            ManualConfigurationScreen(
+                listOf(it.toRoute<ManualConfiguration>().packageName), vm.manualRestrictions,
+                vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
+                ::navigateUp
+            )
+        }
+        composable<ManualConfigurations> {
+            ManualConfigurationScreen(
+                it.toRoute<ManualConfigurations>().packages, vm.manualRestrictions,
+                vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
+                ::navigateUp
+            )
+        }
+        composable<MultiplePermissions> {
+            MultiplePermissionsScreen(
+                it.toRoute(), vm.packagePermissions, vm::getPackagePermissions,
+                vm::setPackagePermission, ::navigateUp
             )
         }
         composable<ManageAppGroups> {

@@ -723,7 +723,8 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         composable<EditAppGroup> {
             EditAppGroupScreen(
                 it.toRoute(), vm::getAppInfo, ::navigateUp, vm::setAppGroup,
-                vm::deleteAppGroup, ::choosePackage, vm.chosenPackage
+                vm::deleteAppGroup, ::choosePackage, vm.chosenPackage, vm.appGroups,
+                vm.autoAppGroups, vm::refreshAutoAppGroups
             )
         }
 

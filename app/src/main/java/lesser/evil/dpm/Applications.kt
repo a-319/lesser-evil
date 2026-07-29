@@ -70,6 +70,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -1393,14 +1394,21 @@ fun AppGroupsList(
 fun EditAppGroupScreen(
     params: EditAppGroup, getAppInfo: (String) -> AppInfo, navigateUp: () -> Unit,
     setGroup: (Int?, String, List<String>) -> Unit, deleteGroup: (Int) -> Unit,
-    onChoosePackage: () -> Unit, chosenPackage: Channel<String>
+    onChoosePackage: () -> Unit, chosenPackage: Channel<String>,
+    appGroups: StateFlow<List<AppGroup>>, autoAppGroups: StateFlow<List<AutoAppGroup>>,
+    refreshAutoGroups: () -> Unit
 ) {
     var name by rememberSaveable { mutableStateOf(params.name) }
     val list = rememberSaveable { mutableStateListOf(*params.apps.toTypedArray()) }
     val appInfoList = list.map { getAppInfo(it) }
     var input by rememberSaveable { mutableStateOf("") }
     val inputPackages = parsePackageNames(input)
+    val groups by appGroups.collectAsStateWithLifecycle()
+    val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
+    // Every other group, the automatic ones included, can hand over its applications
+    val otherGroups = selectableGroups(groups, autoGroups).filter { it.id != params.id }
     LaunchedEffect(Unit) {
+        refreshAutoGroups()
         // Apps picked from the list are added right away, only typing needs the button
         list += parsePackageNames(chosenPackage.receive()).filter { it !in list }
     }
@@ -1461,6 +1469,29 @@ fun EditAppGroupScreen(
                     inputPackages.isNotEmpty() && inputPackages.all { it !in list }
                 ) {
                     Text(stringResource(R.string.add))
+                }
+                var groupMenu by remember { mutableStateOf(false) }
+                Box(Modifier.padding(horizontal = HorizontalPadding)) {
+                    OutlinedButton(
+                        { groupMenu = true }, Modifier.fillMaxWidth(),
+                        enabled = otherGroups.isNotEmpty()
+                    ) {
+                        Text(stringResource(R.string.add_from_group))
+                    }
+                    DropdownMenu(groupMenu, { groupMenu = false }) {
+                        otherGroups.forEach { group ->
+                            DropdownMenuItem(
+                                { Text("(${group.apps.size}) ${group.name}") },
+                                {
+                                    list += group.apps.filter { it !in list }
+                                    groupMenu = false
+                                },
+                                leadingIcon = {
+                                    if (group.auto) Icon(painterResource(R.drawable.tune_fill0), null)
+                                }
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(BottomPadding))
             }

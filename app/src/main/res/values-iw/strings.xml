@@ -17,6 +17,7 @@
 	<string name="add">להוסיף</string>
 	<string name="add_config">הוסף תצורה</string>
 	<string name="add_delegated_admin">הוסף מנהל מוסמך</string>
+	<string name="add_from_group">הוסף מקבוצה</string>
 	<string name="add_network">הוסף רשת</string>
 	<string name="add_network_result_invalid_configuration">תצורה לא חוקית</string>
 	<string name="add_packages">הוסף חבילות</string>

@@ -11,6 +11,7 @@ import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -806,19 +807,24 @@ fun PackageFunctionScreen(
     title: Int, packagesState: MutableStateFlow<List<AppInfo>>, onGet: () -> Unit,
     onSet: (List<String>, Boolean) -> Unit, onNavigateUp: () -> Unit,
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    navigateToGroups: () -> Unit, appGroups: StateFlow<List<AppGroup>>, notes: Int? = null
+    navigateToGroups: () -> Unit, appGroups: StateFlow<List<AppGroup>>,
+    autoAppGroups: StateFlow<List<AutoAppGroup>>, refreshAutoGroups: () -> Unit,
+    notes: Int? = null
 ) {
     val context = LocalContext.current
     val groups by appGroups.collectAsStateWithLifecycle()
+    val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
+    val allGroups = selectableGroups(groups, autoGroups)
     val packages by packagesState.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
     val inputPackages = parsePackageNames(input)
     var dialog by remember { mutableStateOf(false) }
-    var selectedGroup by remember { mutableStateOf<AppGroup?>(null) }
+    var selectedGroup by remember { mutableStateOf<SelectableAppGroup?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val coroutine = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         onGet()
+        refreshAutoGroups()
         input = chosenPackage.receive()
     }
     Scaffold(
@@ -835,17 +841,20 @@ fun PackageFunctionScreen(
                             Icon(Icons.Default.MoreVert, null)
                         }
                         DropdownMenu(expand, { expand = false }) {
-                            groups.forEach {
+                            allGroups.forEach { group ->
                                 DropdownMenuItem(
-                                    { Text("(${it.apps.size}) ${it.name}") },
+                                    { Text("(${group.apps.size}) ${group.name}") },
                                     {
-                                        selectedGroup = it
+                                        selectedGroup = group
                                         dialog = true
                                         expand = false
+                                    },
+                                    leadingIcon = {
+                                        if (group.auto) Icon(painterResource(R.drawable.tune_fill0), null)
                                     }
                                 )
                             }
-                            if (groups.isNotEmpty()) HorizontalDivider()
+                            if (allGroups.isNotEmpty()) HorizontalDivider()
                             DropdownMenuItem(
                                 { Text(stringResource(R.string.manage_app_groups)) },
                                 {
@@ -934,15 +943,35 @@ class AppGroup(
     val id: Int, override val name: String, override val apps: List<String>
 ) : BasicAppGroup(name, apps)
 
+/**
+ * A group created automatically from the apps a policy was applied to (hidden, suspended...).
+ * [title] is a string resource, the group itself is never stored - it always mirrors the policy.
+ */
+class AutoAppGroup(@StringRes val title: Int, val apps: List<String>)
+
+/** A group that can be picked from a list: either a stored [AppGroup] or an [AutoAppGroup] */
+class SelectableAppGroup(val name: String, val apps: List<String>, val auto: Boolean)
+
+/** The stored groups followed by the automatic ones, ready to be displayed */
+@Composable
+fun selectableGroups(
+    groups: List<AppGroup>, autoGroups: List<AutoAppGroup>
+): List<SelectableAppGroup> =
+    groups.map { SelectableAppGroup(it.name, it.apps, false) } +
+            autoGroups.map { SelectableAppGroup(stringResource(it.title), it.apps, true) }
+
 @Serializable object ManageAppGroups
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManageAppGroupsScreen(
-    appGroups: StateFlow<List<AppGroup>>, exportData: (Uri) -> Unit, importData: (Uri) -> Unit,
+    appGroups: StateFlow<List<AppGroup>>, autoAppGroups: StateFlow<List<AutoAppGroup>>,
+    refreshAutoGroups: () -> Unit, exportData: (Uri) -> Unit, importData: (Uri) -> Unit,
     navigateToEditScreen: (Int?, String, List<String>) -> Unit, navigateUp: () -> Unit
 ) {
     val groups by appGroups.collectAsStateWithLifecycle()
+    val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { refreshAutoGroups() }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) {
@@ -1011,11 +1040,36 @@ fun ManageAppGroupsScreen(
                 ) {
                     Text(it.name)
                     Text(
-                        it.apps.size.toString() + " apps", Modifier.alpha(0.7F),
-                        style = typography.bodyMedium
+                        stringResource(R.string.app_group_apps_count, it.apps.size),
+                        Modifier.alpha(0.7F), style = typography.bodyMedium
                     )
                 }
             }
+            if (autoGroups.isNotEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.automatic_groups),
+                        Modifier.padding(HorizontalPadding, 12.dp), style = typography.titleMedium
+                    )
+                }
+                items(autoGroups.size) { index ->
+                    val group = autoGroups[index]
+                    val name = stringResource(group.title)
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { navigateToEditScreen(null, name, group.apps) }
+                            .padding(HorizontalPadding, 8.dp)
+                    ) {
+                        Text(name)
+                        Text(
+                            stringResource(R.string.auto_group_apps_count, group.apps.size),
+                            Modifier.alpha(0.7F), style = typography.bodyMedium
+                        )
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(BottomPadding)) }
         }
     }
 }

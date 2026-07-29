@@ -24,6 +24,8 @@ class SharedPrefs(context: Context) {
     var lockPasswordFailedAttempts by IntSharedPref("lock.password.failed_attempts")
     var lockPasswordLockoutUntil by LongSharedPref("lock.password.lockout_until")
     var applicationsListView by BooleanSharedPref("applications.list_view", true)
+    /** Show the applications as a launcher-like grid instead of a list */
+    var applicationsGridView by BooleanSharedPref("applications.grid_view")
     var shortcuts by BooleanSharedPref("shortcuts")
     var dhizukuServer by BooleanSharedPref("dhizuku_server")
     var notifications by StringSharedPref("notifications")

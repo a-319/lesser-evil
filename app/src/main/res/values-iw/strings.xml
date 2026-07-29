@@ -46,6 +46,7 @@
 	<string name="api_key_exist">מפתח ה-API כבר קיים, הגדרת מפתח חדש תחליף את המפתח הנוכחי.</string>
 	<string name="apn_setting">הגדרת APN</string>
 	<string name="app_group">קבוצת אפליקציות</string>
+	<string name="app_group_apps_count">%1$d אפליקציות</string>
 	<string name="app_name_user_profile">OwnDroid (משתמש)</string>
 	<string name="app_installer">מתקין אפליקציה</string>
 	<string name="app_lock">נעילת אפליקציה</string>
@@ -55,12 +56,25 @@
 	<string name="applications">יישומים</string>
 	<string name="apply">החל</string>
 	<string name="apps_ctrl">שליטה באפליקציות</string>
+	<string name="apps_tab_all">הכל</string>
+	<string name="apps_tab_background">רקע</string>
+	<string name="apps_tab_groups">קבוצות</string>
+	<string name="apps_tab_user">משתמש</string>
+	<string name="apps_tab_visual">חזותיים</string>
 	<string name="assist_content">תוכן מסייע</string>
 	<string name="auto">אוטומטי</string>
 	<string name="auto_deny">דחייה אוטומטית</string>
 	<string name="auto_grant">הענקה אוטומטית</string>
+	<string name="auto_group_apps_count">%1$d אפליקציות \u00B7 אוטומטי</string>
+	<string name="auto_group_hidden">מוסתרות</string>
+	<string name="auto_group_keep_uninstalled">נשמרות לאחר הסרה</string>
+	<string name="auto_group_metered_data_disabled">נתונים מושבתים</string>
+	<string name="auto_group_suspended">מושעות</string>
+	<string name="auto_group_uninstall_blocked">חסומות להסרה</string>
+	<string name="auto_group_user_control_disabled">בקרת משתמש מושבתת</string>
 	<string name="auto_reboot_after_install_succeed">המכשיר שלך יאותחל אוטומטית כאשר התקנת עדכון המערכת תצליח.</string>
 	<string name="auto_time">שעה אוטומטית </string>
+	<string name="automatic_groups">קבוצות אוטומטיות</string>
 	<string name="available_to_user_profile">זמין לפרופיל המשתמש</string>
 	<string name="auto_time_policy">מדיניות זמן אוטומטי</string>
 	<string name="auto_timezone">אזור זמן אוטומטי</string>
@@ -258,6 +272,7 @@
 	<string name="grant_admin">הענק מנהל מכשיר</string>
 	<string name="grant_permissions">הענק הרשאות</string>
 	<string name="granted">מוענק</string>
+	<string name="grid_view">תצוגת רשת</string>
 	<string name="hardware_monitor">צג חומרה</string>
 	<string name="headless_system_user_mode">מצב משתמש מערכת ללא ראש (נשאר לפעול מאחורי הקלעים)</string>
 	<string name="hidden_ssid">SSID מוסתר</string>
@@ -290,6 +305,7 @@
 	<string name="info_keep_uninstalled_apps">הגדר רשימה של אפליקציות לשמירה כחבילות APK גם אם אף משתמש לא התקין אותה כעת.</string>
 	<string name="info_lock_screen_info">הצג הודעה קצרה על מסך הנעילה שלך.\nעוקף כל מידע בעלים שהוגדר ידנית על ידי המשתמש ומונע מהמשתמש לשנות אותו.</string>
 	<string name="info_lock_task_nav_buttons">מאפשר ללחצני הניווט לצאת ממצב נעילת המשימה. בניווט שלושה-לחצנים לחצן הבית תמיד יוצא (ללא צורך בנגישות), ושירות הנגישות של OwnDroid מוסיף חזרה ואחרונים דרך אזורי מגע שקופים מעל הלחצנים האמיתיים. בניווט מחוות, OwnDroid מצייר סרגל משלו בתחתית במקום לתת למערכת להחליף את המכשיר ללחצנים: עם שירות הנגישות פועלים חזרה, בית ואחרונים; בלעדיו, אישור תצוגה מעל אפליקציות נותן לחצן יציאה למסך הבית בעוד מחוות החזרה ממשיכה לעבוד. ללא שתי ההרשאות ייעשה שימוש זמני בסרגל המערכת.</string>
+	<string name="list_view">תצוגת רשימה</string>
 	<string name="lock_task_nav_overlay_hint">אפשר ל-OwnDroid להציג מעל אפליקציות אחרות (או הפעל את שירות הנגישות של OwnDroid) כדי לקבל לחצני ניווט בניווט מחוות.</string>
 	<string name="lock_task_nav_accessibility_hint">לחצן הבית יעבוד גם בלי נגישות. הפעל את שירות הנגישות של OwnDroid כדי שגם חזרה ואחרונים יעבדו.</string>
 	<string name="lock_task_swap_nav_buttons">החלף בין לחצני החזרה והאחרונים</string>
@@ -454,6 +470,7 @@
 	<string name="next">הבא</string>
 	<string name="nfc">NFC</string>
 	<string name="no">לא</string>
+	<string name="no_app_groups">אין קבוצות עדיין</string>
 	<string name="no_data">אין נתונים</string>
 	<string name="no_lock_task_profiles">אין פרופילים שמורים</string>
 	<string name="no_secondary_users">אין משתמשים משניים</string>

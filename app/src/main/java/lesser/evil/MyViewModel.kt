@@ -64,6 +64,7 @@ import lesser.evil.dpm.ApnProtocol
 import lesser.evil.dpm.AppGroup
 import lesser.evil.dpm.AppRestriction
 import lesser.evil.dpm.AppStatus
+import lesser.evil.dpm.AutoAppGroup
 import lesser.evil.dpm.BasicAppGroup
 import lesser.evil.dpm.CaCertInfo
 import lesser.evil.dpm.CreateUserResult
@@ -257,11 +258,28 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
 
     val chosenPackage = Channel<String>(1, BufferOverflow.DROP_LATEST)
 
+    /** Packages with a launcher entry, i.e. the apps the user actually sees */
+    private var launcherPackages: Set<String>? = null
+    fun getLauncherPackages(refresh: Boolean = false): Set<String> {
+        launcherPackages?.let { if (!refresh) return it }
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val result: Set<String> = try {
+            PM.queryIntentActivities(intent, getInstalledAppsFlags).mapNotNullTo(mutableSetOf()) {
+                it.activityInfo?.packageName
+            }
+        } catch (_: Exception) {
+            emptySet()
+        }
+        launcherPackages = result
+        return result
+    }
+
     val installedPackages = MutableStateFlow(emptyList<AppInfo>())
     val refreshPackagesProgress = MutableStateFlow(0F)
     fun refreshPackageList() {
         viewModelScope.launch(Dispatchers.IO) {
             installedPackages.value = emptyList()
+            getLauncherPackages(true)
             val apps = PM.getInstalledApplications(getInstalledAppsFlags)
             apps.forEachIndexed { index, info ->
                 installedPackages.update {
@@ -276,8 +294,10 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             list.filter { it.name != name }
         }
     }
-    fun getAppInfo(info: ApplicationInfo) =
-        AppInfo(info.packageName, info.loadLabel(PM).toString(), info.loadIcon(PM), info.flags)
+    fun getAppInfo(info: ApplicationInfo) = AppInfo(
+        info.packageName, info.loadLabel(PM).toString(), info.loadIcon(PM), info.flags,
+        info.packageName in getLauncherPackages()
+    )
     fun getAppInfo(name: String): AppInfo {
         return try {
             getAppInfo(PM.getApplicationInfo(name, getInstalledAppsFlags))
@@ -733,6 +753,45 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             myRepo.setAppGroup(null, it.name, it.apps)
         }
         getAppGroups()
+    }
+
+    /**
+     * Groups built from the apps a policy was applied to (hidden, suspended, data disabled...).
+     * They are never stored: every refresh mirrors what is currently applied.
+     */
+    val autoAppGroups = MutableStateFlow(emptyList<AutoAppGroup>())
+    /** A policy list, or an empty one when the policy is unavailable for the current privilege */
+    private fun policyPackages(block: () -> List<String>?): List<String> =
+        try { block()?.distinct() ?: emptyList() } catch (_: Exception) { emptyList() }
+    /** The packages of [packages] the policy [applied] to, skipping the ones it cannot answer for */
+    private fun filterPackages(packages: List<String>, applied: (String) -> Boolean) =
+        packages.filter { try { applied(it) } catch (_: Exception) { false } }
+    @SuppressLint("NewApi")
+    fun refreshAutoAppGroups() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val installed = policyPackages {
+                PM.getInstalledApplications(getInstalledAppsFlags).map { it.packageName }
+            }
+            autoAppGroups.value = listOf(
+                AutoAppGroup(R.string.auto_group_hidden, filterPackages(installed) {
+                    DPM.isApplicationHidden(DAR, it)
+                }),
+                AutoAppGroup(R.string.auto_group_suspended, if (VERSION.SDK_INT < 24) emptyList()
+                else filterPackages(installed) { DPM.isPackageSuspended(DAR, it) }),
+                AutoAppGroup(R.string.auto_group_uninstall_blocked, filterPackages(installed) {
+                    DPM.isUninstallBlocked(DAR, it)
+                }),
+                AutoAppGroup(R.string.auto_group_user_control_disabled, policyPackages {
+                    if (VERSION.SDK_INT >= 30) DPM.getUserControlDisabledPackages(DAR) else null
+                }),
+                AutoAppGroup(R.string.auto_group_metered_data_disabled, policyPackages {
+                    if (VERSION.SDK_INT >= 28) DPM.getMeteredDataDisabledPackages(DAR) else null
+                }),
+                AutoAppGroup(R.string.auto_group_keep_uninstalled, policyPackages {
+                    if (VERSION.SDK_INT >= 28) DPM.getKeepUninstalledPackages(DAR) else null
+                })
+            ).filter { it.apps.isNotEmpty() }
+        }
     }
 
     val policyToggles = MutableStateFlow(emptyList<PolicyToggle>())

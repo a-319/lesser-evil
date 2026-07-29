@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.app.admin.DeviceAdminInfo
 import android.app.admin.DeviceAdminReceiver
 import android.app.admin.DevicePolicyManager
+import android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_DEFAULT
 import android.app.admin.DevicePolicyManager.InstallSystemUpdateCallback
 import android.app.admin.FactoryResetProtectionPolicy
 import android.app.admin.IDevicePolicyManager
@@ -867,6 +868,67 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             }
         }
         return b
+    }
+
+    /** The apps a runtime permission was granted or denied on; null while the scan runs */
+    val appsWithPermissions = MutableStateFlow<List<AppInfo>?>(null)
+    fun getAppsWithPermissions() {
+        appsWithPermissions.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            val permissions = runtimePermissions.filter { VERSION.SDK_INT >= it.requiresApi }
+            appsWithPermissions.value = installedPackageNames().filter { name ->
+                permissions.any {
+                    try {
+                        DPM.getPermissionGrantState(DAR, name, it.id) != PERMISSION_GRANT_STATE_DEFAULT
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+            }.map { getAppInfo(it) }
+        }
+    }
+    /** Puts every runtime permission of [name] back to the default, taking it off the list */
+    fun clearPackagePermissions(name: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runtimePermissions.filter { VERSION.SDK_INT >= it.requiresApi }.forEach {
+                try {
+                    DPM.setPermissionGrantState(DAR, name, it.id, PERMISSION_GRANT_STATE_DEFAULT)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            appsWithPermissions.update { list -> list?.filter { it.name != name } }
+        }
+    }
+    /** The apps holding a configuration; null while the scan runs */
+    val appsWithRestrictions = MutableStateFlow<List<AppInfo>?>(null)
+    fun getAppsWithRestrictions() {
+        appsWithRestrictions.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            appsWithRestrictions.value = installedPackageNames().filter { name ->
+                try {
+                    !DPM.getApplicationRestrictions(DAR, name).isEmpty
+                } catch (_: Exception) {
+                    false
+                }
+            }.map { getAppInfo(it) }
+        }
+    }
+    /** Drops the whole configuration of [name], taking it off the list */
+    fun clearAppRestrictionsOf(name: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            restrictionsMutex.withLock {
+                try {
+                    DPM.setApplicationRestrictions(DAR, name, Bundle())
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            appsWithRestrictions.update { list -> list?.filter { it.name != name } }
+        }
+    }
+    private fun installedPackageNames() = policyPackages {
+        PM.getInstalledApplications(getInstalledAppsFlags).map { it.packageName }
     }
 
     val manualRestrictions = MutableStateFlow(emptyList<ManualRestriction>())

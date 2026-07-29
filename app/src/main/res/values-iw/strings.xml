@@ -54,6 +54,7 @@
 	<string name="app_not_allowed">אפליקציה אסורה</string>
 	<string name="appearance">הופעה</string>
 	<string name="applications">יישומים</string>
+	<string name="applied_apps">אפליקציות שהוחל עליהן</string>
 	<string name="apply">החל</string>
 	<string name="apps_ctrl">שליטה באפליקציות</string>
 	<string name="apps_tab_all">הכל</string>
@@ -442,6 +443,7 @@
 	<string name="edit_configuration">עריכת תצורה</string>
 	<string name="key">מפתח</string>
 	<string name="multi_select_hint">לחיצה ארוכה על אפליקציה תאפשר בחירה מרובה</string>
+	<string name="no_applied_apps">אף אפליקציה לא מחזיקה בזה</string>
 	<string name="select_all">בחר הכל</string>
 	<string name="select_all_hint">לחץ כדי לבחור הכל</string>
 	<string name="value">ערך</string>

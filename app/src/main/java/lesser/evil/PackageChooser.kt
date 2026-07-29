@@ -46,7 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -87,6 +87,7 @@ import lesser.evil.dpm.AppGroupsList
 import lesser.evil.dpm.appGroupKey
 import lesser.evil.dpm.autoAppGroupKey
 import lesser.evil.dpm.AutoAppGroup
+import lesser.evil.dpm.SelectableAppGroup
 
 data class AppInfo(
     val name: String,
@@ -130,8 +131,8 @@ fun AppChooserScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var searchMode by rememberSaveable { mutableStateOf(false) }
     var hintDismissed by rememberSaveable { mutableStateOf(SP.multiSelectHintDismissed) }
-    var selectAllHintsLeft by rememberSaveable { mutableIntStateOf(SP.selectAllHintsLeft) }
-    var selectAllHint by rememberSaveable { mutableStateOf(false) }
+    /** The group whose applications the groups tab is showing, if one was opened */
+    var openedGroup by remember { mutableStateOf<SelectableAppGroup?>(null) }
     val tab = AppChooserTab.entries[tabIndex]
     val filteredPackages = packages.filter {
         val inTab = when(tab) {
@@ -139,7 +140,7 @@ fun AppChooserScreen(
             AppChooserTab.Visual -> it.launchable
             AppChooserTab.Background -> !it.launchable
             AppChooserTab.All -> true
-            AppChooserTab.Groups -> false
+            AppChooserTab.Groups -> openedGroup?.apps?.contains(it.name) == true
         }
         inTab && (query.isEmpty() || searchInString(query, it.label) || searchInString(query, it.name))
     }
@@ -153,16 +154,6 @@ fun AppChooserScreen(
     }
     LaunchedEffect(tab) {
         if(tab == AppChooserTab.Groups) onRefreshAutoGroups()
-    }
-    // Point at the select all button the first few times a selection is started
-    LaunchedEffect(selection.isEmpty()) {
-        if (selection.isEmpty()) {
-            selectAllHint = false
-        } else if (selectAllHintsLeft > 0) {
-            selectAllHint = true
-            selectAllHintsLeft--
-            SP.selectAllHintsLeft = selectAllHintsLeft
-        }
     }
     fun onItemClick(app: AppInfo) {
         if (selection.isEmpty()) {
@@ -202,7 +193,7 @@ fun AppChooserScreen(
             Column {
                 TopAppBar(
                     actions = {
-                        val appsShown = tab != AppChooserTab.Groups
+                        val appsShown = tab != AppChooserTab.Groups || openedGroup != null
                         if(!searchMode) {
                             if (appsShown) {
                                 IconButton({
@@ -278,19 +269,24 @@ fun AppChooserScreen(
                     },
                     colors = TopAppBarDefaults.topAppBarColors(MaterialTheme.colorScheme.surfaceContainer)
                 )
-                ScrollableTabRow(
-                    tabIndex, containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    edgePadding = 0.dp
-                ) {
+                TabRow(tabIndex, containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                     AppChooserTab.entries.forEachIndexed { index, entry ->
                         Tab(
                             index == tabIndex,
                             {
                                 tabIndex = index
+                                openedGroup = null
                                 if (entry == AppChooserTab.Groups) searchMode = false
-                            },
-                            text = { Text(stringResource(entry.title)) }
-                        )
+                            }
+                        ) {
+                            // The label carries its own padding so five of them fit side by side
+                            Text(
+                                stringResource(entry.title),
+                                Modifier.padding(horizontal = 2.dp, vertical = 14.dp),
+                                style = typography.labelLarge, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
@@ -299,7 +295,7 @@ fun AppChooserScreen(
     ) { paddingValues ->
         Column(Modifier.fillMaxSize().padding(paddingValues)) {
             if (progress < 1F) LinearProgressIndicator({ progress }, Modifier.fillMaxWidth())
-            if (selectAllHint) Row(
+            if (selection.isNotEmpty() && !searchMode) Row(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceContainer)
@@ -330,12 +326,32 @@ fun AppChooserScreen(
                     Icon(Icons.Outlined.Clear, stringResource(R.string.dismiss))
                 }
             }
-            if (tab == AppChooserTab.Groups) {
+            val group = openedGroup
+            if (tab == AppChooserTab.Groups && group != null) Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(start = 4.dp, end = 4.dp),
+                Arrangement.SpaceBetween, Alignment.CenterVertically
+            ) {
+                IconButton({ openedGroup = null }) {
+                    Icon(Icons.AutoMirrored.Default.ArrowBack, null)
+                }
+                Text(group.name, Modifier.weight(1F), style = typography.titleMedium)
+                // An automatic group mirrors a policy, so there is nothing to edit in it
+                if (!group.auto) IconButton({
+                    onEditGroup(group.id, group.name, group.apps)
+                }) {
+                    Icon(painterResource(R.drawable.edit_fill0), stringResource(R.string.edit))
+                }
+            }
+            if (tab == AppChooserTab.Groups && group == null) {
                 Box(Modifier.fillMaxSize()) {
                     AppGroupsList(
-                        groups, autoGroups, onEditGroup, Modifier.fillMaxSize(),
-                        selectedGroups.keys.toList(),
-                        if (params.multiSelect) ::onGroupSelect else null
+                        groups, autoGroups,
+                        { id, name, apps -> openedGroup = SelectableAppGroup(name, apps, id == null, id) },
+                        Modifier.fillMaxSize(), selectedGroups.keys.toList(),
+                        if (params.multiSelect) ::onGroupSelect else null, true
                     )
                     FloatingActionButton(
                         { onEditGroup(null, "", emptyList()) },

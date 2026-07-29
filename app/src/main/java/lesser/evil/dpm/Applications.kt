@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -521,6 +522,25 @@ private fun MultipleAppsActionDialog(
 
 @Serializable object DisableUserControl
 
+/** The apps a setting is already applied to, with a way to take it off any of them */
+@Composable
+fun AppliedAppsDialog(apps: List<AppInfo>?, onRemove: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        title = { Text(stringResource(R.string.applied_apps)) },
+        text = {
+            when {
+                apps == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                apps.isEmpty() -> Text(stringResource(R.string.no_applied_apps))
+                else -> LazyColumn(Modifier.heightIn(max = 400.dp)) {
+                    items(apps, { it.name }) { ApplicationItem(it) { onRemove(it.name) } }
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text(stringResource(R.string.confirm)) } },
+        onDismissRequest = onDismiss
+    )
+}
+
 /**
  * The package field with its add button: what is typed needs the button, what is picked from the
  * application list is added as soon as the picker hands it back.
@@ -561,12 +581,13 @@ fun PermissionsManagerScreen(
     packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
-    onNavigateUp: () -> Unit, param: PermissionsManager, chosenPackage: Channel<String>,
-    onChoosePackage: () -> Unit
+    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    removeApplied: (String) -> Unit, onNavigateUp: () -> Unit, param: PermissionsManager,
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit
 ) = PermissionsContent(
     listOfNotNull(param.packageName), packagePermissions, getPackagePermissions,
-    setPackagePermission, getAppInfo, param.packageName == null, chosenPackage, onChoosePackage,
-    onNavigateUp
+    setPackagePermission, getAppInfo, appliedApps, getAppliedApps, removeApplied,
+    param.packageName == null, chosenPackage, onChoosePackage, onNavigateUp
 )
 
 @Serializable data class MultiplePermissions(val packages: List<String>)
@@ -577,10 +598,12 @@ fun MultiplePermissionsScreen(
     param: MultiplePermissions, packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
-    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
+    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    removeApplied: (String) -> Unit, chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
+    onNavigateUp: () -> Unit
 ) = PermissionsContent(
     param.packages, packagePermissions, getPackagePermissions, setPackagePermission, getAppInfo,
-    true, chosenPackage, onChoosePackage, onNavigateUp
+    appliedApps, getAppliedApps, removeApplied, true, chosenPackage, onChoosePackage, onNavigateUp
 )
 
 @Composable
@@ -588,18 +611,25 @@ private fun PermissionsContent(
     initialPackages: List<String>, packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
-    canAddPackages: Boolean, chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    onNavigateUp: () -> Unit
+    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    removeApplied: (String) -> Unit, canAddPackages: Boolean, chosenPackage: Channel<String>,
+    onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     var selectedPermission by rememberSaveable { mutableIntStateOf(-1) }
     val permissions by packagePermissions.collectAsStateWithLifecycle()
     val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
+    val applied by appliedApps.collectAsStateWithLifecycle()
+    var appliedDialog by remember { mutableStateOf(false) }
     LaunchedEffect(packages.toList()) {
         getPackagePermissions(packages)
     }
     MyLazyScaffold(R.string.permissions, onNavigateUp) {
         item {
+            FunctionItem(R.string.applied_apps, icon = R.drawable.list_fill0) {
+                appliedDialog = true
+                getAppliedApps()
+            }
             if (packages.size > 1) Notes(R.string.info_multiple_apps, HorizontalPadding)
         }
         items(packages.map { getAppInfo(it) }, { it.name }) {
@@ -635,6 +665,7 @@ private fun PermissionsContent(
             Spacer(Modifier.height(BottomPadding))
         }
     }
+    if (appliedDialog) AppliedAppsDialog(applied, removeApplied) { appliedDialog = false }
     if(selectedPermission != -1) {
         val permission = runtimePermissions[selectedPermission]
         fun changeState(state: Int) {
@@ -1185,14 +1216,16 @@ class AppGroup(
 class AutoAppGroup(@StringRes val title: Int, val apps: List<String>)
 
 /** A group that can be picked from a list: either a stored [AppGroup] or an [AutoAppGroup] */
-class SelectableAppGroup(val name: String, val apps: List<String>, val auto: Boolean)
+class SelectableAppGroup(
+    val name: String, val apps: List<String>, val auto: Boolean, val id: Int? = null
+)
 
 /** The stored groups followed by the automatic ones, ready to be displayed */
 @Composable
 fun selectableGroups(
     groups: List<AppGroup>, autoGroups: List<AutoAppGroup>
 ): List<SelectableAppGroup> =
-    groups.map { SelectableAppGroup(it.name, it.apps, false) } +
+    groups.map { SelectableAppGroup(it.name, it.apps, false, it.id) } +
             autoGroups.map { SelectableAppGroup(stringResource(it.title), it.apps, true) }
 
 @Serializable object ManageAppGroups
@@ -1282,7 +1315,8 @@ fun AppGroupsList(
     groups: List<AppGroup>, autoGroups: List<AutoAppGroup>,
     navigateToEditScreen: (Int?, String, List<String>) -> Unit, modifier: Modifier = Modifier,
     selectedKeys: List<String> = emptyList(),
-    onSelect: ((key: String, apps: List<String>) -> Unit)? = null
+    onSelect: ((key: String, apps: List<String>) -> Unit)? = null,
+    openAutoGroups: Boolean = false
 ) {
     val hf = LocalHapticFeedback.current
     @Composable
@@ -1343,7 +1377,8 @@ fun AppGroupsList(
                 val group = autoGroups[index]
                 val name = stringResource(group.title)
                 GroupItem(autoAppGroupKey(group), name, group.apps, R.string.auto_group_apps_count) {
-                    navigateToEditScreen(null, name, group.apps)
+                    // An automatic group mirrors a policy: it can be opened, never edited
+                    if (openAutoGroups) navigateToEditScreen(null, name, group.apps)
                 }
             }
         }
@@ -1957,10 +1992,13 @@ fun ManualConfigurationScreen(
     getManualRestrictions: (List<String>) -> Unit,
     setManualRestriction: (List<String>, String?, ManualRestriction) -> Unit,
     removeManualRestriction: (List<String>, String) -> Unit, getAppInfo: (String) -> AppInfo,
-    canAddPackages: Boolean, chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    onNavigateUp: () -> Unit
+    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    removeApplied: (String) -> Unit, canAddPackages: Boolean, chosenPackage: Channel<String>,
+    onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
     val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
+    val applied by appliedApps.collectAsStateWithLifecycle()
+    var appliedDialog by remember { mutableStateOf(false) }
     val restrictions by manualRestrictions.collectAsStateWithLifecycle()
     var path by remember { mutableStateOf(emptyList<BundlePath>()) }
     var editDialog by remember { mutableStateOf<ManualRestriction?>(null) }
@@ -2052,6 +2090,10 @@ fun ManualConfigurationScreen(
         LazyColumn(Modifier.padding(paddingValues)) {
             if (path.isEmpty()) {
                 item {
+                    FunctionItem(R.string.applied_apps, icon = R.drawable.list_fill0) {
+                        appliedDialog = true
+                        getAppliedApps()
+                    }
                     Notes(R.string.info_manual_configurations, HorizontalPadding)
                     Spacer(Modifier.height(8.dp))
                 }
@@ -2152,6 +2194,7 @@ fun ManualConfigurationScreen(
         }
     }
     val siblingKeys = entries.orEmpty().map { it.key }
+    if (appliedDialog) AppliedAppsDialog(applied, removeApplied) { appliedDialog = false }
     if (addDialog) Dialog({ addDialog = false }) {
         Surface(
             color = AlertDialogDefaults.containerColor,

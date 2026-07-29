@@ -547,7 +547,6 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                     navigateUp()
                 }
             }, {
-                SP.applicationsListView = false
                 navController.navigate(ApplicationsFeatures) {
                     popUpTo(Home)
                 }
@@ -557,7 +556,6 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         }
         composable<ApplicationsFeatures> {
             ApplicationsFeaturesScreen(::navigateUp, ::navigate) {
-                SP.applicationsListView = true
                 navController.navigate(ApplicationsList(true, true)) {
                     popUpTo(Home)
                 }
@@ -602,7 +600,9 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         composable<PermissionsManager> {
             PermissionsManagerScreen(
                 vm.packagePermissions, vm::getPackagePermissions, vm::setPackagePermission,
-                vm::getAppInfo, ::navigateUp, it.toRoute(), vm.chosenPackage, ::choosePackage
+                vm::getAppInfo, vm.appsWithPermissions, vm::getAppsWithPermissions,
+                vm::clearPackagePermissions, ::navigateUp, it.toRoute(), vm.chosenPackage,
+                ::choosePackage
             )
         }
         composable<DisableMeteredData> {
@@ -692,21 +692,24 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             ManualConfigurationScreen(
                 listOf(it.toRoute<ManualConfiguration>().packageName), vm.manualRestrictions,
                 vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
-                vm::getAppInfo, false, vm.chosenPackage, ::choosePackage, ::navigateUp
+                vm::getAppInfo, vm.appsWithRestrictions, vm::getAppsWithRestrictions,
+                vm::clearAppRestrictionsOf, false, vm.chosenPackage, ::choosePackage, ::navigateUp
             )
         }
         composable<ManualConfigurations> {
             ManualConfigurationScreen(
                 it.toRoute<ManualConfigurations>().packages, vm.manualRestrictions,
                 vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
-                vm::getAppInfo, true, vm.chosenPackage, ::choosePackage, ::navigateUp
+                vm::getAppInfo, vm.appsWithRestrictions, vm::getAppsWithRestrictions,
+                vm::clearAppRestrictionsOf, true, vm.chosenPackage, ::choosePackage, ::navigateUp
             )
         }
         composable<MultiplePermissions> {
             MultiplePermissionsScreen(
                 it.toRoute(), vm.packagePermissions, vm::getPackagePermissions,
-                vm::setPackagePermission, vm::getAppInfo, vm.chosenPackage, ::choosePackage,
-                ::navigateUp
+                vm::setPackagePermission, vm::getAppInfo, vm.appsWithPermissions,
+                vm::getAppsWithPermissions, vm::clearPackagePermissions, vm.chosenPackage,
+                ::choosePackage, ::navigateUp
             )
         }
         composable<ManageAppGroups> {
@@ -880,10 +883,7 @@ private fun HomeScreen(restricted: Boolean, onNavigate: (Any) -> Unit, onLock: (
             }
             if(privilege.device || privilege.profile) {
                 HomePageItem(R.string.applications, R.drawable.apps_fill0) {
-                    onNavigate(
-                        if (SP.applicationsListView) ApplicationsList(true, true)
-                        else ApplicationsFeatures
-                    )
+                    onNavigate(ApplicationsFeatures)
                 }
                 if(VERSION.SDK_INT >= 24) {
                     HomePageItem(R.string.user_restriction, R.drawable.person_off) { onNavigate(UserRestriction) }

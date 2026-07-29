@@ -139,6 +139,8 @@ import lesser.evil.dpm.ManageAppGroups
 import lesser.evil.dpm.ManageAppGroupsScreen
 import lesser.evil.dpm.ManagedConfiguration
 import lesser.evil.dpm.ManagedConfigurationScreen
+import lesser.evil.dpm.ManualConfiguration
+import lesser.evil.dpm.ManualConfigurationScreen
 import lesser.evil.dpm.MtePolicy
 import lesser.evil.dpm.MtePolicyScreen
 import lesser.evil.dpm.NearbyStreamingPolicy
@@ -661,9 +663,17 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             )
         }
         composable<ManagedConfiguration> {
+            val params: ManagedConfiguration = it.toRoute()
             ManagedConfigurationScreen(
-                it.toRoute(), vm.appRestrictions, vm::setAppRestrictions,
-                vm::clearAppRestrictions, ::navigateUp
+                params, vm.appRestrictions, vm::getAppRestrictions, vm::setAppRestrictions,
+                vm::clearAppRestrictions, { navigate(ManualConfiguration(params.packageName)) },
+                ::navigateUp
+            )
+        }
+        composable<ManualConfiguration> {
+            ManualConfigurationScreen(
+                it.toRoute(), vm.manualRestrictions, vm::getManualRestrictions,
+                vm::setManualRestriction, vm::removeManualRestriction, ::navigateUp
             )
         }
         composable<ManageAppGroups> {

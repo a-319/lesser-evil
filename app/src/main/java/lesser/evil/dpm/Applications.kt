@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build.VERSION
 import android.os.Looper
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -54,6 +55,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,6 +65,7 @@ import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.MaterialTheme.typography
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -103,6 +107,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -115,6 +120,7 @@ import lesser.evil.MyViewModel
 import lesser.evil.Privilege
 import lesser.evil.R
 import lesser.evil.adaptiveInsets
+import lesser.evil.fabInsetsPadding
 import lesser.evil.parsePackageNames
 import lesser.evil.showOperationResultToast
 import lesser.evil.ui.FullWidthRadioButtonItem
@@ -331,6 +337,10 @@ fun ApplicationDetailsScreen(
         if (appRestrictions.isNotEmpty()) {
             FunctionItem(R.string.managed_configuration, icon = R.drawable.description_fill0) {
                 onNavigate(ManagedConfiguration(packageName))
+            }
+        } else {
+            FunctionItem(R.string.add_managed_configuration, icon = R.drawable.description_fill0) {
+                onNavigate(ManualConfiguration(packageName))
             }
         }
         if(VERSION.SDK_INT >= 28) FunctionItem(R.string.clear_app_storage, icon = R.drawable.mop_fill0) { dialog = 1 }
@@ -1107,10 +1117,14 @@ fun EditAppGroupScreen(
 @Composable
 fun ManagedConfigurationScreen(
     params: ManagedConfiguration, appRestrictions: StateFlow<List<AppRestriction>>,
-    setRestriction: (String, AppRestriction) -> Unit, clearRestriction: (String) -> Unit,
-    navigateUp: () -> Unit
+    getRestrictions: (String) -> Unit, setRestriction: (String, AppRestriction) -> Unit,
+    clearRestriction: (String) -> Unit, navigateToManual: () -> Unit, navigateUp: () -> Unit
 ) {
     val restrictions by appRestrictions.collectAsStateWithLifecycle()
+    // Refresh when coming back from the manual configurations screen
+    LaunchedEffect(Unit) {
+        getRestrictions(params.packageName)
+    }
     var searchMode by remember { mutableStateOf(false) }
     var searchKeyword by remember { mutableStateOf("") }
     val displayRestrictions = if (searchKeyword.isEmpty()) {
@@ -1173,6 +1187,14 @@ fun ManagedConfigurationScreen(
         contentWindowInsets = adaptiveInsets()
     ) { paddingValues ->
         LazyColumn(Modifier.padding(paddingValues)) {
+            item {
+                if (!searchMode) {
+                    FunctionItem(R.string.manual_configurations, icon = R.drawable.edit_fill0) {
+                        navigateToManual()
+                    }
+                    HorizontalDivider(Modifier.padding(bottom = 8.dp))
+                }
+            }
             items(displayRestrictions, { it.key }) { entry ->
                 Row(
                     Modifier
@@ -1498,3 +1520,536 @@ sealed class AppRestriction(
 }
 
 data class MultiSelectEntry(val value: String, val title: String?, val selected: Boolean)
+
+sealed class ManualRestriction {
+    abstract val key: String
+    data class StringItem(override val key: String, val value: String) : ManualRestriction()
+    data class IntItem(override val key: String, val value: Int) : ManualRestriction()
+    data class BooleanItem(override val key: String, val value: Boolean) : ManualRestriction()
+    data class StringArrayItem(override val key: String, val value: List<String>) : ManualRestriction()
+    data class BundleItem(
+        override val key: String, val value: List<ManualRestriction>
+    ) : ManualRestriction()
+    data class BundleArrayItem(
+        override val key: String, val value: List<List<ManualRestriction>>
+    ) : ManualRestriction()
+}
+
+// Nested bundles in application restrictions are only supported from Android 6
+enum class ManualRestrictionType(val label: Int, val minSdk: Int = 21) {
+    STRING(R.string.type_string),
+    INTEGER(R.string.type_integer),
+    BOOLEAN(R.string.type_boolean),
+    STRING_ARRAY(R.string.type_string_array),
+    BUNDLE(R.string.type_bundle, 23),
+    BUNDLE_ARRAY(R.string.type_bundle_array, 23);
+
+    companion object {
+        val supported
+            get() = ManualRestrictionType.entries.filter { VERSION.SDK_INT >= it.minSdk }
+    }
+}
+
+@Serializable class ManualConfiguration(val packageName: String)
+
+/** A step down into a nested bundle: a key, plus an index when the key holds a `Bundle[]`. */
+private sealed class BundlePath {
+    data class Key(val key: String) : BundlePath()
+    data class Index(val index: Int) : BundlePath()
+}
+
+/** The entries of the bundle [path] points at, or null if it points at a `Bundle[]` itself. */
+private fun entriesAt(
+    root: List<ManualRestriction>, path: List<BundlePath>
+): List<ManualRestriction>? {
+    var current = root
+    var i = 0
+    while (i < path.size) {
+        val key = (path[i] as? BundlePath.Key)?.key ?: return null
+        when (val entry = current.firstOrNull { it.key == key }) {
+            is ManualRestriction.BundleItem -> {
+                current = entry.value
+                i++
+            }
+            is ManualRestriction.BundleArrayItem -> {
+                val index = (path.getOrNull(i + 1) as? BundlePath.Index)?.index ?: return null
+                current = entry.value.getOrNull(index) ?: return null
+                i += 2
+            }
+            else -> return null
+        }
+    }
+    return current
+}
+
+/** The elements of the `Bundle[]` [path] points at, or null if it points at a plain bundle. */
+private fun elementsAt(
+    root: List<ManualRestriction>, path: List<BundlePath>
+): List<List<ManualRestriction>>? {
+    val key = (path.lastOrNull() as? BundlePath.Key)?.key ?: return null
+    val parent = entriesAt(root, path.dropLast(1)) ?: return null
+    return (parent.firstOrNull { it.key == key } as? ManualRestriction.BundleArrayItem)?.value
+}
+
+private fun replaceEntries(
+    entries: List<ManualRestriction>, path: List<BundlePath>, new: List<ManualRestriction>
+): List<ManualRestriction> {
+    if (path.isEmpty()) return new
+    val key = (path.first() as? BundlePath.Key)?.key ?: return entries
+    val rest = path.drop(1)
+    return entries.map { entry ->
+        if (entry.key != key) entry else when (entry) {
+            is ManualRestriction.BundleItem ->
+                entry.copy(value = replaceEntries(entry.value, rest, new))
+            is ManualRestriction.BundleArrayItem -> {
+                val index = (rest.firstOrNull() as? BundlePath.Index)?.index
+                if (index == null) entry else entry.copy(
+                    value = entry.value.mapIndexed { i, element ->
+                        if (i == index) replaceEntries(element, rest.drop(1), new) else element
+                    }
+                )
+            }
+            else -> entry
+        }
+    }
+}
+
+private fun replaceElements(
+    root: List<ManualRestriction>, path: List<BundlePath>, new: List<List<ManualRestriction>>
+): List<ManualRestriction> {
+    val key = (path.lastOrNull() as? BundlePath.Key)?.key ?: return root
+    val parentPath = path.dropLast(1)
+    val parent = entriesAt(root, parentPath) ?: return root
+    val updated = parent.map {
+        if (it.key == key && it is ManualRestriction.BundleArrayItem) it.copy(value = new) else it
+    }
+    return replaceEntries(root, parentPath, updated)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ManualConfigurationScreen(
+    params: ManualConfiguration, manualRestrictions: StateFlow<List<ManualRestriction>>,
+    getManualRestrictions: (String) -> Unit,
+    setManualRestriction: (String, String?, ManualRestriction) -> Unit,
+    removeManualRestriction: (String, String) -> Unit,
+    onNavigateUp: () -> Unit
+) {
+    val packageName = params.packageName
+    val restrictions by manualRestrictions.collectAsStateWithLifecycle()
+    var path by remember { mutableStateOf(emptyList<BundlePath>()) }
+    var editDialog by remember { mutableStateOf<ManualRestriction?>(null) }
+    var addDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        getManualRestrictions(packageName)
+    }
+    // A nested bundle can disappear underneath us if it's edited away; fall back to its parent
+    val entries = entriesAt(restrictions, path)
+    val elements = if (entries == null) elementsAt(restrictions, path) else null
+    LaunchedEffect(entries, elements) {
+        if (entries == null && elements == null && path.isNotEmpty()) path = emptyList()
+    }
+    // Each step is one level: leaving a Bundle[] element lands back on its element list
+    fun leave() {
+        if (path.isEmpty()) onNavigateUp() else path = path.dropLast(1)
+    }
+    BackHandler(path.isNotEmpty()) { leave() }
+
+    // Every change rewrites the top level entry the current bundle lives under
+    fun persist(newRoot: List<ManualRestriction>) {
+        val rootKey = (path.firstOrNull() as? BundlePath.Key)?.key ?: return
+        newRoot.firstOrNull { it.key == rootKey }?.let {
+            setManualRestriction(packageName, rootKey, it)
+        }
+    }
+    fun setEntry(oldKey: String?, item: ManualRestriction) {
+        if (path.isEmpty()) {
+            setManualRestriction(packageName, oldKey, item)
+        } else {
+            val kept = (entries ?: return).filter { it.key != oldKey && it.key != item.key }
+            persist(replaceEntries(restrictions, path, kept + item))
+        }
+    }
+    fun removeEntry(key: String) {
+        if (path.isEmpty()) {
+            removeManualRestriction(packageName, key)
+        } else {
+            val kept = (entries ?: return).filter { it.key != key }
+            persist(replaceEntries(restrictions, path, kept))
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                {
+                    if (path.isEmpty()) {
+                        Text(stringResource(R.string.manual_configurations))
+                    } else {
+                        Text(
+                            buildString {
+                                path.forEach {
+                                    when (it) {
+                                        is BundlePath.Key -> {
+                                            if (isNotEmpty()) append(" / ")
+                                            append(it.key)
+                                        }
+                                        is BundlePath.Index -> append("[${it.index}]")
+                                    }
+                                }
+                            },
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                },
+                navigationIcon = { NavIcon { leave() } }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                {
+                    if (elements != null) {
+                        persist(replaceElements(
+                            restrictions, path, elements + listOf(emptyList<ManualRestriction>())
+                        ))
+                    } else {
+                        addDialog = true
+                    }
+                },
+                Modifier.fabInsetsPadding()
+            ) {
+                Icon(Icons.Default.Add, null)
+            }
+        },
+        contentWindowInsets = adaptiveInsets()
+    ) { paddingValues ->
+        LazyColumn(Modifier.padding(paddingValues)) {
+            if (path.isEmpty()) item {
+                Notes(R.string.info_manual_configurations, HorizontalPadding)
+                Spacer(Modifier.height(8.dp))
+            }
+            // A Bundle[] lists its elements; anything else lists key/value entries
+            if (elements != null) {
+                itemsIndexed(elements) { index, element ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { path = path + BundlePath.Index(index) }
+                            .padding(HorizontalPadding, 8.dp)
+                            .animateItem(),
+                        Arrangement.SpaceBetween, Alignment.CenterVertically
+                    ) {
+                        Row(Modifier.weight(1F), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painterResource(R.drawable.folder_fill0), null,
+                                Modifier.padding(end = 12.dp)
+                            )
+                            Column {
+                                Text("[$index]", style = typography.labelLarge)
+                                Text(
+                                    stringResource(R.string.entries_count, element.size),
+                                    Modifier.alpha(0.7F), style = typography.bodyMedium
+                                )
+                            }
+                        }
+                        IconButton({
+                            persist(replaceElements(
+                                restrictions, path,
+                                elements.filterIndexed { i, _ -> i != index }
+                            ))
+                        }) {
+                            Icon(Icons.Outlined.Delete, null)
+                        }
+                    }
+                }
+            } else items(entries.orEmpty(), { it.key }) { entry ->
+                val nested = entry is ManualRestriction.BundleItem ||
+                        entry is ManualRestriction.BundleArrayItem
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (nested) path = path + BundlePath.Key(entry.key)
+                            else editDialog = entry
+                        }
+                        .padding(start = HorizontalPadding, top = 8.dp, bottom = 8.dp)
+                        .animateItem(),
+                    Arrangement.SpaceBetween, Alignment.CenterVertically
+                ) {
+                    Row(Modifier.weight(1F), verticalAlignment = Alignment.CenterVertically) {
+                        val iconId = when (entry) {
+                            is ManualRestriction.IntItem -> R.drawable.number_123_fill0
+                            is ManualRestriction.StringItem -> R.drawable.abc_fill0
+                            is ManualRestriction.BooleanItem -> R.drawable.toggle_off_fill0
+                            is ManualRestriction.StringArrayItem -> R.drawable.check_box_fill0
+                            is ManualRestriction.BundleItem -> R.drawable.folder_fill0
+                            is ManualRestriction.BundleArrayItem -> R.drawable.list_fill0
+                        }
+                        Icon(painterResource(iconId), null, Modifier.padding(end = 12.dp))
+                        Column {
+                            Text(entry.key, style = typography.labelLarge)
+                            val text = when (entry) {
+                                is ManualRestriction.IntItem -> entry.value.toString()
+                                is ManualRestriction.StringItem -> entry.value.take(40)
+                                is ManualRestriction.BooleanItem -> entry.value.toString()
+                                is ManualRestriction.StringArrayItem ->
+                                    entry.value.joinToString(limit = 30)
+                                is ManualRestriction.BundleItem ->
+                                    stringResource(R.string.entries_count, entry.value.size)
+                                is ManualRestriction.BundleArrayItem ->
+                                    stringResource(R.string.elements_count, entry.value.size)
+                            }
+                            Text(text, Modifier.alpha(0.7F), style = typography.bodyMedium)
+                        }
+                    }
+                    // Tapping a nested bundle opens it, so renaming it needs its own button
+                    if (nested) IconButton({ editDialog = entry }) {
+                        Icon(painterResource(R.drawable.edit_fill0), null)
+                    }
+                    IconButton({ removeEntry(entry.key) }) {
+                        Icon(Icons.Outlined.Delete, null)
+                    }
+                }
+            }
+            item {
+                Spacer(Modifier.height(BottomPadding))
+            }
+        }
+    }
+    val siblingKeys = entries.orEmpty().map { it.key }
+    if (addDialog) Dialog({ addDialog = false }) {
+        Surface(
+            color = AlertDialogDefaults.containerColor,
+            shape = AlertDialogDefaults.shape,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
+        ) {
+            ManualRestrictionDialog(null, siblingKeys, { addDialog = false }) { oldKey, item ->
+                setEntry(oldKey, item)
+                addDialog = false
+            }
+        }
+    }
+    editDialog?.let { current ->
+        Dialog({ editDialog = null }) {
+            Surface(
+                color = AlertDialogDefaults.containerColor,
+                shape = AlertDialogDefaults.shape,
+                tonalElevation = AlertDialogDefaults.TonalElevation,
+            ) {
+                ManualRestrictionDialog(
+                    current, siblingKeys.filter { it != current.key }, { editDialog = null }
+                ) { oldKey, item ->
+                    setEntry(oldKey, item)
+                    editDialog = null
+                }
+            }
+        }
+    }
+}
+
+private data class ArrayRow(val id: Int, val value: String)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ManualRestrictionDialog(
+    existing: ManualRestriction?,
+    existingKeys: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (String?, ManualRestriction) -> Unit
+) {
+    var key by remember { mutableStateOf(existing?.key ?: "") }
+    var type by remember {
+        mutableStateOf(
+            when (existing) {
+                is ManualRestriction.IntItem -> ManualRestrictionType.INTEGER
+                is ManualRestriction.BooleanItem -> ManualRestrictionType.BOOLEAN
+                is ManualRestriction.StringArrayItem -> ManualRestrictionType.STRING_ARRAY
+                is ManualRestriction.BundleItem -> ManualRestrictionType.BUNDLE
+                is ManualRestriction.BundleArrayItem -> ManualRestrictionType.BUNDLE_ARRAY
+                else -> ManualRestrictionType.STRING
+            }
+        )
+    }
+    var typeMenuExpanded by remember { mutableStateOf(false) }
+    var stringValue by remember {
+        mutableStateOf(
+            when (existing) {
+                is ManualRestriction.StringItem -> existing.value
+                is ManualRestriction.IntItem -> existing.value.toString()
+                else -> ""
+            }
+        )
+    }
+    var boolValue by remember {
+        mutableStateOf((existing as? ManualRestriction.BooleanItem)?.value ?: false)
+    }
+    var nextRowId by remember { mutableIntStateOf(0) }
+    val arrayValue = remember {
+        mutableStateListOf(
+            *((existing as? ManualRestriction.StringArrayItem)?.value ?: emptyList())
+                .map { ArrayRow(nextRowId++, it) }.toTypedArray()
+        )
+    }
+    val listState = rememberLazyListState()
+    val reorderableListState = rememberReorderableLazyListState(listState) { from, to ->
+        // `-1` because there's an `item` (key + type) before the array rows
+        arrayValue.add(from.index - 1, arrayValue.removeAt(to.index - 1))
+    }
+    val keyTaken = key in existingKeys
+    val keyError = key.isBlank() || keyTaken
+    val intError = type == ManualRestrictionType.INTEGER && stringValue.toIntOrNull() == null
+    val valid = !keyError && !intError
+    LazyColumn(Modifier.padding(12.dp), listState) {
+        item {
+            Text(
+                stringResource(
+                    if (existing == null) R.string.add_configuration
+                    else R.string.edit_configuration
+                ),
+                style = typography.titleLarge
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                key, { key = it }, Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.key)) },
+                singleLine = true,
+                isError = keyError,
+                supportingText = {
+                    if (key.isBlank()) Text(stringResource(R.string.key_empty_error))
+                    else if (keyTaken) Text(stringResource(R.string.key_already_exists))
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+            )
+            Spacer(Modifier.height(8.dp))
+            ExposedDropdownMenuBox(typeMenuExpanded, { typeMenuExpanded = it }) {
+                OutlinedTextField(
+                    stringResource(type.label), {},
+                    Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    readOnly = true,
+                    label = { Text(stringResource(R.string.type)) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeMenuExpanded) }
+                )
+                DropdownMenu(typeMenuExpanded, { typeMenuExpanded = false }) {
+                    ManualRestrictionType.supported.forEach { t ->
+                        DropdownMenuItem(
+                            { Text(stringResource(t.label)) },
+                            {
+                                type = t
+                                typeMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        when (type) {
+            ManualRestrictionType.STRING -> item {
+                OutlinedTextField(
+                    stringValue, { stringValue = it }, Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.value)) }
+                )
+            }
+            ManualRestrictionType.INTEGER -> item {
+                OutlinedTextField(
+                    stringValue, { stringValue = it }, Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.value)) },
+                    isError = intError,
+                    supportingText = { if (intError) Text(stringResource(R.string.value_not_a_number)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+            }
+            ManualRestrictionType.BOOLEAN -> item {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        boolValue, { boolValue = true },
+                        SegmentedButtonDefaults.itemShape(0, 2)
+                    ) { Text("true") }
+                    SegmentedButton(
+                        !boolValue, { boolValue = false },
+                        SegmentedButtonDefaults.itemShape(1, 2)
+                    ) { Text("false") }
+                }
+            }
+            ManualRestrictionType.STRING_ARRAY -> {
+                itemsIndexed(arrayValue, { _, row -> row.id }) { index, row ->
+                    ReorderableItem(reorderableListState, row.id) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                row.value, { arrayValue[index] = row.copy(value = it) },
+                                Modifier.weight(1F),
+                                singleLine = true
+                            )
+                            IconButton({ arrayValue.removeAt(index) }) {
+                                Icon(Icons.Outlined.Clear, null)
+                            }
+                            Icon(
+                                painterResource(R.drawable.drag_indicator_fill0), null,
+                                Modifier.draggableHandle()
+                            )
+                        }
+                    }
+                }
+                item {
+                    TextButton({ arrayValue.add(ArrayRow(nextRowId++, "")) }) {
+                        Icon(Icons.Default.Add, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.add))
+                    }
+                }
+            }
+            // Nested bundles are filled in by opening them from the list, not here
+            ManualRestrictionType.BUNDLE, ManualRestrictionType.BUNDLE_ARRAY -> item {
+                Notes(R.string.info_edit_bundle_contents)
+            }
+        }
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                Arrangement.End
+            ) {
+                TextButton(onDismiss, Modifier.padding(end = 4.dp)) {
+                    Text(stringResource(R.string.cancel))
+                }
+                TextButton(
+                    {
+                        val result = when (type) {
+                            ManualRestrictionType.STRING ->
+                                ManualRestriction.StringItem(key, stringValue)
+                            ManualRestrictionType.INTEGER ->
+                                ManualRestriction.IntItem(key, stringValue.toIntOrNull() ?: 0)
+                            ManualRestrictionType.BOOLEAN ->
+                                ManualRestriction.BooleanItem(key, boolValue)
+                            ManualRestrictionType.STRING_ARRAY ->
+                                ManualRestriction.StringArrayItem(
+                                    key, arrayValue.map { it.value }.filter { it.isNotBlank() }
+                                )
+                            // Keep the contents when only the key changed
+                            ManualRestrictionType.BUNDLE -> ManualRestriction.BundleItem(
+                                key, (existing as? ManualRestriction.BundleItem)?.value.orEmpty()
+                            )
+                            ManualRestrictionType.BUNDLE_ARRAY -> ManualRestriction.BundleArrayItem(
+                                key,
+                                (existing as? ManualRestriction.BundleArrayItem)?.value.orEmpty()
+                            )
+                        }
+                        onConfirm(existing?.key, result)
+                    },
+                    enabled = valid
+                ) {
+                    Text(stringResource(R.string.confirm))
+                }
+            }
+        }
+    }
+}

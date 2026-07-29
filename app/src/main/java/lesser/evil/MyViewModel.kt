@@ -42,6 +42,7 @@ import android.os.Binder
 import android.os.Build.VERSION
 import android.os.Bundle
 import android.os.HardwarePropertiesManager
+import android.os.Parcelable
 import android.os.UserHandle
 import android.os.UserManager
 import android.telephony.data.ApnSetting
@@ -77,6 +78,7 @@ import lesser.evil.dpm.IntentFilterOptions
 import lesser.evil.dpm.IpMode
 import lesser.evil.dpm.KeyguardDisableConfig
 import lesser.evil.dpm.KeyguardDisableMode
+import lesser.evil.dpm.ManualRestriction
 import lesser.evil.dpm.NetworkStatsData
 import lesser.evil.dpm.NetworkStatsTarget
 import lesser.evil.dpm.PasswordComplexity
@@ -118,6 +120,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.addJsonObject
@@ -656,20 +660,30 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
+    // Guards every read-modify-write of a package's restrictions bundle, declared or manual,
+    // so concurrent edits can't race on a stale read and silently undo each other.
+    private val restrictionsMutex = Mutex()
+
     fun setAppRestrictions(name: String, item: AppRestriction) {
         viewModelScope.launch(Dispatchers.IO) {
-            val bundle = transformAppRestriction(
-                appRestrictions.value.filter { it.key != item.key }.plus(item)
-            )
-            DPM.setApplicationRestrictions(DAR, name, bundle)
-            getAppRestrictions(name)
+            restrictionsMutex.withLock {
+                val declared = appRestrictions.value.filter { it.key != item.key }.plus(item)
+                // Start from what is currently applied so manually added keys are kept
+                val bundle = DPM.getApplicationRestrictions(DAR, name)
+                declared.forEach { bundle.remove(it.key) }
+                bundle.putAll(transformAppRestriction(declared))
+                DPM.setApplicationRestrictions(DAR, name, bundle)
+                getAppRestrictions(name)
+            }
         }
     }
 
     fun clearAppRestrictions(name: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            DPM.setApplicationRestrictions(DAR, name, Bundle())
-            getAppRestrictions(name)
+            restrictionsMutex.withLock {
+                DPM.setApplicationRestrictions(DAR, name, Bundle())
+                getAppRestrictions(name)
+            }
         }
     }
 
@@ -700,6 +714,90 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                 is AppRestriction.MultiSelectItem -> r.value?.let { b.putStringArray(r.key, r.value) }
             }
         }
+        return b
+    }
+
+    val manualRestrictions = MutableStateFlow(emptyList<ManualRestriction>())
+
+    fun getManualRestrictions(name: String) {
+        try {
+            manualRestrictions.value = parseRestrictions(DPM.getApplicationRestrictions(DAR, name))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            manualRestrictions.value = emptyList()
+        }
+    }
+
+    private fun parseRestrictions(bundle: Bundle): List<ManualRestriction> =
+        bundle.keySet().mapNotNull { key ->
+            when (val value = bundle.get(key)) {
+                is Boolean -> ManualRestriction.BooleanItem(key, value)
+                is Int -> ManualRestriction.IntItem(key, value)
+                is String -> ManualRestriction.StringItem(key, value)
+                is Bundle -> ManualRestriction.BundleItem(key, parseRestrictions(value))
+                is Array<*> -> {
+                    // A bundle array comes back as Parcelable[] once it has been through a
+                    // parcel, so trust the elements and only fall back to the component type
+                    // when the array is empty and there's nothing to look at.
+                    val component: Class<*>? = value.javaClass.componentType
+                    when {
+                        value.any { it is Bundle } -> ManualRestriction.BundleArrayItem(
+                            key, value.map { parseRestrictions(it as? Bundle ?: Bundle()) }
+                        )
+                        value.any { it is String } ->
+                            ManualRestriction.StringArrayItem(key, value.filterIsInstance<String>())
+                        component != null && Parcelable::class.java.isAssignableFrom(component) ->
+                            ManualRestriction.BundleArrayItem(key, emptyList())
+                        else -> ManualRestriction.StringArrayItem(key, emptyList())
+                    }
+                }
+                else -> null
+            }
+        }.sortedBy { it.key }
+
+    fun setManualRestriction(name: String, oldKey: String?, item: ManualRestriction) {
+        viewModelScope.launch(Dispatchers.IO) {
+            restrictionsMutex.withLock {
+                // Mutate the live bundle in place so keys of unsupported types (e.g. Bundle,
+                // Bundle[]) that getManualRestrictions can't represent are left untouched
+                // instead of being dropped when the bundle is rebuilt.
+                val bundle = DPM.getApplicationRestrictions(DAR, name)
+                if (oldKey != null) bundle.remove(oldKey)
+                bundle.remove(item.key)
+                putManualRestriction(bundle, item)
+                DPM.setApplicationRestrictions(DAR, name, bundle)
+                getManualRestrictions(name)
+            }
+        }
+    }
+
+    fun removeManualRestriction(name: String, key: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            restrictionsMutex.withLock {
+                val bundle = DPM.getApplicationRestrictions(DAR, name)
+                bundle.remove(key)
+                DPM.setApplicationRestrictions(DAR, name, bundle)
+                getManualRestrictions(name)
+            }
+        }
+    }
+
+    private fun putManualRestriction(bundle: Bundle, r: ManualRestriction) {
+        when (r) {
+            is ManualRestriction.StringItem -> bundle.putString(r.key, r.value)
+            is ManualRestriction.IntItem -> bundle.putInt(r.key, r.value)
+            is ManualRestriction.BooleanItem -> bundle.putBoolean(r.key, r.value)
+            is ManualRestriction.StringArrayItem ->
+                bundle.putStringArray(r.key, r.value.toTypedArray())
+            is ManualRestriction.BundleItem -> bundle.putBundle(r.key, buildBundle(r.value))
+            is ManualRestriction.BundleArrayItem ->
+                bundle.putParcelableArray(r.key, r.value.map { buildBundle(it) }.toTypedArray())
+        }
+    }
+
+    private fun buildBundle(list: List<ManualRestriction>): Bundle {
+        val b = Bundle()
+        list.forEach { putManualRestriction(b, it) }
         return b
     }
 

@@ -118,6 +118,7 @@ import lesser.evil.R
 import lesser.evil.SP
 import lesser.evil.adaptiveInsets
 import lesser.evil.clickableTextField
+import lesser.evil.fabInsetsPadding
 import lesser.evil.formatDate
 import lesser.evil.popToast
 import lesser.evil.showOperationResultToast
@@ -1580,7 +1581,7 @@ fun CaCertScreen(
             FloatingActionButton({
                 context.popToast(R.string.select_ca_cert)
                 getCertLauncher.launch(arrayOf("*/*"))
-            }) {
+            }, Modifier.fabInsetsPadding()) {
                 Icon(Icons.Default.Add, stringResource(R.string.install))
             }
         },

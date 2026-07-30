@@ -93,6 +93,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -130,9 +131,12 @@ import lesser.evil.MyViewModel
 import lesser.evil.Privilege
 import lesser.evil.R
 import lesser.evil.adaptiveInsets
+import lesser.evil.canTranslateText
 import lesser.evil.fabInsetsPadding
 import lesser.evil.parsePackageNames
 import lesser.evil.showOperationResultToast
+import lesser.evil.translateTextIntent
+import lesser.evil.translatedText
 import lesser.evil.ui.FullWidthRadioButtonItem
 import lesser.evil.ui.FunctionItem
 import lesser.evil.ui.MyLazyScaffold
@@ -1554,6 +1558,23 @@ fun ManagedConfigurationScreen(
     }
     var dialog by remember { mutableStateOf<AppRestriction?>(null) }
     var clearRestrictionDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    // Descriptions another app translated for us, kept per key so reopening an entry doesn't have
+    // to ask for the translation again
+    val translations = remember { mutableStateMapOf<String, String>() }
+    // The entry a translation was asked for, the answer only says which text came back. Saved so
+    // it still finds its entry when this screen is recreated while the translator is in front.
+    var translating by rememberSaveable { mutableStateOf<String?>(null) }
+    val translate = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val key = translating
+        translating = null
+        val text = translatedText(result.data)
+        if (key != null && text != null) translations[key] = text
+    }
+    // Asked again whenever an entry is opened, a translator may well be installed meanwhile
+    val canTranslate = remember(dialog) { dialog?.description != null && context.canTranslateText() }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1666,7 +1687,17 @@ fun ManagedConfigurationScreen(
             shape = AlertDialogDefaults.shape,
             tonalElevation = AlertDialogDefaults.TonalElevation,
         ) {
-            ManagedConfigurationDialog(dialog!!) {
+            val entry = dialog!!
+            ManagedConfigurationDialog(
+                entry, translations[entry.key], canTranslate,
+                onTranslate = {
+                    context.translateTextIntent(entry.description.orEmpty())?.let {
+                        translating = entry.key
+                        translate.launch(it)
+                    }
+                },
+                onShowOriginal = { translations.remove(entry.key) }
+            ) {
                 if (it != null) {
                     setRestriction(params.packageName, it)
                 }
@@ -1699,9 +1730,19 @@ fun ManagedConfigurationScreen(
     )
 }
 
+/**
+ * The dialog of a declared configuration entry, where its value is set.
+ *
+ * @param translation The translation of the entry's description, shown in place of the original
+ * @param canTranslate Whether an app is around to translate the description
+ * @param onTranslate Callback to hand the description over to be translated
+ * @param onShowOriginal Callback to drop the translation and show the original description again
+ */
 @Composable
 fun ManagedConfigurationDialog(
-    restriction: AppRestriction, setRestriction: (AppRestriction?) -> Unit
+    restriction: AppRestriction, translation: String? = null, canTranslate: Boolean = false,
+    onTranslate: () -> Unit = {}, onShowOriginal: () -> Unit = {},
+    setRestriction: (AppRestriction?) -> Unit
 ) {
     var specifyValue by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
@@ -1759,11 +1800,25 @@ fun ManagedConfigurationDialog(
                     Text(restriction.key, Modifier.padding(vertical = 4.dp), style = typography.labelLarge)
                     Spacer(Modifier.height(4.dp))
                     restriction.description?.let {
-                        Text(it, Modifier.alpha(0.8F), style = typography.bodyMedium)
+                        Text(translation ?: it, Modifier.alpha(0.8F), style = typography.bodyMedium)
                     }
-                    Spacer(Modifier.height(8.dp))
                 }
             }
+            // Sits outside the SelectionContainer, the action is not a part of the text
+            if (restriction.description != null && (canTranslate || translation != null)) {
+                TextButton({ if (translation == null) onTranslate() else onShowOriginal() }) {
+                    Icon(painterResource(R.drawable.translate), null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(
+                            if (translation == null) R.string.translate_description
+                            else R.string.original_description
+                        ),
+                        style = typography.labelLarge
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             Row(
                 Modifier
                     .fillMaxWidth()

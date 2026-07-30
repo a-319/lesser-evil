@@ -521,6 +521,7 @@
 	<string name="org_id">מזהה ארגון</string>
 	<string name="org_name">שם הארגון</string>
 	<string name="org_owned_work_profile">פרופיל עבודה בארגון</string>
+	<string name="original_description">הצגת המקור</string>
 	<string name="other">אחר</string>
 	<string name="outgoing_beam">קרן יוצאת</string>
 	<string name="outgoing_calls">שיחות יוצאות</string>
@@ -728,6 +729,7 @@
 	<string name="transfer">להעביר</string>
 	<string name="transfer_ownership">העברת בעלות</string>
 	<string name="transfer_ownership_warning">ההרשאה %1$s תועבר ל-%2$s\nבאחריותך לוודא שבאפליקציה הזו קיימת האפשרות לבטל את ההרשאה! אחרת, הפעולה תהיה בלתי הפיכה.</string>
+	<string name="translate_description">תרגום התיאור</string>
 	<string name="transmitted">מועבר</string>
 	<string name="type">סוג</string>
 	<string name="uid">UID</string>

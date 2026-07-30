@@ -24,8 +24,8 @@ jobs:
 
       - name: Build APK
         run: |
-          echo "${{ secrets.KEY_BASE64 }}" | base64 --decode - > app/release.jks
-          ./gradlew clean assembleRelease --no-build-cache --no-configuration-cache -PStoreFile="$(pwd)/app/release.jks" -PStorePassword="${{ secrets.KEYSTORE_PASSWORD }}" -PKeyPassword="${{ secrets.KEY_PASSWORD }}" -PKeyAlias="${{ secrets.KEY_ALIAS }}"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode - > app/release.jks
+          ./gradlew clean assembleRelease --no-build-cache --no-configuration-cache -PStoreFile="$(pwd)/app/release.jks" -PStorePassword="${{ secrets.STORE_PASSWORD }}" -PKeyPassword="${{ secrets.KEY_PASSWORD }}" -PKeyAlias="${{ secrets.KEY_ALIAS }}"
           mv app/build/outputs/apk/release/app-release.apk OwnDroid-${{ github.ref_name }}.apk
           ./gradlew assembleRelease
           mv app/build/outputs/apk/release/app-release.apk OwnDroid-${{ github.ref_name }}-testkey.apk

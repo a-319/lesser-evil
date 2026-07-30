@@ -558,7 +558,6 @@
     <string name="minimum_length_4">Uzunluk 4\'ten az olmamalıdır</string>
     <string name="leave_empty_to_remain_unchanged">Değişmeden kalması için boş bırakın</string>
     <string name="allow_biometrics">Biyometriğe İzin Ver</string>
-    <string name="lock_when_leaving">Ayrılırken Kilitle</string>
     <string name="unlock">Kilidi Aç</string>
     <string name="security">Güvenlik</string>
     <string name="clear_storage">Depolamayı Temizle</string>

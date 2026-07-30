@@ -117,6 +117,17 @@ fun String.hash(): String {
     return md.digest(this.encodeToByteArray()).toHexString()
 }
 
+private const val RandomPasswordChars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+/** A password nobody gets to see, for those who want to lock the app for good */
+fun generateRandomPassword(length: Int = 32): String {
+    val random = SecureRandom()
+    return buildString(length) {
+        repeat(length) { append(RandomPasswordChars[random.nextInt(RandomPasswordChars.length)]) }
+    }
+}
+
 val MyAdminComponent = ComponentName.unflattenFromString("lesser.evil/.Receiver")!!
 
 

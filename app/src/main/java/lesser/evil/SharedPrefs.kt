@@ -20,7 +20,6 @@ class SharedPrefs(context: Context) {
     var blackTheme by BooleanSharedPref("theme.black")
     var lockPasswordHash by StringSharedPref("lock.password.sha256")
     var biometricsUnlock by BooleanSharedPref("lock.biometrics")
-    var lockWhenLeaving by BooleanSharedPref("lock.onleave")
     var lockPasswordFailedAttempts by IntSharedPref("lock.password.failed_attempts")
     var lockPasswordLockoutUntil by LongSharedPref("lock.password.lockout_until")
     /** Show the applications as a launcher-like grid instead of a list */

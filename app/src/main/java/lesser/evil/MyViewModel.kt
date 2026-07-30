@@ -232,7 +232,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun getAppLockConfig(): AppLockConfig {
         val passwordHash = SP.lockPasswordHash
-        return AppLockConfig(passwordHash?.ifEmpty { null }, SP.biometricsUnlock, SP.lockWhenLeaving)
+        return AppLockConfig(passwordHash?.ifEmpty { null }, SP.biometricsUnlock)
+    }
+    fun verifyAppLockPassword(password: String): Boolean {
+        val passwordHash = SP.lockPasswordHash
+        return !passwordHash.isNullOrEmpty() && password.hash() == passwordHash
     }
     fun setAppLockConfig(config: AppLockConfig) {
         if (adminOnly()) return
@@ -242,7 +246,9 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             SP.lockPasswordHash = config.password.hash()
         }
         SP.biometricsUnlock = config.biometrics
-        SP.lockWhenLeaving = config.whenLeaving
+        // A new password starts over with a clean slate, without a pending lockout
+        SP.lockPasswordFailedAttempts = 0
+        SP.lockPasswordLockoutUntil = 0L
     }
     fun getApiEnabled(): Boolean {
         return SP.apiKeyHash?.isNotEmpty() ?: false

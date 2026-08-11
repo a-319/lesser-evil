@@ -24,6 +24,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -77,33 +79,61 @@ fun AppLockDialog(
     var lockoutUntil by rememberSaveable { mutableLongStateOf(SP.lockPasswordLockoutUntil) }
     var remainingSeconds by rememberSaveable { mutableIntStateOf(calculateRemainingSeconds(lockoutUntil)) }
     val isLocked = remainingSeconds > 0
+    var showCode by rememberSaveable { mutableStateOf(false) }
+    var codeInput by rememberSaveable { mutableStateOf("") }
+    var codeError by rememberSaveable { mutableStateOf(false) }
+    // A challenge belongs to the lock screen in front of you, never to an older one
+    val challenge = remember { if (AdminUnlockChallenge.enabled) AdminUnlockChallenge.regenerate() else null }
+
+    fun succeed() {
+        fm.clearFocus()
+        failedAttempts = 0
+        lockoutUntil = 0L
+        SP.lockPasswordFailedAttempts = 0
+        SP.lockPasswordLockoutUntil = 0L
+        AdminUnlockChallenge.invalidate()
+        onSucceed()
+    }
+
+    fun registerFailure() {
+        failedAttempts += 1
+        SP.lockPasswordFailedAttempts = failedAttempts
+        if (failedAttempts >= 3) {
+            val extraFailures = min(failedAttempts - 3, 5)
+            val delayMillis = min(BASE_LOCKOUT_MILLIS * (1L shl extraFailures), MAX_LOCKOUT_MILLIS)
+            lockoutUntil = System.currentTimeMillis() + delayMillis
+            remainingSeconds = calculateRemainingSeconds(lockoutUntil)
+            SP.lockPasswordLockoutUntil = lockoutUntil
+        }
+    }
 
     fun unlock() {
         if (isLocked) return
-        if (input.hash() == SP.lockPasswordHash) {
-            fm.clearFocus()
-            failedAttempts = 0
-            lockoutUntil = 0L
-            SP.lockPasswordFailedAttempts = 0
-            SP.lockPasswordLockoutUntil = 0L
-            onSucceed()
-        } else {
+        if (input.hash() == SP.lockPasswordHash) succeed()
+        else {
             isError = true
-            failedAttempts += 1
-            SP.lockPasswordFailedAttempts = failedAttempts
-            if (failedAttempts >= 3) {
-                val extraFailures = min(failedAttempts - 3, 5)
-                val delayMillis = min(BASE_LOCKOUT_MILLIS * (1L shl extraFailures), MAX_LOCKOUT_MILLIS)
-                lockoutUntil = System.currentTimeMillis() + delayMillis
-                remainingSeconds = calculateRemainingSeconds(lockoutUntil)
-                SP.lockPasswordLockoutUntil = lockoutUntil
-            }
+            registerFailure()
+        }
+    }
+
+    /** The admin's signature over the challenge on screen opens this session once */
+    fun unlockWithCode() {
+        if (isLocked) return
+        // A mistyped code the check digits caught costs nothing, it never reached the key
+        if (AdminUnlockCode.decodeResponse(codeInput) == null) {
+            codeError = true
+            return
+        }
+        if (AdminUnlockChallenge.verify(codeInput)) succeed()
+        else {
+            codeError = true
+            registerFailure()
         }
     }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 28 && SP.biometricsUnlock) {
-            startBiometricsUnlock(context, onSucceed)
+            startBiometricsUnlock(context, ::succeed)
         } else {
             fr.requestFocus()
         }
@@ -151,7 +181,7 @@ fun AppLockDialog(
                     }
                 )
                 if (Build.VERSION.SDK_INT >= 28 && SP.biometricsUnlock) {
-                    FilledTonalIconButton({ startBiometricsUnlock(context, onSucceed) }, Modifier.padding(start = 4.dp)) {
+                    FilledTonalIconButton({ startBiometricsUnlock(context, ::succeed) }, Modifier.padding(start = 4.dp)) {
                         Icon(painterResource(R.drawable.fingerprint_fill0), null)
                     }
                 }
@@ -178,6 +208,67 @@ fun AppLockDialog(
                     Modifier.padding(top = 8.dp)
                 )
             }
+            if (AdminUnlockChallenge.enabled) {
+                TextButton({ showCode = !showCode }, Modifier.align(Alignment.CenterHorizontally)) {
+                    Text(stringResource(R.string.unlock_with_code))
+                }
+                if (showCode) UnlockCode(
+                    challenge.orEmpty(), codeInput, codeError, !isLocked,
+                    { codeInput = it; codeError = false }, ::unlockWithCode
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The challenge to read out to the admin, and the signature they read back.
+ * Both are digits only, so nothing gets lost over the phone.
+ */
+@Composable
+private fun UnlockCode(
+    challenge: String, response: String, isError: Boolean, enabled: Boolean,
+    onResponseChange: (String) -> Unit, onUnlock: () -> Unit
+) {
+    val context = LocalContext.current
+    val typed = AdminUnlockCode.digitsOnly(response).length
+    val expected = AdminUnlockCode.ResponseDigits + AdminUnlockCode.CheckDigits
+    val shown = if (challenge.length == AdminUnlockCode.ChallengeDigits)
+        AdminUnlockCode.formatChallenge(challenge) else ""
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            stringResource(R.string.unlock_code_notes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OutlinedTextField(
+            shown, {}, Modifier.fillMaxWidth().padding(top = 8.dp), readOnly = true,
+            label = { Text(stringResource(R.string.unlock_code_challenge)) },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+            trailingIcon = {
+                IconButton({ writeClipBoard(context, shown) }) {
+                    Icon(painterResource(R.drawable.content_copy_fill0), stringResource(R.string.copy))
+                }
+            }
+        )
+        OutlinedTextField(
+            response, onResponseChange, Modifier.fillMaxWidth().padding(top = 4.dp),
+            label = { Text(stringResource(R.string.unlock_code_response)) },
+            isError = isError, enabled = enabled, maxLines = 6,
+            supportingText = {
+                Text(
+                    if (isError) stringResource(R.string.unlock_code_refused)
+                    else stringResource(R.string.unlock_code_digits, typed, expected)
+                )
+            },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+        )
+        Button(
+            onUnlock, Modifier.fillMaxWidth().padding(top = 4.dp),
+            enabled = enabled && typed == expected
+        ) {
+            Text(stringResource(R.string.unlock))
         }
     }
 }

@@ -752,7 +752,13 @@
 	<string name="unknown">לא ידוע</string>
 	<string name="unknown_error">שגיאה לא ידועה</string>
 	<string name="unlock">לפתוח</string>
+	<string name="unlock_code_challenge">אתגר</string>
+	<string name="unlock_code_digits">%1$d מתוך %2$d ספרות</string>
+	<string name="unlock_code_notes">הקריאו את האתגר למנהל האפליקציה, והקלידו את הקוד שהוא מקריא בחזרה. הוא פותח את ההפעלה הנוכחית פעם אחת, ורק במכשיר הזה.</string>
+	<string name="unlock_code_refused">הקוד הזה לא מתאים לאתגר</string>
+	<string name="unlock_code_response">קוד</string>
 	<string name="unlock_wait_seconds">נסה שוב בעוד %1$d שניות.</string>
+	<string name="unlock_with_code">פתיחה באמצעות קוד</string>
 	<string name="unmute">אי שביעות רצון</string>
 	<string name="unmute_microphone">בטל השתקת המיקרופון</string>
 	<string name="unsupported">לא נתמך</string>

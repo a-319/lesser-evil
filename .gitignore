@@ -11,3 +11,10 @@ app/build
 app/release
 app/debug
 .androidide
+
+# Admin unlock keys never belong in the repository, wherever they were dropped
+*.pem
+*.key
+admin-unlock-key*
+__pycache__
+

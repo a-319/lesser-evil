@@ -678,6 +678,12 @@
     <string name="app_lock_notes">The app locks itself every time you leave it, and asks for the password when you come back.</string>
     <string name="unlock">Unlock</string>
     <string name="unlock_wait_seconds">Try again in %1$d seconds.</string>
+    <string name="unlock_with_code">Unlock with a code</string>
+    <string name="unlock_code_notes">Read the challenge out to the admin of this app, and type in the code they read back. It opens this session once, and only on this device.</string>
+    <string name="unlock_code_challenge">Challenge</string>
+    <string name="unlock_code_response">Code</string>
+    <string name="unlock_code_digits">%1$d of %2$d digits</string>
+    <string name="unlock_code_refused">This code does not match the challenge</string>
     <string name="security">Security</string>
     <string name="clear_storage">Clear storage</string>
     

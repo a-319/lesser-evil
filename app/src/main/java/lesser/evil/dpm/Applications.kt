@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -539,23 +540,21 @@ private fun MultipleAppsActionDialog(
 
 @Serializable object DisableUserControl
 
-/** The apps a setting is already applied to, with a way to take it off any of them */
+/** A caption that opens a section of a list */
 @Composable
-fun AppliedAppsDialog(apps: List<AppInfo>?, onRemove: (String) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        title = { Text(stringResource(R.string.applied_apps)) },
-        text = {
-            when {
-                apps == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                apps.isEmpty() -> Text(stringResource(R.string.no_applied_apps))
-                else -> LazyColumn(Modifier.heightIn(max = 400.dp)) {
-                    items(apps, { it.name }) { ApplicationItem(it) { onRemove(it.name) } }
-                }
-            }
-        },
-        confirmButton = { TextButton(onDismiss) { Text(stringResource(R.string.confirm)) } },
-        onDismissRequest = onDismiss
+fun SectionHeader(@StringRes title: Int) {
+    HorizontalDivider(Modifier.padding(top = 4.dp))
+    Text(
+        stringResource(title).uppercase(), Modifier.padding(HorizontalPadding, 12.dp),
+        color = colorScheme.primary, style = typography.labelLarge, fontWeight = FontWeight.Bold
     )
+}
+
+/** The apps a setting was applied to, each with the X that takes it off again */
+fun LazyListScope.appliedApps(apps: List<AppInfo>, onRemove: (String) -> Unit) {
+    if (apps.isEmpty()) return
+    item { SectionHeader(R.string.applied_apps) }
+    items(apps, { "applied:" + it.name }) { ApplicationItem(it) { onRemove(it.name) } }
 }
 
 /**
@@ -598,7 +597,7 @@ fun PermissionsManagerScreen(
     packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
-    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    appliedApps: StateFlow<List<AppInfo>>, getAppliedApps: () -> Unit,
     removeApplied: (String) -> Unit, onNavigateUp: () -> Unit, param: PermissionsManager,
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit
 ) = PermissionsContent(
@@ -615,7 +614,7 @@ fun MultiplePermissionsScreen(
     param: MultiplePermissions, packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
-    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    appliedApps: StateFlow<List<AppInfo>>, getAppliedApps: () -> Unit,
     removeApplied: (String) -> Unit, chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
     onNavigateUp: () -> Unit
 ) = PermissionsContent(
@@ -628,7 +627,7 @@ private fun PermissionsContent(
     initialPackages: List<String>, packagePermissions: MutableStateFlow<Map<String, Int>>,
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
-    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    appliedApps: StateFlow<List<AppInfo>>, getAppliedApps: () -> Unit,
     removeApplied: (String) -> Unit, canAddPackages: Boolean, chosenPackage: Channel<String>,
     onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
@@ -637,16 +636,14 @@ private fun PermissionsContent(
     val permissions by packagePermissions.collectAsStateWithLifecycle()
     val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
     val applied by appliedApps.collectAsStateWithLifecycle()
-    var appliedDialog by remember { mutableStateOf(false) }
     LaunchedEffect(packages.toList()) {
         getPackagePermissions(packages)
     }
+    LaunchedEffect(Unit) {
+        getAppliedApps()
+    }
     MyLazyScaffold(R.string.permissions, onNavigateUp) {
         item {
-            FunctionItem(R.string.applied_apps, icon = R.drawable.list_fill0) {
-                appliedDialog = true
-                getAppliedApps()
-            }
             if (packages.size > 1) Notes(R.string.info_multiple_apps, HorizontalPadding)
         }
         items(packages.map { getAppInfo(it) }, { it.name }) {
@@ -678,11 +675,11 @@ private fun PermissionsContent(
                 }
             }
         }
+        appliedApps(applied, removeApplied)
         item {
             Spacer(Modifier.height(BottomPadding))
         }
     }
-    if (appliedDialog) AppliedAppsDialog(applied, removeApplied) { appliedDialog = false }
     if(selectedPermission != -1) {
         val permission = runtimePermissions[selectedPermission]
         fun changeState(state: Int) {
@@ -1394,14 +1391,7 @@ fun AppGroupsList(
             }
         }
         if (autoGroups.isNotEmpty()) {
-            item {
-                if (groups.isNotEmpty()) HorizontalDivider(Modifier.padding(top = 4.dp))
-                Text(
-                    stringResource(R.string.automatic_groups).uppercase(),
-                    Modifier.padding(HorizontalPadding, 12.dp), color = colorScheme.primary,
-                    style = typography.labelLarge, fontWeight = FontWeight.Bold
-                )
-            }
+            item { SectionHeader(R.string.automatic_groups) }
             items(autoGroups.size) { index ->
                 val group = autoGroups[index]
                 val name = stringResource(group.title)
@@ -2052,19 +2042,21 @@ fun ManualConfigurationScreen(
     getManualRestrictions: (List<String>) -> Unit,
     setManualRestriction: (List<String>, String?, ManualRestriction) -> Unit,
     removeManualRestriction: (List<String>, String) -> Unit, getAppInfo: (String) -> AppInfo,
-    appliedApps: StateFlow<List<AppInfo>?>, getAppliedApps: () -> Unit,
+    appliedApps: StateFlow<List<AppInfo>>, getAppliedApps: () -> Unit,
     removeApplied: (String) -> Unit, canAddPackages: Boolean, chosenPackage: Channel<String>,
     onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
     val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
     val applied by appliedApps.collectAsStateWithLifecycle()
-    var appliedDialog by remember { mutableStateOf(false) }
     val restrictions by manualRestrictions.collectAsStateWithLifecycle()
     var path by remember { mutableStateOf(emptyList<BundlePath>()) }
     var editDialog by remember { mutableStateOf<ManualRestriction?>(null) }
     var addDialog by remember { mutableStateOf(false) }
     LaunchedEffect(packages.toList()) {
         getManualRestrictions(packages)
+    }
+    LaunchedEffect(Unit) {
+        getAppliedApps()
     }
     // A nested bundle can disappear underneath us if it's edited away; fall back to its parent
     val entries = entriesAt(restrictions, path)
@@ -2150,10 +2142,6 @@ fun ManualConfigurationScreen(
         LazyColumn(Modifier.padding(paddingValues)) {
             if (path.isEmpty()) {
                 item {
-                    FunctionItem(R.string.applied_apps, icon = R.drawable.list_fill0) {
-                        appliedDialog = true
-                        getAppliedApps()
-                    }
                     Notes(R.string.info_manual_configurations, HorizontalPadding)
                     Spacer(Modifier.height(8.dp))
                 }
@@ -2248,13 +2236,13 @@ fun ManualConfigurationScreen(
                     }
                 }
             }
+            if (path.isEmpty()) appliedApps(applied, removeApplied)
             item {
                 Spacer(Modifier.height(BottomPadding))
             }
         }
     }
     val siblingKeys = entries.orEmpty().map { it.key }
-    if (appliedDialog) AppliedAppsDialog(applied, removeApplied) { appliedDialog = false }
     if (addDialog) Dialog({ addDialog = false }) {
         Surface(
             color = AlertDialogDefaults.containerColor,

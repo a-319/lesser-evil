@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -329,16 +330,16 @@ fun MyScaffold(
 fun MyLazyScaffold(
     @StringRes title: Int,
     onNavIconClicked: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {},
     content: LazyListScope.() -> Unit
 ) {
-    val sb = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        Modifier.nestedScroll(sb.nestedScrollConnection),
+        // The title stays at the top of the list, the way the other list screens hold it
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 { Text(stringResource(title)) },
                 navigationIcon = { NavIcon(onNavIconClicked) },
-                scrollBehavior = sb
+                actions = actions
             )
         },
         contentWindowInsets = adaptiveInsets()

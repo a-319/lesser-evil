@@ -155,10 +155,13 @@ val String.isValidPackageName
     get() = Regex("""^(?:[a-zA-Z]\w*\.)+[a-zA-Z]\w*$""").matches(this)
 
 @Composable
-fun LazyItemScope.ApplicationItem(info: AppInfo, onClear: () -> Unit) {
+fun LazyItemScope.ApplicationItem(
+    info: AppInfo, onClick: (() -> Unit)? = null, onClear: () -> Unit
+) {
     Row(
         Modifier
             .fillMaxWidth()
+            .then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick))
             .padding(horizontal = 8.dp, vertical = 6.dp)
             .animateItem(),
         Arrangement.SpaceBetween, Alignment.CenterVertically
@@ -550,11 +553,85 @@ fun SectionHeader(@StringRes title: Int) {
     )
 }
 
+/**
+ * The groups menu every screen that collects packages carries: picking a group hands over its
+ * applications, to add to the list or to take out of it.
+ */
+@Composable
+fun AppGroupsMenu(
+    appGroups: StateFlow<List<AppGroup>>, autoAppGroups: StateFlow<List<AutoAppGroup>>,
+    navigateToGroups: () -> Unit, onPick: (List<String>, Boolean) -> Unit
+) {
+    val groups by appGroups.collectAsStateWithLifecycle()
+    val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
+    val allGroups = selectableGroups(groups, autoGroups)
+    var expand by remember { mutableStateOf(false) }
+    var selectedGroup by remember { mutableStateOf<SelectableAppGroup?>(null) }
+    Box {
+        IconButton({ expand = true }) {
+            Icon(Icons.Default.MoreVert, null)
+        }
+        DropdownMenu(expand, { expand = false }) {
+            allGroups.forEach { group ->
+                DropdownMenuItem(
+                    { Text("(${group.apps.size}) ${group.name}") },
+                    {
+                        selectedGroup = group
+                        expand = false
+                    },
+                    leadingIcon = {
+                        if (group.auto) Icon(painterResource(R.drawable.tune_fill0), null)
+                    }
+                )
+            }
+            if (allGroups.isNotEmpty()) HorizontalDivider()
+            DropdownMenuItem(
+                { Text(stringResource(R.string.manage_app_groups)) },
+                {
+                    navigateToGroups()
+                    expand = false
+                }
+            )
+        }
+    }
+    val picked = selectedGroup
+    if (picked != null) AlertDialog(
+        text = {
+            Column {
+                Text(picked.name, style = typography.titleLarge)
+                Spacer(Modifier.height(6.dp))
+                Button({
+                    onPick(picked.apps, true)
+                    selectedGroup = null
+                }) {
+                    Text(stringResource(R.string.add_to_list))
+                }
+                Button({
+                    onPick(picked.apps, false)
+                    selectedGroup = null
+                }) {
+                    Text(stringResource(R.string.remove_from_list))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton({ selectedGroup = null }) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+        onDismissRequest = { selectedGroup = null }
+    )
+}
+
 /** The apps a setting was applied to, each with the X that takes it off again */
-fun LazyListScope.appliedApps(apps: List<AppInfo>, onRemove: (String) -> Unit) {
+fun LazyListScope.appliedApps(
+    apps: List<AppInfo>, onOpen: (String) -> Unit, onRemove: (String) -> Unit
+) {
     if (apps.isEmpty()) return
     item { SectionHeader(R.string.applied_apps) }
-    items(apps, { "applied:" + it.name }) { ApplicationItem(it) { onRemove(it.name) } }
+    items(apps, { "applied:" + it.name }) {
+        ApplicationItem(it, { onOpen(it.name) }) { onRemove(it.name) }
+    }
 }
 
 /**
@@ -598,12 +675,15 @@ fun PermissionsManagerScreen(
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
     appliedApps: StateFlow<List<AppInfo>>, getAppliedApps: () -> Unit,
-    removeApplied: (String) -> Unit, onNavigateUp: () -> Unit, param: PermissionsManager,
-    chosenPackage: Channel<String>, onChoosePackage: () -> Unit
+    removeApplied: (String) -> Unit, appGroups: StateFlow<List<AppGroup>>,
+    autoAppGroups: StateFlow<List<AutoAppGroup>>, refreshAutoGroups: () -> Unit,
+    navigateToGroups: () -> Unit, onOpenApp: (String) -> Unit, onNavigateUp: () -> Unit,
+    param: PermissionsManager, chosenPackage: Channel<String>, onChoosePackage: () -> Unit
 ) = PermissionsContent(
     listOfNotNull(param.packageName), packagePermissions, getPackagePermissions,
-    setPackagePermission, getAppInfo, appliedApps, getAppliedApps, removeApplied,
-    param.packageName == null, chosenPackage, onChoosePackage, onNavigateUp
+    setPackagePermission, getAppInfo, appliedApps, getAppliedApps, removeApplied, appGroups,
+    autoAppGroups, refreshAutoGroups, navigateToGroups, onOpenApp, param.packageName == null,
+    chosenPackage, onChoosePackage, onNavigateUp
 )
 
 @Serializable data class MultiplePermissions(val packages: List<String>)
@@ -615,11 +695,14 @@ fun MultiplePermissionsScreen(
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
     appliedApps: StateFlow<List<AppInfo>>, getAppliedApps: () -> Unit,
-    removeApplied: (String) -> Unit, chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    onNavigateUp: () -> Unit
+    removeApplied: (String) -> Unit, appGroups: StateFlow<List<AppGroup>>,
+    autoAppGroups: StateFlow<List<AutoAppGroup>>, refreshAutoGroups: () -> Unit,
+    navigateToGroups: () -> Unit, onOpenApp: (String) -> Unit, chosenPackage: Channel<String>,
+    onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) = PermissionsContent(
     param.packages, packagePermissions, getPackagePermissions, setPackagePermission, getAppInfo,
-    appliedApps, getAppliedApps, removeApplied, true, chosenPackage, onChoosePackage, onNavigateUp
+    appliedApps, getAppliedApps, removeApplied, appGroups, autoAppGroups, refreshAutoGroups,
+    navigateToGroups, onOpenApp, true, chosenPackage, onChoosePackage, onNavigateUp
 )
 
 @Composable
@@ -628,8 +711,10 @@ private fun PermissionsContent(
     getPackagePermissions: (List<String>) -> Unit,
     setPackagePermission: (List<String>, String, Int) -> Boolean, getAppInfo: (String) -> AppInfo,
     appliedApps: StateFlow<List<AppInfo>>, getAppliedApps: () -> Unit,
-    removeApplied: (String) -> Unit, canAddPackages: Boolean, chosenPackage: Channel<String>,
-    onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
+    removeApplied: (String) -> Unit, appGroups: StateFlow<List<AppGroup>>,
+    autoAppGroups: StateFlow<List<AutoAppGroup>>, refreshAutoGroups: () -> Unit,
+    navigateToGroups: () -> Unit, onOpenApp: (String) -> Unit, canAddPackages: Boolean,
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     var selectedPermission by rememberSaveable { mutableIntStateOf(-1) }
@@ -641,10 +726,16 @@ private fun PermissionsContent(
     }
     LaunchedEffect(Unit) {
         getAppliedApps()
+        refreshAutoGroups()
     }
-    MyLazyScaffold(R.string.permissions, onNavigateUp) {
+    MyLazyScaffold(R.string.permissions, onNavigateUp, {
+        AppGroupsMenu(appGroups, autoAppGroups, navigateToGroups) { apps, add ->
+            if (add) packages += apps.filter { it !in packages } else packages -= apps
+        }
+    }) {
         item {
             if (packages.size > 1) Notes(R.string.info_multiple_apps, HorizontalPadding)
+            if (applied.isNotEmpty()) Notes(R.string.info_applied_apps, HorizontalPadding)
         }
         items(packages.map { getAppInfo(it) }, { it.name }) {
             ApplicationItem(it) { packages -= it.name }
@@ -675,7 +766,7 @@ private fun PermissionsContent(
                 }
             }
         }
-        appliedApps(applied, removeApplied)
+        appliedApps(applied, onOpenApp, removeApplied)
         item {
             Spacer(Modifier.height(BottomPadding))
         }
@@ -1102,14 +1193,9 @@ fun PackageFunctionScreen(
     notes: Int? = null
 ) {
     val context = LocalContext.current
-    val groups by appGroups.collectAsStateWithLifecycle()
-    val autoGroups by autoAppGroups.collectAsStateWithLifecycle()
-    val allGroups = selectableGroups(groups, autoGroups)
     val packages by packagesState.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
     val inputPackages = parsePackageNames(input)
-    var dialog by remember { mutableStateOf(false) }
-    var selectedGroup by remember { mutableStateOf<SelectableAppGroup?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val coroutine = rememberCoroutineScope()
     LaunchedEffect(Unit) {
@@ -1125,37 +1211,7 @@ fun PackageFunctionScreen(
                 { Text(stringResource(title)) },
                 navigationIcon = { NavIcon(onNavigateUp) },
                 actions = {
-                    var expand by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton({
-                            expand = true
-                        }) {
-                            Icon(Icons.Default.MoreVert, null)
-                        }
-                        DropdownMenu(expand, { expand = false }) {
-                            allGroups.forEach { group ->
-                                DropdownMenuItem(
-                                    { Text("(${group.apps.size}) ${group.name}") },
-                                    {
-                                        selectedGroup = group
-                                        dialog = true
-                                        expand = false
-                                    },
-                                    leadingIcon = {
-                                        if (group.auto) Icon(painterResource(R.drawable.tune_fill0), null)
-                                    }
-                                )
-                            }
-                            if (allGroups.isNotEmpty()) HorizontalDivider()
-                            DropdownMenuItem(
-                                { Text(stringResource(R.string.manage_app_groups)) },
-                                {
-                                    navigateToGroups()
-                                    expand = false
-                                }
-                            )
-                        }
-                    }
+                    AppGroupsMenu(appGroups, autoAppGroups, navigateToGroups, onSet)
                 }
             )
         },
@@ -1200,32 +1256,6 @@ fun PackageFunctionScreen(
             }
         }
     }
-    if (dialog) AlertDialog(
-        text = {
-            Column {
-                Text(selectedGroup!!.name, style = typography.titleLarge)
-                Spacer(Modifier.height(6.dp))
-                Button({
-                    onSet(selectedGroup!!.apps, true)
-                    dialog = false
-                }) {
-                    Text(stringResource(R.string.add_to_list))
-                }
-                Button({
-                    onSet(selectedGroup!!.apps, false)
-                    dialog = false
-                }) {
-                    Text(stringResource(R.string.remove_from_list))
-                }
-            }
-        },
-        confirmButton = {
-            TextButton({ dialog = false }) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-        onDismissRequest = { dialog = false }
-    )
 }
 
 @Serializable
@@ -2043,8 +2073,10 @@ fun ManualConfigurationScreen(
     setManualRestriction: (List<String>, String?, ManualRestriction) -> Unit,
     removeManualRestriction: (List<String>, String) -> Unit, getAppInfo: (String) -> AppInfo,
     appliedApps: StateFlow<List<AppInfo>>, getAppliedApps: () -> Unit,
-    removeApplied: (String) -> Unit, canAddPackages: Boolean, chosenPackage: Channel<String>,
-    onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
+    removeApplied: (String) -> Unit, appGroups: StateFlow<List<AppGroup>>,
+    autoAppGroups: StateFlow<List<AutoAppGroup>>, refreshAutoGroups: () -> Unit,
+    navigateToGroups: () -> Unit, onOpenApp: (String) -> Unit, canAddPackages: Boolean,
+    chosenPackage: Channel<String>, onChoosePackage: () -> Unit, onNavigateUp: () -> Unit
 ) {
     val packages = rememberSaveable { mutableStateListOf(*initialPackages.toTypedArray()) }
     val applied by appliedApps.collectAsStateWithLifecycle()
@@ -2057,6 +2089,7 @@ fun ManualConfigurationScreen(
     }
     LaunchedEffect(Unit) {
         getAppliedApps()
+        refreshAutoGroups()
     }
     // A nested bundle can disappear underneath us if it's edited away; fall back to its parent
     val entries = entriesAt(restrictions, path)
@@ -2117,7 +2150,14 @@ fun ManualConfigurationScreen(
                         )
                     }
                 },
-                navigationIcon = { NavIcon { leave() } }
+                navigationIcon = { NavIcon { leave() } },
+                actions = {
+                    if (path.isEmpty()) AppGroupsMenu(
+                        appGroups, autoAppGroups, navigateToGroups
+                    ) { apps, add ->
+                        if (add) packages += apps.filter { it !in packages } else packages -= apps
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -2236,7 +2276,7 @@ fun ManualConfigurationScreen(
                     }
                 }
             }
-            if (path.isEmpty()) appliedApps(applied, removeApplied)
+            if (path.isEmpty()) appliedApps(applied, onOpenApp, removeApplied)
             item {
                 Spacer(Modifier.height(BottomPadding))
             }

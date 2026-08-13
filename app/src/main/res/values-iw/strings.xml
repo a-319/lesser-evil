@@ -69,9 +69,11 @@
 	<string name="auto_deny">דחייה אוטומטית</string>
 	<string name="auto_grant">הענקה אוטומטית</string>
 	<string name="auto_group_apps_count">%1$d אפליקציות \u00B7 אוטומטי</string>
+	<string name="auto_group_configuration">תצורה מוגדרת</string>
 	<string name="auto_group_hidden">מוסתרות</string>
 	<string name="auto_group_keep_uninstalled">נשמרות לאחר הסרה</string>
 	<string name="auto_group_metered_data_disabled">נתונים מושבתים</string>
+	<string name="auto_group_permissions">הרשאות מוגדרות</string>
 	<string name="auto_group_suspended">מושעות</string>
 	<string name="auto_group_uninstall_blocked">חסומות להסרה</string>
 	<string name="auto_group_user_control_disabled">בקרת משתמש מושבתת</string>
@@ -293,6 +295,7 @@
 	<string name="indeterminate">נבדק חלקית</string>
 	<string name="info_affiliation_id">כאשר בעל המכשיר יוצר משתמש מנוהל, המשתמש המנוהל אינו משויך. כדי להפוך את המשתמש המנוהל למזוהה עם בעל המכשיר, עליך להגדיר את אותם מזהים משויכים במשתמש הראשי ובמשתמש המנוהל</string>
 	<string name="info_always_on_vpn">הגדר חיבור VPN תמידי דרך יישום ספציפי עבור המשתמש הנוכחי. חיבור זה מוענק אוטומטית ונמשך לאחר אתחול מחדש.\nהפעל נעילה: גישת רשת מושבתת כאשר ה-VPN אינו מחובר.</string>
+	<string name="info_applied_apps">האפליקציות שהוחל עליהן הרשאה מופיעות בסוף הרשימה.</string>
 	<string name="info_backup_service">לכל משתמש יש שירות גיבוי משלו המנהל את מנגנוני הגיבוי והשחזור באותו משתמש. השבתת שירות הגיבוי תמנע גיבוי או שחזור של נתונים.\nעבור משתמש מנוהל פונקציונליות הגיבוי שלו מופעלת רק אם גם בעל המכשיר וגם בעל הפרופיל הפעילו את שירות הגיבוי.</string>
 	<string name="info_common_criteria_mode">כאשר המכשיר נמצא במצב Common Criteria, פונקציונליות מסויימת של המכשיר מכווננת כך שתעמוד ברמת האבטחה הגבוהה יותר הנדרשת על ידי אישור Common Criteria.</string>
 	<string name="info_content_protection_policy">מדיניות הגנת תוכן שולטת בסריקה לאיתור אפליקציות מטעות.</string>

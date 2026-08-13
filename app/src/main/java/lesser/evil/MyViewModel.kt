@@ -1136,7 +1136,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                 }),
                 AutoAppGroup(R.string.auto_group_keep_uninstalled, policyPackages {
                     if (VERSION.SDK_INT >= 28) DPM.getKeepUninstalledPackages(DAR) else null
-                })
+                }),
+                // Kept as they are applied, so they cost nothing to read here
+                AutoAppGroup(R.string.auto_group_permissions, storedPackages(SP.appliedPermissions)),
+                AutoAppGroup(
+                    R.string.auto_group_configuration, storedPackages(SP.appliedConfigurations)
+                )
             ).filter { it.apps.isNotEmpty() }
         }
     }

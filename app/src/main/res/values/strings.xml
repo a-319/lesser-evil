@@ -434,6 +434,9 @@
     <string name="auto_group_user_control_disabled">User control disabled</string>
     <string name="auto_group_metered_data_disabled">Data disabled</string>
     <string name="auto_group_keep_uninstalled">Kept after uninstall</string>
+    <string name="auto_group_permissions">Permissions set</string>
+    <string name="auto_group_configuration">Configured</string>
+    <string name="info_applied_apps">The apps a permission was set on are listed at the end.</string>
     <string name="apps_tab_user">User</string>
     <string name="select_all">Select all</string>
     <string name="applied_apps">Apps it is applied to</string>

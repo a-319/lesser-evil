@@ -704,10 +704,14 @@ private fun PermissionsContent(
             AddPackagesField(chosenPackage, onChoosePackage, packages) { packages += it }
         }
         itemsIndexed(runtimePermissions, { _, it -> it.id }) { index, it ->
+            val grantState = permissions[it.id]
+            val nonDefault = grantState == PERMISSION_GRANT_STATE_GRANTED || grantState == PERMISSION_GRANT_STATE_DENIED
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (nonDefault) colorScheme.surfaceVariant else Color.Transparent)
                     .clickable(packages.isNotEmpty()) {
                         selectedPermission = index
                     }
@@ -715,7 +719,7 @@ private fun PermissionsContent(
             ) {
                 Icon(painterResource(it.icon), null, Modifier.padding(horizontal = 12.dp))
                 Column {
-                    val state = when(permissions[it.id]) {
+                    val state = when(grantState) {
                         PERMISSION_GRANT_STATE_DEFAULT -> R.string.default_stringres
                         PERMISSION_GRANT_STATE_GRANTED -> R.string.granted
                         PERMISSION_GRANT_STATE_DENIED -> R.string.denied

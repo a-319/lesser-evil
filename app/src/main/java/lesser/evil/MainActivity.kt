@@ -597,8 +597,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 vm.packagePermissions, vm::getPackagePermissions, vm::setPackagePermission,
                 vm::getAppInfo, vm.appsWithPermissions, vm::getAppsWithPermissions,
                 vm::clearPackagePermissions, vm.appGroups, vm.autoAppGroups,
-                vm::refreshAutoAppGroups, ::navigateToAppGroups,
-                { name -> navigate(PermissionsManager(name)) }, ::navigateUp, it.toRoute(),
+                vm::refreshAutoAppGroups, ::navigateToAppGroups, ::navigateUp, it.toRoute(),
                 vm.chosenPackage, ::choosePackage
             )
         }
@@ -692,8 +691,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
                 vm::getAppInfo, vm.appsWithRestrictions, vm::getAppsWithRestrictions,
                 vm::clearAppRestrictionsOf, vm.appGroups, vm.autoAppGroups,
-                vm::refreshAutoAppGroups, ::navigateToAppGroups,
-                { name -> navigate(ManualConfiguration(name)) }, false, vm.chosenPackage,
+                vm::refreshAutoAppGroups, ::navigateToAppGroups, false, vm.chosenPackage,
                 ::choosePackage, ::navigateUp
             )
         }
@@ -703,8 +701,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
                 vm::getAppInfo, vm.appsWithRestrictions, vm::getAppsWithRestrictions,
                 vm::clearAppRestrictionsOf, vm.appGroups, vm.autoAppGroups,
-                vm::refreshAutoAppGroups, ::navigateToAppGroups,
-                { name -> navigate(ManualConfiguration(name)) }, true, vm.chosenPackage,
+                vm::refreshAutoAppGroups, ::navigateToAppGroups, true, vm.chosenPackage,
                 ::choosePackage, ::navigateUp
             )
         }
@@ -714,8 +711,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 vm::setPackagePermission, vm::getAppInfo, vm.appsWithPermissions,
                 vm::getAppsWithPermissions, vm::clearPackagePermissions, vm.appGroups,
                 vm.autoAppGroups, vm::refreshAutoAppGroups, ::navigateToAppGroups,
-                { name -> navigate(PermissionsManager(name)) }, vm.chosenPackage, ::choosePackage,
-                ::navigateUp
+                vm.chosenPackage, ::choosePackage, ::navigateUp
             )
         }
         composable<ManageAppGroups> {

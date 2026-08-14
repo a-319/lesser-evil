@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -331,6 +333,7 @@ fun MyLazyScaffold(
     @StringRes title: Int,
     onNavIconClicked: () -> Unit,
     actions: @Composable RowScope.() -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit
 ) {
     Scaffold(
@@ -344,7 +347,7 @@ fun MyLazyScaffold(
         },
         contentWindowInsets = adaptiveInsets()
     ) { paddingValues ->
-        LazyColumn(Modifier.fillMaxSize().padding(paddingValues), content = content)
+        LazyColumn(Modifier.fillMaxSize().padding(paddingValues), listState, content = content)
     }
 }
 

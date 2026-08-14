@@ -57,6 +57,7 @@
 	<string name="appearance">מראה</string>
 	<string name="applications">אפליקציות</string>
 	<string name="applied_apps">אפליקציות שהוחל עליהן</string>
+	<string name="applied_apps_hint">לחץ על אפליקציה כדי לערוך הגבלה, או X לביטול ההגבלה</string>
 	<string name="apply">החל</string>
 	<string name="apps_ctrl">שליטה באפליקציות</string>
 	<string name="apps_tab_all">הכל</string>

@@ -628,7 +628,14 @@ fun LazyListScope.appliedApps(
     apps: List<AppInfo>, onOpen: (String) -> Unit, onRemove: (String) -> Unit
 ) {
     if (apps.isEmpty()) return
-    item { SectionHeader(R.string.applied_apps) }
+    item {
+        SectionHeader(R.string.applied_apps)
+        Text(
+            stringResource(R.string.applied_apps_hint),
+            Modifier.padding(HorizontalPadding, 0.dp, HorizontalPadding, 8.dp),
+            color = colorScheme.onSurfaceVariant, style = typography.bodySmall
+        )
+    }
     items(apps, { "applied:" + it.name }) {
         ApplicationItem(it, { onOpen(it.name) }) { onRemove(it.name) }
     }
@@ -723,9 +730,10 @@ private fun PermissionsContent(
     val applied by appliedApps.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val coroutine = rememberCoroutineScope()
-    /** An applied app is taken into the list of this screen, which scrolls back up to it */
+    /** An applied app replaces the list of this screen, which scrolls back up to it */
     fun openApp(name: String) {
-        if (name !in packages) packages += name
+        packages.clear()
+        packages += name
         coroutine.launch { listState.animateScrollToItem(0) }
     }
     LaunchedEffect(packages.toList()) {
@@ -2089,9 +2097,10 @@ fun ManualConfigurationScreen(
     val applied by appliedApps.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val coroutine = rememberCoroutineScope()
-    /** An applied app is taken into the list of this screen, which scrolls back up to it */
+    /** An applied app replaces the list of this screen, which scrolls back up to it */
     fun openApp(name: String) {
-        if (name !in packages) packages += name
+        packages.clear()
+        packages += name
         coroutine.launch { listState.animateScrollToItem(0) }
     }
     val restrictions by manualRestrictions.collectAsStateWithLifecycle()

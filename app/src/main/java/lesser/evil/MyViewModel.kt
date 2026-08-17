@@ -1391,10 +1391,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     @RequiresApi(28)
     fun startLockTaskMode(
         packageName: String, activity: String, clearTask: Boolean, showNotification: Boolean,
-        showNavigationButtons: Boolean
+        showNavigationButtons: Boolean, suspendOtherApps: Boolean, blockedPackages: List<String>
     ): Boolean {
         val result = LockTaskUtils.start(
-            application, packageName, activity, clearTask, showNotification, showNavigationButtons
+            application, packageName, activity, clearTask, showNotification, showNavigationButtons,
+            suspendOtherApps, blockedPackages
         )
         getLockTaskPackages()
         return result
@@ -1406,10 +1407,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     @RequiresApi(28)
     fun buildLockTaskProfile(
         name: String, packageName: String, activity: String, clearTask: Boolean,
-        showNotification: Boolean, showNavigationButtons: Boolean
+        showNotification: Boolean, showNavigationButtons: Boolean,
+        suspendOtherApps: Boolean, blockedPackages: List<String>
     ) = LockTaskProfile(
         0, name, packageName, activity, clearTask, showNotification,
-        DPM.getLockTaskPackages(DAR).toList(), DPM.getLockTaskFeatures(DAR), showNavigationButtons
+        DPM.getLockTaskPackages(DAR).toList(), DPM.getLockTaskFeatures(DAR), showNavigationButtons,
+        suspendOtherApps, blockedPackages
     )
     fun addLockTaskProfile(profile: LockTaskProfile): LockTaskProfile {
         val added = LockTaskUtils.addProfile(profile)

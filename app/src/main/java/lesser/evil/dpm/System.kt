@@ -1157,10 +1157,10 @@ fun LockTaskModeScreen(
     chosenPackage: Channel<String>, chooseSinglePackage: () -> Unit, choosePackage: () -> Unit,
     lockTaskPackages: StateFlow<List<AppInfo>>, getLockTaskPackages: () -> Unit,
     setLockTaskPackage: (String, Boolean) -> Unit,
-    startLockTaskMode: (String, String, Boolean, Boolean, Boolean) -> Boolean,
+    startLockTaskMode: (String, String, Boolean, Boolean, Boolean, Boolean, List<String>) -> Boolean,
     getLockTaskFeatures: () -> Int, setLockTaskFeature: (Int) -> String?,
     lockTaskProfiles: StateFlow<List<LockTaskProfile>>, getLockTaskProfiles: () -> Unit,
-    buildLockTaskProfile: (String, String, String, Boolean, Boolean, Boolean) -> LockTaskProfile,
+    buildLockTaskProfile: (String, String, String, Boolean, Boolean, Boolean, Boolean, List<String>) -> LockTaskProfile,
     addLockTaskProfile: (LockTaskProfile) -> LockTaskProfile,
     deleteLockTaskProfile: (Int) -> Unit,
     startLockTaskProfile: (LockTaskProfile) -> Boolean,
@@ -1227,9 +1227,9 @@ fun LockTaskModeScreen(
 @RequiresApi(28)
 @Composable
 private fun StartLockTaskMode(
-    startLockTaskMode: (String, String, Boolean, Boolean, Boolean) -> Boolean,
+    startLockTaskMode: (String, String, Boolean, Boolean, Boolean, Boolean, List<String>) -> Boolean,
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    buildLockTaskProfile: (String, String, String, Boolean, Boolean, Boolean) -> LockTaskProfile,
+    buildLockTaskProfile: (String, String, String, Boolean, Boolean, Boolean, Boolean, List<String>) -> LockTaskProfile,
     addLockTaskProfile: (LockTaskProfile) -> LockTaskProfile,
     createLockTaskProfileShortcut: (LockTaskProfile) -> Boolean
 ) {
@@ -1242,6 +1242,8 @@ private fun StartLockTaskMode(
     var clearTask by rememberSaveable { mutableStateOf(true) }
     var showNotification by rememberSaveable { mutableStateOf(true) }
     var showNavigationButtons by rememberSaveable { mutableStateOf(false) }
+    var suspendOtherApps by rememberSaveable { mutableStateOf(false) }
+    var blockedPackages by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) {
         packageName = chosenPackage.receive()
     }
@@ -1294,6 +1296,22 @@ private fun StartLockTaskMode(
                 SP.lockTaskNavButtonsSwapped = it
             }
         }
+        if (VERSION.SDK_INT >= 24) {
+            FullWidthCheckBoxItem(
+                R.string.lock_task_suspend_other_apps, suspendOtherApps
+            ) { suspendOtherApps = it }
+            OutlinedTextField(
+                value = blockedPackages,
+                onValueChange = { blockedPackages = it },
+                label = { Text(stringResource(R.string.lock_task_blocked_packages)) },
+                placeholder = { Text(stringResource(R.string.one_package_name_per_line)) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusMgr.clearFocus() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = HorizontalPadding, vertical = 4.dp)
+            )
+        }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -1320,7 +1338,8 @@ private fun StartLockTaskMode(
                 .padding(horizontal = HorizontalPadding),
             onClick = {
                 val result = startLockTaskMode(
-                    packageName, activity, clearTask, showNotification, showNavigationButtons
+                    packageName, activity, clearTask, showNotification, showNavigationButtons,
+                    suspendOtherApps, parsePackageNames(blockedPackages)
                 )
                 if (!result) context.showOperationResultToast(false)
             },
@@ -1340,6 +1359,7 @@ private fun StartLockTaskMode(
         }
         Spacer(Modifier.height(5.dp))
         if (!privilege.dhizuku) Notes(R.string.info_start_lock_task_mode)
+        if (VERSION.SDK_INT >= 24) Notes(R.string.info_lock_task_suspend_other_apps)
         Notes(R.string.info_lock_task_nav_buttons)
         Notes(R.string.info_lock_task_profile_shortcut)
         Spacer(Modifier.height(BottomPadding))
@@ -1363,7 +1383,8 @@ private fun StartLockTaskMode(
                         onClick = {
                             val profile = addLockTaskProfile(buildLockTaskProfile(
                                 profileName, packageName, activity, clearTask, showNotification,
-                                showNavigationButtons
+                                showNavigationButtons, suspendOtherApps,
+                                parsePackageNames(blockedPackages)
                             ))
                             context.showOperationResultToast(createLockTaskProfileShortcut(profile))
                             profileDialog = false

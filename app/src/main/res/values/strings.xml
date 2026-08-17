@@ -219,6 +219,9 @@
     <string name="lock_task_nav_overlay_hint">Allow OwnDroid to display over other apps (or enable the OwnDroid accessibility service) to get navigation buttons in gesture navigation.</string>
     <string name="lock_task_nav_accessibility_hint">The Home button will work without accessibility. Enable the OwnDroid accessibility service to also make Back and Overview work.</string>
     <string name="lock_task_swap_nav_buttons">Swap the back and recents buttons</string>
+    <string name="lock_task_suspend_other_apps">Suspend apps that are not allowed</string>
+    <string name="lock_task_blocked_packages">Allowed to run, blocked from opening</string>
+    <string name="info_lock_task_suspend_other_apps">Suspending apps that are not on the allowed list keeps them out of the session even when the locked app itself opens them. This matters below Android 11, where "Block activity start in task" is not available. Apps listed in "Allowed to run, blocked from opening" stay on the allowed list — so apps that depend on them keep working — but are suspended, so the user cannot open them: for example, allow the Google app so Gemini works, and list it here so the user cannot enter Google Search. All the apps are released as soon as lock task mode ends.</string>
     <string name="accessibility_service_not_enabled">Please enable the OwnDroid accessibility service</string>
     <string name="accessibility_service_description">Adds working Back and Overview controls while lock task mode is running.</string>
     <string name="profiles">Profiles</string>
@@ -352,6 +355,7 @@
     <string name="included_uids">Included UIDs</string>
     <string name="excluded_uids">Excluded UIDs</string>
     <string name="one_uid_per_line">One UID per line</string>
+    <string name="one_package_name_per_line">One package name per line</string>
     <string name="override_apn">Override APN</string>
     <string name="apn_setting">APN setting</string>
     <string name="name">Name</string>

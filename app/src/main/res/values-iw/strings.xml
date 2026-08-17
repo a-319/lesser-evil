@@ -52,6 +52,7 @@
 	<string name="app_name_user_profile">OwnDroid (משתמש)</string>
 	<string name="app_installer">מתקין אפליקציה</string>
 	<string name="app_lock">נעילת אפליקציה</string>
+	<string name="app_lock_notes">האפליקציה נועלת את עצמה בכל יציאה, ומבקשת את הסיסמה כשחוזרים אליה.</string>
 	<string name="app_name">OwnDroid</string>
 	<string name="app_not_allowed">אפליקציה אסורה</string>
 	<string name="appearance">מראה</string>
@@ -165,7 +166,9 @@
 	<string name="cross_profile_copy">עותק חוצה פרופיל</string>
 	<string name="cross_profile_widget">ווידג\'ט חוצה פרופיל</string>
 	<string name="current">נוכחי</string>
+	<string name="current_password">סיסמה נוכחית</string>
 	<string name="current_password_complexity">מורכבות הסיסמה הנוכחית</string>
+	<string name="current_password_required">נדרשת כדי לשנות או להשבית את הסיסמה</string>
 	<string name="current_state">סטטוס נוכחי: %1$s</string>
 	<string name="custom">מותאם אישית </string>
 	<string name="dark_theme">נושא אפל</string>
@@ -388,7 +391,6 @@
 	<string name="lock_task_mode_nav_buttons">לחצני הניווט יוצאים ממצב הנעילה</string>
 	<string name="lock_task_mode_show_notification">הצג התראה ליציאה</string>
 	<string name="lock_task_mode_start_clear_task">נקה משימה (התחל מחדש)</string>
-	<string name="lock_when_leaving">נעילה בעת יציאה</string>
 	<string name="lockdown_admin_configured_network">נעילה של רשת בהגדרת מנהל</string>
 	<string name="logout">התנתק</string>
 	<string name="logout_enabled">התנתקות מופעלת</string>
@@ -650,6 +652,8 @@
 	<string name="serial_number">מספר סידורי</string>
 	<string name="set">הגדר</string>
 	<string name="set_default_dialer">הגדר חייגן ברירת מחדל</string>
+	<string name="set_random_password">הגדר סיסמה אקראית</string>
+	<string name="set_random_password_warning">האפליקציה תגדיר סיסמה שאף אחד לא מכיר ותכבה זיהוי ביומטרי, כך שהיא תישאר נעולה לצמיתות: לא ניתן יהיה להקיש, לשנות או להשבית את הסיסמה הזו לעולם. הכניסה כמשתמש תמשיך להיות אפשרית.</string>
 	<string name="set_user_icon">הגדר סמל משתמש</string>
 	<string name="set_wallpaper">הגדר טפט</string>
 	<string name="settings">הגדרות</string>
@@ -751,7 +755,13 @@
 	<string name="unknown">לא ידוע</string>
 	<string name="unknown_error">שגיאה לא ידועה</string>
 	<string name="unlock">לפתוח</string>
+	<string name="unlock_code_challenge">אתגר</string>
+	<string name="unlock_code_digits">%1$d מתוך %2$d ספרות</string>
+	<string name="unlock_code_notes">הקריאו את האתגר למנהל האפליקציה, והקלידו את הקוד שהוא מקריא בחזרה. הוא פותח את ההפעלה הנוכחית פעם אחת, ורק במכשיר הזה.</string>
+	<string name="unlock_code_refused">הקוד הזה לא מתאים לאתגר</string>
+	<string name="unlock_code_response">קוד</string>
 	<string name="unlock_wait_seconds">נסה שוב בעוד %1$d שניות.</string>
+	<string name="unlock_with_code">פתיחה באמצעות קוד</string>
 	<string name="unmute">אי שביעות רצון</string>
 	<string name="unmute_microphone">בטל השתקת המיקרופון</string>
 	<string name="unsupported">לא נתמך</string>
@@ -802,5 +812,6 @@
 	<string name="work_profile">פרופיל עבודה</string>
 	<string name="work_profile_activated">פרופיל העבודה הופעל</string>
 	<string name="work_to_personal">עבודה ל\'אישי\'</string>
+	<string name="wrong_password">סיסמה שגויה</string>
 	<string name="yes">כן</string>
 </resources>

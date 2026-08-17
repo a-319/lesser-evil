@@ -584,7 +584,6 @@
     <string name="minimum_length_4">长度不得小于4</string>
     <string name="leave_empty_to_remain_unchanged">留空以保持未更改</string>
     <string name="allow_biometrics">允许生物识别</string>
-    <string name="lock_when_leaving">离开时锁定</string>
     <string name="unlock">解锁</string>
     <string name="security">安全性</string>
     <string name="clear_storage">清除存储空间</string>

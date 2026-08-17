@@ -81,7 +81,9 @@ kotlin {
 }
 
 gradle.taskGraph.whenReady {
-    project.tasks.findByPath(":app:test")?.enabled = false
+    // Building doesn't wait for the tests, but asking for them still runs them
+    val testsAsked = gradle.startParameter.taskNames.any { it.contains("test", ignoreCase = true) }
+    if (!testsAsked) project.tasks.findByPath(":app:test")?.enabled = false
     project.tasks.findByPath(":app:lint")?.enabled = false
     project.tasks.findByPath(":app:lintAnalyzeDebug")?.enabled = false
 }
@@ -105,5 +107,7 @@ dependencies {
     implementation(libs.libsu)
     implementation(libs.reoderable)
     implementation(libs.serialization)
+    implementation(libs.bouncycastle)
     implementation(kotlin("reflect"))
+    testImplementation(libs.junit)
 }

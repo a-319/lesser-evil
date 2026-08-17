@@ -26,3 +26,8 @@
 -dontwarn android.app.LoadedApk
 
 -keep class lesser.evil.MyViewModel { *; }
+
+# Only the Ed25519 verifier of Bouncy Castle is reached, the rest of the jar
+# mentions desktop classes this build never has
+-dontwarn org.bouncycastle.**
+-dontwarn javax.naming.**

@@ -10,7 +10,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.edit
@@ -20,6 +19,8 @@ import lesser.evil.ui.theme.OwnDroidTheme
 import kotlin.system.exitProcess
 
 class ManageSpaceActivity: FragmentActivity() {
+    private var appLockDialog by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -27,7 +28,6 @@ class ManageSpaceActivity: FragmentActivity() {
         setContent {
             val theme by vm.theme.collectAsStateWithLifecycle()
             OwnDroidTheme(theme) {
-                var appLockDialog by remember { mutableStateOf(!SP.lockPasswordHash.isNullOrEmpty()) }
                 if(appLockDialog) {
                     AppLockDialog({ appLockDialog = false }, onDismiss = ::finish)
                 } else {
@@ -50,6 +50,12 @@ class ManageSpaceActivity: FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // A password locks the app on launch and every time it's left
+        if(!SP.lockPasswordHash.isNullOrEmpty()) appLockDialog = true
     }
 
     fun clearStorage() {

@@ -799,7 +799,8 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             AppearanceScreen(::navigateUp, vm.theme, vm::changeTheme)
         }
         composable<AppLockSettings> {
-            AppLockSettingsScreen(vm.getAppLockConfig(), vm::setAppLockConfig, ::navigateUp)
+            AppLockSettingsScreen(vm.getAppLockConfig(), vm::setAppLockConfig,
+                vm::verifyAppLockPassword, ::navigateUp)
         }
         composable<ApiSettings> {
             ApiSettings(vm::getApiEnabled, vm::setApiKey, ::navigateUp)
@@ -812,9 +813,10 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
     }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
+            // A password always locks the app, both on launch and whenever it's left
             if (
-                (event == Lifecycle.Event.ON_CREATE && !SP.lockPasswordHash.isNullOrEmpty()) ||
-                (event == Lifecycle.Event.ON_RESUME && SP.lockWhenLeaving)
+                (event == Lifecycle.Event.ON_CREATE || event == Lifecycle.Event.ON_RESUME) &&
+                !SP.lockPasswordHash.isNullOrEmpty()
             ) {
                 onLock()
             }

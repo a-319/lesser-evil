@@ -673,9 +673,20 @@
     <string name="minimum_length_4">The length must not be less than 4</string>
     <string name="leave_empty_to_remain_unchanged">Leave empty to remain unchanged</string>
     <string name="allow_biometrics">Allow biometrics</string>
-    <string name="lock_when_leaving">Lock when leaving</string>
+    <string name="current_password">Current password</string>
+    <string name="current_password_required">Required to change or disable the password</string>
+    <string name="wrong_password">Wrong password</string>
+    <string name="set_random_password">Set a random password</string>
+    <string name="set_random_password_warning">The app will set a password nobody knows and turn off biometrics, so it stays locked for good: this password can never be entered, changed or disabled again. Entering as a user remains possible.</string>
+    <string name="app_lock_notes">The app locks itself every time you leave it, and asks for the password when you come back.</string>
     <string name="unlock">Unlock</string>
     <string name="unlock_wait_seconds">Try again in %1$d seconds.</string>
+    <string name="unlock_with_code">Unlock with a code</string>
+    <string name="unlock_code_notes">Read the challenge out to the admin of this app, and type in the code they read back. It opens this session once, and only on this device.</string>
+    <string name="unlock_code_challenge">Challenge</string>
+    <string name="unlock_code_response">Code</string>
+    <string name="unlock_code_digits">%1$d of %2$d digits</string>
+    <string name="unlock_code_refused">This code does not match the challenge</string>
     <string name="security">Security</string>
     <string name="clear_storage">Clear storage</string>
     

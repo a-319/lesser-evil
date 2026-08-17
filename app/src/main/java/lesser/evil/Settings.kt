@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,6 +34,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -223,7 +225,7 @@ fun AppearanceScreen(
 
 data class AppLockConfig(
     /** null means no password, empty means password already set */
-    val password: String?, val biometrics: Boolean, val whenLeaving: Boolean
+    val password: String?, val biometrics: Boolean
 )
 
 @Serializable object AppLockSettings
@@ -231,14 +233,38 @@ data class AppLockConfig(
 @Composable
 fun AppLockSettingsScreen(
     config: AppLockConfig, setConfig: (AppLockConfig) -> Unit,
-    onNavigateUp: () -> Unit
+    verifyPassword: (String) -> Boolean, onNavigateUp: () -> Unit
 ) = MyScaffold(R.string.app_lock, onNavigateUp) {
+    var currentPassword by rememberSaveable { mutableStateOf("") }
+    var wrongCurrentPassword by rememberSaveable { mutableStateOf(false) }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
     var allowBiometrics by rememberSaveable { mutableStateOf(config.biometrics) }
-    var lockWhenLeaving by rememberSaveable { mutableStateOf(config.whenLeaving) }
-    var alreadySet by rememberSaveable { mutableStateOf(config.password != null) }
+    var randomPasswordDialog by rememberSaveable { mutableStateOf(false) }
+    val alreadySet = config.password != null
     val isInputLegal = password.length !in 1..3 && (alreadySet || password.isNotBlank())
+    /** Changing an existing password requires knowing the current one */
+    val authorized = !alreadySet || currentPassword.isNotEmpty()
+    /** True if the current password was confirmed, otherwise marks its field as wrong */
+    fun authorize(): Boolean {
+        if (!alreadySet) return true
+        if (verifyPassword(currentPassword)) return true
+        wrongCurrentPassword = true
+        return false
+    }
+    if (alreadySet) OutlinedTextField(
+        currentPassword, { currentPassword = it; wrongCurrentPassword = false },
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        label = { Text(stringResource(R.string.current_password)) },
+        isError = wrongCurrentPassword,
+        supportingText = {
+            Text(stringResource(
+                if (wrongCurrentPassword) R.string.wrong_password else R.string.current_password_required
+            ))
+        },
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next)
+    )
     OutlinedTextField(
         password, { password = it }, Modifier.fillMaxWidth().padding(vertical = 4.dp),
         label = { Text(stringResource(R.string.password)) },
@@ -259,32 +285,52 @@ fun AppLockSettingsScreen(
         Text(stringResource(R.string.allow_biometrics))
         Switch(allowBiometrics, { allowBiometrics = it })
     }
-    Row(
-        Modifier.fillMaxWidth().padding(bottom = 6.dp),
-        Arrangement.SpaceBetween, Alignment.CenterVertically
-    ) {
-        Text(stringResource(R.string.lock_when_leaving))
-        Switch(lockWhenLeaving, { lockWhenLeaving = it })
-    }
     Button(
         onClick = {
-            setConfig(AppLockConfig(password, allowBiometrics, lockWhenLeaving))
-            onNavigateUp()
+            if (authorize()) {
+                setConfig(AppLockConfig(password, allowBiometrics))
+                onNavigateUp()
+            }
         },
         modifier = Modifier.fillMaxWidth(),
-        enabled = isInputLegal && confirmPassword == password
+        enabled = isInputLegal && confirmPassword == password && authorized
     ) {
         Text(stringResource(if(alreadySet) R.string.update else R.string.set))
     }
+    FilledTonalButton(
+        onClick = { if (authorize()) randomPasswordDialog = true },
+        modifier = Modifier.fillMaxWidth(),
+        enabled = authorized
+    ) {
+        Text(stringResource(R.string.set_random_password))
+    }
     if (alreadySet) FilledTonalButton(
         onClick = {
-            setConfig(AppLockConfig(null, false, false))
-            onNavigateUp()
+            if (authorize()) {
+                setConfig(AppLockConfig(null, false))
+                onNavigateUp()
+            }
         },
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(stringResource(R.string.disable))
     }
+    Notes(R.string.app_lock_notes)
+    if (randomPasswordDialog) AlertDialog(
+        title = { Text(stringResource(R.string.set_random_password)) },
+        text = { Text(stringResource(R.string.set_random_password_warning)) },
+        onDismissRequest = { randomPasswordDialog = false },
+        dismissButton = {
+            TextButton({ randomPasswordDialog = false }) { Text(stringResource(R.string.cancel)) }
+        },
+        confirmButton = {
+            TextButton({
+                randomPasswordDialog = false
+                setConfig(AppLockConfig(generateRandomPassword(), false))
+                onNavigateUp()
+            }) { Text(stringResource(R.string.confirm)) }
+        }
+    )
 }
 
 @Serializable object ApiSettings

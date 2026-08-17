@@ -484,6 +484,8 @@
     <string name="elements_count">%1$d elements</string>
     <string name="clear_configurations">Clear configurations</string>
     <string name="specify_value">Specify value</string>
+    <string name="translate_description">Translate description</string>
+    <string name="original_description">Show original</string>
     <string name="package_removed">Removed %1$s</string>
 
     <!--UserRestriction-->

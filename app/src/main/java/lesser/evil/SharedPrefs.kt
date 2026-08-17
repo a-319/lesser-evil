@@ -39,6 +39,8 @@ class SharedPrefs(context: Context) {
     var lockTaskUnsuspendedApps by StringSharedPref("lock_task.unsuspended_apps")
     var lockTaskUnhiddenApps by StringSharedPref("lock_task.unhidden_apps")
     var lockTaskSuspendedApps by StringSharedPref("lock_task.suspended_apps")
+    var lockTaskBlockedApps by StringSharedPref("lock_task.blocked_apps")
+    var lockTaskMainApp by StringSharedPref("lock_task.main_app")
     var lockTaskHomeInterception by BooleanSharedPref("lock_task.home_interception")
     var lockTaskNavButtonsSwapped by BooleanSharedPref("lock_task.nav_buttons_swapped")
 }

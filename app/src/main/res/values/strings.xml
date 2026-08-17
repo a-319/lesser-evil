@@ -220,8 +220,9 @@
     <string name="lock_task_nav_accessibility_hint">The Home button will work without accessibility. Enable the OwnDroid accessibility service to also make Back and Overview work.</string>
     <string name="lock_task_swap_nav_buttons">Swap the back and recents buttons</string>
     <string name="lock_task_suspend_other_apps">Suspend apps that are not allowed</string>
-    <string name="lock_task_blocked_packages">Allowed to run, blocked from opening</string>
-    <string name="info_lock_task_suspend_other_apps">Suspending apps that are not on the allowed list keeps them out of the session even when the locked app itself opens them. This matters below Android 11, where "Block activity start in task" is not available. Apps listed in "Allowed to run, blocked from opening" stay on the allowed list — so apps that depend on them keep working — but are suspended, so the user cannot open them: for example, allow the Google app so Gemini works, and list it here so the user cannot enter Google Search. All the apps are released as soon as lock task mode ends.</string>
+    <string name="lock_task_blocked_needs_accessibility">This needs the OwnDroid accessibility service to be enabled</string>
+    <string name="lock_task_blocked_packages">Keep running, but never show</string>
+    <string name="info_lock_task_suspend_other_apps">Suspending apps that are not on the allowed list keeps them out of the session even when the locked app itself opens them. This matters below Android 11, where "Block activity start in task" is not available. Suspended apps are released as soon as lock task mode ends.\n\n"Keep running, but never show" is for helper apps that the locked app stops working without — for example Gemini needs the Google app. Such an app cannot be suspended, so instead it stays fully allowed and the OwnDroid accessibility service sends the user back whenever it reaches the foreground. This one needs the accessibility service; without it the app stays reachable.</string>
     <string name="accessibility_service_not_enabled">Please enable the OwnDroid accessibility service</string>
     <string name="accessibility_service_description">Adds working Back and Overview controls while lock task mode is running.</string>
     <string name="profiles">Profiles</string>

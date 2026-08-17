@@ -1302,7 +1302,15 @@ private fun StartLockTaskMode(
             ) { suspendOtherApps = it }
             OutlinedTextField(
                 value = blockedPackages,
-                onValueChange = { blockedPackages = it },
+                onValueChange = {
+                    // Only the accessibility service can keep the user out of an app that must
+                    // stay runnable, so ask for it as soon as the field is used.
+                    if (blockedPackages.isBlank() && it.isNotBlank() &&
+                        NavigationAccessibilityService.instance == null) {
+                        context.popToast(R.string.lock_task_blocked_needs_accessibility)
+                    }
+                    blockedPackages = it
+                },
                 label = { Text(stringResource(R.string.lock_task_blocked_packages)) },
                 placeholder = { Text(stringResource(R.string.one_package_name_per_line)) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),

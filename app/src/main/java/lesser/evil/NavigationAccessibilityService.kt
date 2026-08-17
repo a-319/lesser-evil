@@ -5,8 +5,10 @@ import android.app.ActivityManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -34,8 +36,52 @@ class NavigationAccessibilityService : AccessibilityService() {
     private val addedViews = mutableListOf<View>()
     private val handler = Handler(Looper.getMainLooper())
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
+
+    private var lastBouncedPackage: String? = null
+    private var bounceCount = 0
+    private var lastBounceTime = 0L
+
+    /**
+     * Keeps the user out of packages that have to stay runnable for the locked app's sake (for
+     * example the Google app, which Gemini stops working without). They cannot be suspended, so
+     * the only remaining option is to notice them reaching the foreground and go back.
+     */
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (Build.VERSION.SDK_INT < 28) return
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val blocked = SP.lockTaskBlockedApps?.let { parsePackageNames(it) } ?: return
+        if (blocked.isEmpty()) return
+        val packageName = event.packageName?.toString() ?: return
+        if (packageName !in blocked) return
+        val am = getSystemService(ActivityManager::class.java)
+        if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) return
+        bounceOut(packageName)
+    }
+
+    /** Back usually undoes the navigation; if it keeps coming back, relaunch the locked app. */
+    private fun bounceOut(packageName: String) {
+        val now = SystemClock.elapsedRealtime()
+        if (packageName != lastBouncedPackage || now - lastBounceTime > 3000) bounceCount = 0
+        lastBouncedPackage = packageName
+        lastBounceTime = now
+        bounceCount++
+        if (bounceCount <= 2) {
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            return
+        }
+        bounceCount = 0
+        val main = SP.lockTaskMainApp
+        if (main.isNullOrEmpty()) return
+        try {
+            packageManager.getLaunchIntentForPackage(main)?.let {
+                it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(it)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()

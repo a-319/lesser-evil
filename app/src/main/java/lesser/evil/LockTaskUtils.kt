@@ -29,8 +29,10 @@ data class LockTaskProfile(
     val showNavigationButtons: Boolean = false,
     val suspendOtherApps: Boolean = false,
     /**
-     * Packages kept on the lock task allowlist (so apps that depend on them keep working) but
-     * suspended for the session, so the user cannot open them directly.
+     * Packages that stay lock task permitted and fully runnable — so apps depending on them keep
+     * working — but that the user must not end up in. They cannot be suspended (that would break
+     * the apps that need them), so the accessibility service watches for them coming to the
+     * foreground and sends the user back instead.
      */
     val blockedPackages: List<String> = emptyList()
 )
@@ -127,18 +129,17 @@ object LockTaskUtils {
             }
         }
         if (blockedPackages.isNotEmpty()) {
-            // Keep them permitted so apps that depend on them keep working; they are suspended
-            // below so the user still cannot open them.
+            // They must stay permitted and runnable, otherwise the apps that depend on them break;
+            // the accessibility watchdog is what keeps the user out of them.
             val missing = blockedPackages.filter { !dpm.isLockTaskPermitted(it) }
             if (missing.isNotEmpty()) {
                 dpm.setLockTaskPackages(dar, dpm.getLockTaskPackages(dar) + missing)
             }
+            SP.lockTaskBlockedApps = blockedPackages.joinToString("\n")
+            SP.lockTaskMainApp = packageName
         }
-        // Blocked packages must stay suspended, so they are not lifted with the rest.
-        liftTemporaryAppStates(dpm.getLockTaskPackages(dar).toList() - blockedPackages.toSet())
-        if (suspendOtherApps || blockedPackages.isNotEmpty()) {
-            suspendUnallowedApps(context, suspendOtherApps, blockedPackages)
-        }
+        liftTemporaryAppStates(dpm.getLockTaskPackages(dar).toList())
+        if (suspendOtherApps) suspendUnallowedApps(context)
         val intent = if (activity.isNotEmpty()) {
             Intent().setComponent(ComponentName(packageName, activity))
         } else context.packageManager.getLaunchIntentForPackage(packageName)
@@ -308,34 +309,25 @@ object LockTaskUtils {
     }
 
     /**
-     * Suspend apps so they cannot be entered during the session, remembering exactly which ones
-     * were suspended here so they can be released on exit.
-     *
-     * @param suspendOthers suspend every launcher-visible app that is not lock task permitted.
-     *   Useful below API 30, where [DevicePolicyManager.LOCK_TASK_FEATURE_BLOCK_ACTIVITY_START_IN_TASK]
-     *   is unavailable and an app can otherwise pull an unlisted app into the locked task.
-     * @param blocked packages that stay lock task permitted (so apps depending on them keep
-     *   working) but must not be openable by the user.
+     * Suspend every launcher-visible app that is not lock task permitted, remembering exactly
+     * which ones were suspended here so they can be released on exit. Useful below API 30, where
+     * [DevicePolicyManager.LOCK_TASK_FEATURE_BLOCK_ACTIVITY_START_IN_TASK] is unavailable and the
+     * locked app can otherwise pull an unlisted app into the task.
      */
-    private fun suspendUnallowedApps(context: Context, suspendOthers: Boolean, blocked: List<String>) {
+    private fun suspendUnallowedApps(context: Context) {
         if (Build.VERSION.SDK_INT < 24) return
         val dpm = Privilege.DPM
         val dar = Privilege.DAR
-        val targets = mutableListOf<String>()
-        if (suspendOthers) {
-            val permitted = dpm.getLockTaskPackages(dar).toSet()
-            val launchable = try {
-                context.packageManager.queryIntentActivities(
-                    Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
-                ).map { it.activityInfo.packageName }.distinct()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                emptyList()
-            }
-            targets += launchable.filter { it !in permitted }
+        val permitted = dpm.getLockTaskPackages(dar).toSet()
+        val launchable = try {
+            context.packageManager.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+            ).map { it.activityInfo.packageName }.distinct()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
         }
-        targets += blocked
-        val filtered = targets.distinct().filter {
+        val filtered = launchable.filter { it !in permitted }.distinct().filter {
             it != context.packageName && !isPackageSuspendedSafe(it)
         }
         if (filtered.isEmpty()) return
@@ -366,7 +358,7 @@ object LockTaskUtils {
 
     fun hasTemporaryAppStates() =
         !SP.lockTaskUnhiddenApps.isNullOrEmpty() || !SP.lockTaskUnsuspendedApps.isNullOrEmpty() ||
-                !SP.lockTaskSuspendedApps.isNullOrEmpty()
+                !SP.lockTaskSuspendedApps.isNullOrEmpty() || !SP.lockTaskBlockedApps.isNullOrEmpty()
 
     /** Restore every app state that was changed for the lock task session. */
     fun restoreTemporaryAppStates() {
@@ -391,6 +383,8 @@ object LockTaskUtils {
         SP.lockTaskUnhiddenApps = null
         SP.lockTaskUnsuspendedApps = null
         SP.lockTaskSuspendedApps = null
+        SP.lockTaskBlockedApps = null
+        SP.lockTaskMainApp = null
     }
 
     /** Restore state left over from a lock task session that ended without cleanup. */

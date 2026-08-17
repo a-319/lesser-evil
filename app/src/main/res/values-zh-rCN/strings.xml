@@ -191,9 +191,10 @@
     <string name="lock_task_nav_accessibility_hint">主屏幕按键无需无障碍服务即可使用。启用OwnDroid的无障碍服务可让返回和概览按键也生效。</string>
     <string name="lock_task_swap_nav_buttons">交换返回和概览按键</string>
     <string name="lock_task_suspend_other_apps">挂起未被允许的应用</string>
-    <string name="lock_task_blocked_packages">允许运行，禁止打开</string>
+    <string name="lock_task_blocked_needs_accessibility">此功能需要启用OwnDroid的无障碍服务</string>
+    <string name="lock_task_blocked_packages">保持运行，但不显示</string>
     <string name="one_package_name_per_line">每行一个包名</string>
-    <string name="info_lock_task_suspend_other_apps">挂起不在允许列表中的应用，可使它们无法进入本次会话，即使被锁定的应用主动打开它们也是如此。这在 Android 11 以下尤为重要，因为该版本没有"阻止在任务中启动活动"。列在"允许运行，禁止打开"中的应用仍保留在允许列表内——因此依赖它们的应用可继续工作——但会被挂起，用户无法打开：例如允许 Google 应用以便 Gemini 可用，并将其列在此处，使用户无法进入 Google 搜索。锁定任务模式结束后，所有应用都会立即恢复。</string>
+    <string name="info_lock_task_suspend_other_apps">挂起不在允许列表中的应用，可使它们无法进入本次会话，即使被锁定的应用主动打开它们也是如此。这在 Android 11 以下尤为重要，因为该版本没有"阻止在任务中启动活动"。被挂起的应用会在锁定任务模式结束后立即恢复。\n\n"保持运行，但不显示"用于被锁定应用离不开的辅助应用——例如 Gemini 需要 Google 应用。这类应用无法被挂起，因此它会保持完全允许状态，并由 OwnDroid 的无障碍服务在其进入前台时将用户送回。此选项需要无障碍服务；没有它，该应用仍可被进入。</string>
     <string name="accessibility_service_not_enabled">请启用OwnDroid的无障碍服务</string>
     <string name="accessibility_service_description">在锁定任务模式运行期间，提供可用的返回和概览控制。</string>
     <string name="profiles">配置</string>

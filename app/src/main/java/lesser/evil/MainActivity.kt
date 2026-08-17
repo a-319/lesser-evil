@@ -596,8 +596,9 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             PermissionsManagerScreen(
                 vm.packagePermissions, vm::getPackagePermissions, vm::setPackagePermission,
                 vm::getAppInfo, vm.appsWithPermissions, vm::getAppsWithPermissions,
-                vm::clearPackagePermissions, ::navigateUp, it.toRoute(), vm.chosenPackage,
-                ::choosePackage
+                vm::clearPackagePermissions, vm.appGroups, vm.autoAppGroups,
+                vm::refreshAutoAppGroups, ::navigateToAppGroups, ::navigateUp, it.toRoute(),
+                vm.chosenPackage, ::choosePackage
             )
         }
         composable<DisableMeteredData> {
@@ -689,7 +690,9 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 listOf(it.toRoute<ManualConfiguration>().packageName), vm.manualRestrictions,
                 vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
                 vm::getAppInfo, vm.appsWithRestrictions, vm::getAppsWithRestrictions,
-                vm::clearAppRestrictionsOf, false, vm.chosenPackage, ::choosePackage, ::navigateUp
+                vm::clearAppRestrictionsOf, vm.appGroups, vm.autoAppGroups,
+                vm::refreshAutoAppGroups, ::navigateToAppGroups, false, vm.chosenPackage,
+                ::choosePackage, ::navigateUp
             )
         }
         composable<ManualConfigurations> {
@@ -697,15 +700,18 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
                 it.toRoute<ManualConfigurations>().packages, vm.manualRestrictions,
                 vm::getManualRestrictions, vm::setManualRestriction, vm::removeManualRestriction,
                 vm::getAppInfo, vm.appsWithRestrictions, vm::getAppsWithRestrictions,
-                vm::clearAppRestrictionsOf, true, vm.chosenPackage, ::choosePackage, ::navigateUp
+                vm::clearAppRestrictionsOf, vm.appGroups, vm.autoAppGroups,
+                vm::refreshAutoAppGroups, ::navigateToAppGroups, true, vm.chosenPackage,
+                ::choosePackage, ::navigateUp
             )
         }
         composable<MultiplePermissions> {
             MultiplePermissionsScreen(
                 it.toRoute(), vm.packagePermissions, vm::getPackagePermissions,
                 vm::setPackagePermission, vm::getAppInfo, vm.appsWithPermissions,
-                vm::getAppsWithPermissions, vm::clearPackagePermissions, vm.chosenPackage,
-                ::choosePackage, ::navigateUp
+                vm::getAppsWithPermissions, vm::clearPackagePermissions, vm.appGroups,
+                vm.autoAppGroups, vm::refreshAutoAppGroups, ::navigateToAppGroups,
+                vm.chosenPackage, ::choosePackage, ::navigateUp
             )
         }
         composable<ManageAppGroups> {

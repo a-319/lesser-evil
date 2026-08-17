@@ -414,6 +414,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
             }
         }
         getPackagePermissions(packages)
+        recordPermissions(packages, status != PERMISSION_GRANT_STATE_DEFAULT)
         return result
     }
 
@@ -828,6 +829,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                 DPM.setApplicationRestrictions(DAR, name, bundle)
                 getAppRestrictions(name)
             }
+            recordRestrictions(listOf(name))
         }
     }
 
@@ -837,6 +839,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                 DPM.setApplicationRestrictions(DAR, name, Bundle())
                 getAppRestrictions(name)
             }
+            recordRestrictions(listOf(name))
         }
     }
 
@@ -870,23 +873,40 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         return b
     }
 
-    /** The apps a runtime permission was granted or denied on; null while the scan runs */
-    val appsWithPermissions = MutableStateFlow<List<AppInfo>?>(null)
+    /**
+     * The apps a setting of ours reached. Kept as it is applied instead of scanned for, since
+     * there is no way to ask the system which apps hold a permission state.
+     */
+    val appsWithPermissions = MutableStateFlow(emptyList<AppInfo>())
+    val appsWithRestrictions = MutableStateFlow(emptyList<AppInfo>())
+    private fun storedPackages(value: String?) =
+        value?.let { parsePackageNames(it) } ?: emptyList()
+    private fun storePackages(list: List<String>) =
+        list.distinct().takeIf { it.isNotEmpty() }?.joinToString("\n")
+
     fun getAppsWithPermissions() {
-        appsWithPermissions.value = null
+        appsWithPermissions.value = storedPackages(SP.appliedPermissions).map { getAppInfo(it) }
+    }
+    /** Notes that [packages] now hold a permission state, or drops the ones left with none */
+    private fun recordPermissions(packages: List<String>, applied: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            val permissions = runtimePermissions.filter { VERSION.SDK_INT >= it.requiresApi }
-            appsWithPermissions.value = installedPackageNames().filter { name ->
-                permissions.any {
-                    try {
-                        DPM.getPermissionGrantState(DAR, name, it.id) != PERMISSION_GRANT_STATE_DEFAULT
-                    } catch (_: Exception) {
-                        false
-                    }
-                }
-            }.map { getAppInfo(it) }
+            val kept = if (applied) storedPackages(SP.appliedPermissions) + packages
+            else storedPackages(SP.appliedPermissions).filter {
+                it !in packages || holdsAnyPermission(it)
+            }
+            SP.appliedPermissions = storePackages(kept)
+            getAppsWithPermissions()
         }
     }
+    /** True when any runtime permission of [name] is not at its default */
+    private fun holdsAnyPermission(name: String) =
+        runtimePermissions.filter { VERSION.SDK_INT >= it.requiresApi }.any {
+            try {
+                DPM.getPermissionGrantState(DAR, name, it.id) != PERMISSION_GRANT_STATE_DEFAULT
+            } catch (_: Exception) {
+                false
+            }
+        }
     /** Puts every runtime permission of [name] back to the default, taking it off the list */
     fun clearPackagePermissions(name: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -897,21 +917,40 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                     e.printStackTrace()
                 }
             }
-            appsWithPermissions.update { list -> list?.filter { it.name != name } }
+            SP.appliedPermissions = storePackages(
+                storedPackages(SP.appliedPermissions).filter { it != name }
+            )
+            getAppsWithPermissions()
         }
     }
-    /** The apps holding a configuration; null while the scan runs */
-    val appsWithRestrictions = MutableStateFlow<List<AppInfo>?>(null)
+
     fun getAppsWithRestrictions() {
-        appsWithRestrictions.value = null
+        // A configuration can be read back cheaply, so the list is seeded once from the device
+        if (SP.appliedConfigurations == null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                SP.appliedConfigurations = storePackages(
+                    installedPackageNames().filter { holdsRestrictions(it) }
+                )
+                appsWithRestrictions.value =
+                    storedPackages(SP.appliedConfigurations).map { getAppInfo(it) }
+            }
+            return
+        }
+        appsWithRestrictions.value = storedPackages(SP.appliedConfigurations).map { getAppInfo(it) }
+    }
+    private fun holdsRestrictions(name: String) = try {
+        !DPM.getApplicationRestrictions(DAR, name).isEmpty
+    } catch (_: Exception) {
+        false
+    }
+    /** Notes which of [packages] still hold a configuration after a write */
+    private fun recordRestrictions(packages: List<String>) {
         viewModelScope.launch(Dispatchers.IO) {
-            appsWithRestrictions.value = installedPackageNames().filter { name ->
-                try {
-                    !DPM.getApplicationRestrictions(DAR, name).isEmpty
-                } catch (_: Exception) {
-                    false
-                }
-            }.map { getAppInfo(it) }
+            val stored = storedPackages(SP.appliedConfigurations)
+            val kept = stored.filter { it !in packages || holdsRestrictions(it) } +
+                    packages.filter { it !in stored && holdsRestrictions(it) }
+            SP.appliedConfigurations = storePackages(kept)
+            appsWithRestrictions.value = storedPackages(SP.appliedConfigurations).map { getAppInfo(it) }
         }
     }
     /** Drops the whole configuration of [name], taking it off the list */
@@ -924,7 +963,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                     e.printStackTrace()
                 }
             }
-            appsWithRestrictions.update { list -> list?.filter { it.name != name } }
+            recordRestrictions(listOf(name))
         }
     }
     private fun installedPackageNames() = policyPackages {
@@ -991,6 +1030,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                     e.printStackTrace()
                 }
                 getManualRestrictions(packages)
+                recordRestrictions(packages)
             }
         }
     }
@@ -1006,6 +1046,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                     e.printStackTrace()
                 }
                 getManualRestrictions(packages)
+                recordRestrictions(packages)
             }
         }
     }
@@ -1095,7 +1136,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
                 }),
                 AutoAppGroup(R.string.auto_group_keep_uninstalled, policyPackages {
                     if (VERSION.SDK_INT >= 28) DPM.getKeepUninstalledPackages(DAR) else null
-                })
+                }),
+                // Kept as they are applied, so they cost nothing to read here
+                AutoAppGroup(R.string.auto_group_permissions, storedPackages(SP.appliedPermissions)),
+                AutoAppGroup(
+                    R.string.auto_group_configuration, storedPackages(SP.appliedConfigurations)
+                )
             ).filter { it.apps.isNotEmpty() }
         }
     }

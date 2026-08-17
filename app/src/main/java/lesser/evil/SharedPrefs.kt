@@ -27,6 +27,10 @@ class SharedPrefs(context: Context) {
     var applicationsGridView by BooleanSharedPref("applications.grid_view")
     /** The hint telling that a long press selects several apps was dismissed */
     var multiSelectHintDismissed by BooleanSharedPref("applications.multi_select_hint_dismissed")
+    /** Packages a runtime permission was granted or denied on, one per line */
+    var appliedPermissions by StringSharedPref("applied.permissions")
+    /** Packages a managed configuration was written to, one per line */
+    var appliedConfigurations by StringSharedPref("applied.configurations")
     var shortcuts by BooleanSharedPref("shortcuts")
     var dhizukuServer by BooleanSharedPref("dhizuku_server")
     var notifications by StringSharedPref("notifications")

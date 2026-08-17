@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -329,21 +332,22 @@ fun MyScaffold(
 fun MyLazyScaffold(
     @StringRes title: Int,
     onNavIconClicked: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit
 ) {
-    val sb = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        Modifier.nestedScroll(sb.nestedScrollConnection),
+        // The title stays at the top of the list, the way the other list screens hold it
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 { Text(stringResource(title)) },
                 navigationIcon = { NavIcon(onNavIconClicked) },
-                scrollBehavior = sb
+                actions = actions
             )
         },
         contentWindowInsets = adaptiveInsets()
     ) { paddingValues ->
-        LazyColumn(Modifier.fillMaxSize().padding(paddingValues), content = content)
+        LazyColumn(Modifier.fillMaxSize().padding(paddingValues), listState, content = content)
     }
 }
 

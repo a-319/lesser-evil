@@ -94,6 +94,11 @@ object LockTaskUtils {
         if (showNotification) {
             features = features or DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or
                     DevicePolicyManager.LOCK_TASK_FEATURE_HOME
+            // The system only renders notifications from lock-task-permitted apps; without this,
+            // the exit notification shows as an empty placeholder in the shade.
+            if (!dpm.isLockTaskPermitted(context.packageName)) {
+                dpm.setLockTaskPackages(dar, dpm.getLockTaskPackages(dar) + context.packageName)
+            }
         }
         if (showNavigationButtons) {
             val accessibility = NavigationAccessibilityService.instance != null

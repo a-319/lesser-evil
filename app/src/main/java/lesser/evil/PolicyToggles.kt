@@ -190,10 +190,7 @@ object PolicyToggleManager {
                 } else {
                     val saved = snapshot[backupKey(policy)]
                     if (saved != null) restorePolicy(context, policy, saved)
-                    // A switch turned on before snapshots existed has nothing to restore, so fall
-                    // back to the old behaviour and undo the on state - otherwise the switch would
-                    // report itself off while its policies stayed enforced
-                    else applyPolicy(context, policy, !policy.blockedWhenOn)
+                    else legacyRestore(context, policy)
                 }
                 if (!applied) success = false
             } catch (e: Exception) {
@@ -202,6 +199,30 @@ object PolicyToggleManager {
             }
         }
         return success
+    }
+
+    /**
+     * Turns off a policy belonging to a switch that was left on across the upgrade to per-switch
+     * snapshots, so it has nothing on its row to restore from. The release before that kept the
+     * always-on VPN and metered data state in preferences, so those are used when still present -
+     * without them the release would wipe the administrator's configuration instead of putting it
+     * back. Everything else simply has its on state undone, which is what that release did.
+     */
+    private fun legacyRestore(context: Context, policy: TogglePolicy): Boolean {
+        when (policy) {
+            is TogglePolicy.AlwaysOnVpn -> SP.legacyPolicyToggleVpnBackup?.let {
+                val restored = restorePolicy(context, policy, it)
+                SP.legacyPolicyToggleVpnBackup = null
+                return restored
+            }
+            is TogglePolicy.BlockMeteredData -> SP.legacyPolicyToggleMddBackup?.let {
+                val restored = restorePolicy(context, policy, it)
+                SP.legacyPolicyToggleMddBackup = null
+                return restored
+            }
+            else -> {}
+        }
+        return applyPolicy(context, policy, !policy.blockedWhenOn)
     }
 
     private fun applyPolicy(context: Context, policy: TogglePolicy, blocked: Boolean): Boolean {

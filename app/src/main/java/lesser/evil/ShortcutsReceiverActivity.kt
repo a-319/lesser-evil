@@ -48,8 +48,8 @@ class ShortcutsReceiverActivity : Activity() {
                             // A shortcut runs outside any session and bypasses the app lock, so it
                             // never claims ownership for the user profile - it only keeps the
                             // record in step so the restriction does not look user-owned later
-                            BlockOwnership.record(
-                                BlockKind.UserRestriction, listOf(id), state, false
+                            BlockOwnership.recordExternalChange(
+                                BlockKind.UserRestriction, id, state
                             )
                             ShortcutUtils.updateUserRestrictionShortcut(this, id, !state, false)
                         }

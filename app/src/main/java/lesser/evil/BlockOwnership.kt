@@ -46,6 +46,16 @@ object BlockOwnership {
         if (updated != current) put(kind, updated)
     }
 
+    /**
+     * Records a change made outside a user-profile session - the admin API, a launcher shortcut -
+     * after [key] was set to [blocked]. Nothing is ever claimed for the user profile, and the
+     * record is only cleared once the change really took, so the block belongs to whoever made it.
+     */
+    fun recordExternalChange(kind: BlockKind, key: String, blocked: Boolean) {
+        if (isBlocked(kind, key) != blocked) return
+        record(kind, listOf(key), blocked, byUserProfile = false)
+    }
+
     /** Whether [key] is blocked right now, used to tell an existing block from a new one */
     fun isBlocked(kind: BlockKind, key: String): Boolean = try {
         val dpm = Privilege.DPM

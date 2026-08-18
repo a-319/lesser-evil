@@ -776,8 +776,16 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         policyToggles.value = myRepo.getPolicyToggles()
     }
     fun switchPolicyToggle(id: Int, state: Boolean): Boolean {
-        val toggle = policyToggles.value.find { it.id == id } ?: return false
+        // Read the stored row rather than the cached list: a launcher shortcut can flip a switch
+        // while this ViewModel stays alive, and taking a snapshot over an already enforced state
+        // would record that enforced state as the one to go back to
+        val toggle = myRepo.getPolicyToggle(id) ?: return false
         if (restrictedMode.value && !toggle.userAllowed) return false
+        if (toggle.enabled == state) {
+            // Already where it was asked to be; refresh so a stale screen catches up
+            getPolicyToggles()
+            return true
+        }
         // Lock task mode restores the apps it lifted when the session ends, without consulting the
         // switches. Flipping one that targets a lifted app now would be undone by that restoration
         if (PolicyToggleManager.touchesLockTaskLift(toggle.policies)) {
@@ -806,7 +814,8 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun setPolicyToggle(id: Int?, name: String, policies: List<TogglePolicy>, userAllowed: Boolean): Boolean {
         if (restrictedMode.value) return false
-        val existing = if (id == null) null else policyToggles.value.find { it.id == id }
+        // From the stored row, for the same reason as switchPolicyToggle
+        val existing = if (id == null) null else myRepo.getPolicyToggle(id)
         if (id != null && existing != null && existing.enabled) {
             // Put the old policy set back before saving the new one: policies dropped in this edit
             // would otherwise stay enforced forever, and the new snapshot has to be taken from the
@@ -832,7 +841,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun deletePolicyToggle(id: Int) {
         if (restrictedMode.value) return
-        val toggle = policyToggles.value.find { it.id == id }
+        val toggle = myRepo.getPolicyToggle(id)
         if (toggle?.enabled == true) {
             PolicyToggleManager.apply(application, toggle.policies, false, toggle.backup)
         }
@@ -842,7 +851,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun createPolicyToggleShortcut(id: Int): Boolean {
         if (restrictedMode.value) return false
-        val toggle = policyToggles.value.find { it.id == id } ?: return false
+        val toggle = myRepo.getPolicyToggle(id) ?: return false
         return ShortcutUtils.setPolicyToggleShortcut(application, id, toggle.name, toggle.enabled)
     }
 

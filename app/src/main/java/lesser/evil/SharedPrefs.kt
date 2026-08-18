@@ -29,6 +29,13 @@ class SharedPrefs(context: Context) {
     var notifications by StringSharedPref("notifications")
     var shortcutKey by StringSharedPref("shortcut_key")
     /**
+     * Where a release before per-switch snapshots kept the state to restore when a metered data
+     * or always-on VPN policy was released. Only read, to migrate a switch that was left on
+     * across the upgrade; cleared once used.
+     */
+    var legacyPolicyToggleMddBackup by StringSharedPref("policy_toggles.mdd_backup")
+    var legacyPolicyToggleVpnBackup by StringSharedPref("policy_toggles.vpn_backup")
+    /**
      * Blocks created by the user profile, per function - newline separated.
      * Only these may be lifted by the user profile; everything else belongs to the admin.
      */

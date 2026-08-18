@@ -32,16 +32,27 @@ class ShortcutsReceiverActivity : Activity() {
                         val state = intent?.getBooleanExtra("state", false)
                         val id = intent?.getStringExtra("restriction")
                         if (state == null || id == null) return
-                        if (state) {
-                            Privilege.DPM.addUserRestriction(Privilege.DAR, id)
+                        val toggles = (applicationContext as MyApplication).myRepo.getPolicyToggles()
+                        if (PolicyToggleManager.switchControlled(
+                                toggles, BlockKind.UserRestriction, id
+                        )) {
+                            // A mode switch owns this restriction's state. Changing it here would
+                            // fight the switch, and would rewrite ownership on the way past
+                            success = false
                         } else {
-                            Privilege.DPM.clearUserRestriction(Privilege.DAR, id)
+                            if (state) {
+                                Privilege.DPM.addUserRestriction(Privilege.DAR, id)
+                            } else {
+                                Privilege.DPM.clearUserRestriction(Privilege.DAR, id)
+                            }
+                            // A shortcut runs outside any session and bypasses the app lock, so it
+                            // never claims ownership for the user profile - it only keeps the
+                            // record in step so the restriction does not look user-owned later
+                            BlockOwnership.record(
+                                BlockKind.UserRestriction, listOf(id), state, false
+                            )
+                            ShortcutUtils.updateUserRestrictionShortcut(this, id, !state, false)
                         }
-                        // A shortcut runs outside any session and bypasses the app lock, so it
-                        // never claims ownership for the user profile - it only keeps the record
-                        // in step, so a restriction changed here does not look user-owned later
-                        BlockOwnership.record(BlockKind.UserRestriction, listOf(id), state, false)
-                        ShortcutUtils.updateUserRestrictionShortcut(this, id, !state, false)
                     }
                     "USER_OPERATION" -> {
                         val typeName = intent.getStringExtra("operation") ?: return
@@ -54,10 +65,13 @@ class ShortcutsReceiverActivity : Activity() {
                         val id = intent.getIntExtra("id", -1)
                         val repo = (applicationContext as MyApplication).myRepo
                         val toggle = if (id == -1) null else repo.getPolicyToggle(id)
-                        // Shortcuts bypass the app lock, so only switches available to the
-                        // user profile may be flipped this way while a password is set
+                        // Shortcuts bypass the app lock, so only switches available to the user
+                        // profile may be flipped this way while a password is set. A switch
+                        // targeting an app lock task mode has lifted is refused too: the
+                        // restoration at the end of the session would undo the flip anyway
                         success = if (toggle == null ||
-                            (!toggle.userAllowed && !SP.lockPasswordHash.isNullOrEmpty())) {
+                            (!toggle.userAllowed && !SP.lockPasswordHash.isNullOrEmpty()) ||
+                            PolicyToggleManager.touchesLockTaskLift(toggle.policies)) {
                             false
                         } else {
                             var persisted = toggle.enabled

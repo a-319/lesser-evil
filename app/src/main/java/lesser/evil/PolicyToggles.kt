@@ -75,6 +75,45 @@ object PolicyToggleManager {
 
     fun encodePolicies(policies: List<TogglePolicy>): String = json.encodeToString(policies)
 
+    /**
+     * True if one of [toggles] drives [key]'s state for [kind]. The switch owns that state, so it
+     * must not be edited by hand: otherwise the switch and the real state drift apart, and a key
+     * the switch temporarily lifted could be re-applied and claimed by the user profile.
+     *
+     * A metered data policy replaces the whole disabled list rather than one entry, so while such
+     * a policy exists every package's metered data state belongs to the switch.
+     */
+    fun switchControlled(toggles: List<PolicyToggle>, kind: BlockKind, key: String): Boolean =
+        toggles.any { toggle ->
+            toggle.policies.any { policy ->
+                when (policy) {
+                    is TogglePolicy.UserRestriction ->
+                        kind == BlockKind.UserRestriction && policy.restriction == key
+                    is TogglePolicy.HideApp ->
+                        kind == BlockKind.Hidden && policy.packageName == key
+                    is TogglePolicy.SuspendApp ->
+                        kind == BlockKind.Suspended && policy.packageName == key
+                    is TogglePolicy.BlockMeteredData -> kind == BlockKind.Mdd
+                    else -> false
+                }
+            }
+        }
+
+    /**
+     * True if any of [policies] targets an app whose hidden or suspended state lock task mode has
+     * lifted for the current session. Flipping the switch would fight the restoration that runs
+     * when the session ends, leaving the real state and the switch disagreeing.
+     */
+    fun touchesLockTaskLift(policies: List<TogglePolicy>): Boolean = policies.any { policy ->
+        when (policy) {
+            is TogglePolicy.HideApp ->
+                LockTaskUtils.isLifted(BlockKind.Hidden, policy.packageName)
+            is TogglePolicy.SuspendApp ->
+                LockTaskUtils.isLifted(BlockKind.Suspended, policy.packageName)
+            else -> false
+        }
+    }
+
     fun decodePolicies(data: String): List<TogglePolicy> = try {
         json.decodeFromString(data)
     } catch (e: Exception) {

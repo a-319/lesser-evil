@@ -154,7 +154,11 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     private fun recordOwnership(kind: BlockKind, keys: List<String>, blocked: Boolean) {
         // A key driven by a mode switch, or lifted for lock task mode, keeps its existing owner
         val claimable = if (blocked) keys.filter { controlledBy(kind, it) == null } else keys
-        BlockOwnership.record(kind, claimable, blocked, restrictedMode.value)
+        // Only what really changed: setPackagesSuspended reports failures in its result rather
+        // than throwing, so a block that was refused must not be recorded as created, and a
+        // release that did not take must not give up its ownership
+        val changed = claimable.filter { BlockOwnership.isBlocked(kind, it) == blocked }
+        BlockOwnership.record(kind, changed, blocked, restrictedMode.value)
     }
     /**
      * Of [keys], the ones this call is about to newly block. A key that is blocked already keeps
@@ -168,37 +172,13 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
      * flip the switch rather than edit the key by hand: otherwise the switch and the real state
      * drift apart, and a key the switch temporarily lifted could be re-added and claimed.
      */
-    private fun switchControlled(kind: BlockKind, key: String): Boolean =
-        policyToggles.value.any { toggle ->
-            toggle.policies.any { policy ->
-                when (policy) {
-                    is TogglePolicy.UserRestriction ->
-                        kind == BlockKind.UserRestriction && policy.restriction == key
-                    is TogglePolicy.HideApp ->
-                        kind == BlockKind.Hidden && policy.packageName == key
-                    is TogglePolicy.SuspendApp ->
-                        kind == BlockKind.Suspended && policy.packageName == key
-                    else -> false
-                }
-            }
-        }
-    /**
-     * True if lock task mode has [key] temporarily lifted for the current session. The lift is
-     * undone on exit, so the block still belongs to whoever set it and the user profile must not
-     * be able to re-apply it in the meantime and claim it as its own.
-     */
-    private fun lockTaskLifted(kind: BlockKind, key: String): Boolean {
-        val lifted = when (kind) {
-            BlockKind.Hidden -> SP.lockTaskUnhiddenApps
-            BlockKind.Suspended -> SP.lockTaskUnsuspendedApps
-            else -> null
-        } ?: return false
-        return key in parsePackageNames(lifted)
-    }
+    private fun switchControlled(kind: BlockKind, key: String) =
+        PolicyToggleManager.switchControlled(policyToggles.value, kind, key)
+
     /** The message to show when something other than a plain edit owns [key]'s state right now */
     private fun controlledBy(kind: BlockKind, key: String): Int? = when {
         switchControlled(kind, key) -> R.string.controlled_by_mode_switch
-        lockTaskLifted(kind, key) -> R.string.controlled_by_lock_task
+        LockTaskUtils.isLifted(kind, key) -> R.string.controlled_by_lock_task
         else -> null
     }
     /** True (and toasts) if the user profile may not set the block on [key] to [blocked] */
@@ -798,6 +778,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun switchPolicyToggle(id: Int, state: Boolean): Boolean {
         val toggle = policyToggles.value.find { it.id == id } ?: return false
         if (restrictedMode.value && !toggle.userAllowed) return false
+        // Lock task mode restores the apps it lifted when the session ends, without consulting the
+        // switches. Flipping one that targets a lifted app now would be undone by that restoration
+        if (PolicyToggleManager.touchesLockTaskLift(toggle.policies)) {
+            application.popToast(R.string.controlled_by_lock_task)
+            return false
+        }
         var persisted = toggle.enabled
         val result = if (state) {
             // Store the snapshot before applying, so even a partly applied switch can be undone

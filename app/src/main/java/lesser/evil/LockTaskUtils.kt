@@ -290,6 +290,19 @@ object LockTaskUtils {
     fun hasTemporaryAppStates() =
         !SP.lockTaskUnhiddenApps.isNullOrEmpty() || !SP.lockTaskUnsuspendedApps.isNullOrEmpty()
 
+    /**
+     * True while lock task mode has [key]'s state for [kind] temporarily lifted. The lift is undone
+     * on exit, so the block still belongs to whoever set it and must not be changed in the meantime.
+     */
+    fun isLifted(kind: BlockKind, key: String): Boolean {
+        val lifted = when (kind) {
+            BlockKind.Hidden -> SP.lockTaskUnhiddenApps
+            BlockKind.Suspended -> SP.lockTaskUnsuspendedApps
+            else -> null
+        } ?: return false
+        return key in parsePackageNames(lifted)
+    }
+
     /** Re-suspend and re-hide the apps whose state was lifted for lock task mode. */
     fun restoreTemporaryAppStates() {
         val dpm = Privilege.DPM

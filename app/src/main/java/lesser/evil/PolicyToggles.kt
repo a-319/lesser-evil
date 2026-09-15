@@ -178,9 +178,14 @@ object PolicyToggleManager {
      * describes, or off, restoring the targets from [backup].
      * @return true if every policy was applied successfully
      */
+    /** Which switch is being applied, so its blocks are recorded in its own name */
+    private var switchId: Int = 0
+
     fun apply(
-        context: Context, policies: List<TogglePolicy>, state: Boolean, backup: String = ""
+        context: Context, policies: List<TogglePolicy>, state: Boolean, backup: String = "",
+        id: Int = 0
     ): Boolean {
+        switchId = id
         val snapshot = if (state) emptyMap() else decodeBackup(backup)
         var success = true
         policies.forEach { policy ->
@@ -228,18 +233,21 @@ object PolicyToggleManager {
     private fun applyPolicy(context: Context, policy: TogglePolicy, blocked: Boolean): Boolean {
         val dpm = Privilege.DPM
         val dar = Privilege.DAR
+        // The three key-based policies go through the gateway as the switch itself, so the blocks
+        // they create are recorded as the switch's and nobody else can take them over
+        val actor = Actor.Automation.modeSwitch(switchId)
         when (policy) {
-            is TogglePolicy.UserRestriction ->
-                if (blocked) dpm.addUserRestriction(dar, policy.restriction)
-                else dpm.clearUserRestriction(dar, policy.restriction)
-            is TogglePolicy.HideApp ->
-                return dpm.setApplicationHidden(dar, policy.packageName, blocked) ||
-                        dpm.isApplicationHidden(dar, policy.packageName) == blocked
+            is TogglePolicy.UserRestriction -> return PolicyGateway.setBlock(
+                actor, BlockKind.UserRestriction, policy.restriction, blocked, ReleaseRule.Automatic
+            ) == null
+            is TogglePolicy.HideApp -> return PolicyGateway.setBlock(
+                actor, BlockKind.Hidden, policy.packageName, blocked, ReleaseRule.Automatic
+            ) == null
             is TogglePolicy.SuspendApp -> {
                 if (VERSION.SDK_INT < 24) return false
-                return dpm.setPackagesSuspended(
-                    dar, arrayOf(policy.packageName), blocked
-                ).isEmpty()
+                return PolicyGateway.setBlock(
+                    actor, BlockKind.Suspended, policy.packageName, blocked, ReleaseRule.Automatic
+                ) == null
             }
             is TogglePolicy.AlwaysOnVpn -> {
                 if (VERSION.SDK_INT < 24) return false

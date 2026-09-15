@@ -35,9 +35,11 @@ class SharedPrefs(context: Context) {
      */
     var legacyPolicyToggleMddBackup by StringSharedPref("policy_toggles.mdd_backup")
     var legacyPolicyToggleVpnBackup by StringSharedPref("policy_toggles.vpn_backup")
+    /** Who owns every tracked block, as JSON: kind -> key -> record. Written only by the gateway. */
+    var blockRecords by StringSharedPref("block_records")
     /**
-     * Blocks created by the user profile, per function - newline separated.
-     * Only these may be lifted by the user profile; everything else belongs to the admin.
+     * How an earlier version recorded blocks created by the user profile, one newline separated
+     * set per function. Read once to carry those blocks into [blockRecords], then cleared.
      */
     var userOwnedHidden by StringSharedPref("user_owned.hidden")
     var userOwnedSuspended by StringSharedPref("user_owned.suspended")

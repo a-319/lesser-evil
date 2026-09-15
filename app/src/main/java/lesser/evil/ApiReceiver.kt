@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import androidx.annotation.RequiresApi
 
 class ApiReceiver: BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -81,25 +80,18 @@ class ApiReceiver: BroadcastReceiver() {
         }
         Log.d(TAG, log)
     }
+    // The API is an admin surface: it is authenticated by the API key, which only the admin has
     private fun setHidden(app: String?, hidden: Boolean) {
         if (app.isNullOrEmpty()) return
-        Privilege.DPM.setApplicationHidden(Privilege.DAR, app, hidden)
-        BlockOwnership.recordExternalChange(BlockKind.Hidden, app, hidden)
+        PolicyGateway.setBlock(Actor.Admin, BlockKind.Hidden, app, hidden)
     }
-    @RequiresApi(24)
     private fun setSuspended(app: String?, suspended: Boolean) {
         if (app.isNullOrEmpty()) return
-        Privilege.DPM.setPackagesSuspended(Privilege.DAR, arrayOf(app), suspended)
-        BlockOwnership.recordExternalChange(BlockKind.Suspended, app, suspended)
+        PolicyGateway.setBlock(Actor.Admin, BlockKind.Suspended, app, suspended)
     }
     private fun setRestriction(restriction: String?, set: Boolean) {
         if (restriction.isNullOrEmpty()) return
-        if (set) {
-            Privilege.DPM.addUserRestriction(Privilege.DAR, restriction)
-        } else {
-            Privilege.DPM.clearUserRestriction(Privilege.DAR, restriction)
-        }
-        BlockOwnership.recordExternalChange(BlockKind.UserRestriction, restriction, set)
+        PolicyGateway.setBlock(Actor.Admin, BlockKind.UserRestriction, restriction, set)
     }
     companion object {
         private const val TAG = "API"

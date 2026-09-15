@@ -1,62 +1,121 @@
 package lesser.evil
 
 import android.os.Build.VERSION
+import kotlinx.serialization.json.Json
 
 /**
- * The blocking functions the user profile can take ownership of. For each one the set of blocks
- * the user profile created is persisted, so ownership survives admin sessions and app restarts.
- * Anything blocked but not user-owned belongs to the admin.
+ * Where the owner of every tracked block is kept. Written only by [PolicyGateway], so a record
+ * cannot fall out of step with a change that was made without one.
  */
-enum class BlockKind { Hidden, Suspended, UninstallBlocked, Ucd, Mdd, UserRestriction }
-
 object BlockOwnership {
-    fun get(kind: BlockKind): Set<String> = when (kind) {
-        BlockKind.Hidden -> SP.userOwnedHidden
-        BlockKind.Suspended -> SP.userOwnedSuspended
-        BlockKind.UninstallBlocked -> SP.userOwnedUninstallBlocked
-        BlockKind.Ucd -> SP.userOwnedUcd
-        BlockKind.Mdd -> SP.userOwnedMdd
-        BlockKind.UserRestriction -> SP.userOwnedRestrictions
-    }?.split('\n')?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+    private val json = Json { ignoreUnknownKeys = true }
+    private var cache: MutableMap<String, MutableMap<String, BlockRecord>>? = null
 
-    private fun put(kind: BlockKind, value: Set<String>) {
-        val text = value.joinToString("\n")
-        when (kind) {
-            BlockKind.Hidden -> SP.userOwnedHidden = text
-            BlockKind.Suspended -> SP.userOwnedSuspended = text
-            BlockKind.UninstallBlocked -> SP.userOwnedUninstallBlocked = text
-            BlockKind.Ucd -> SP.userOwnedUcd = text
-            BlockKind.Mdd -> SP.userOwnedMdd = text
-            BlockKind.UserRestriction -> SP.userOwnedRestrictions = text
+    private fun records(): MutableMap<String, MutableMap<String, BlockRecord>> {
+        cache?.let { return it }
+        val stored = SP.blockRecords
+        val loaded: MutableMap<String, MutableMap<String, BlockRecord>> = if (stored == null) {
+            migrateFromUserOwnedSets()
+        } else try {
+            json.decodeFromString<Map<String, Map<String, BlockRecord>>>(stored)
+                .mapValues { it.value.toMutableMap() }.toMutableMap()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            mutableMapOf()
+        }
+        cache = loaded
+        return loaded
+    }
+
+    /**
+     * Carries over the flat "owned by the user profile" sets an earlier version kept, so blocks a
+     * child already created stay theirs across the upgrade instead of silently becoming the
+     * admin's. Those entries were all removable by whoever made them, hence [ReleaseRule.ByOwner].
+     */
+    private fun migrateFromUserOwnedSets(): MutableMap<String, MutableMap<String, BlockRecord>> {
+        val legacy = mapOf(
+            BlockKind.Hidden to SP.userOwnedHidden,
+            BlockKind.Suspended to SP.userOwnedSuspended,
+            BlockKind.UninstallBlocked to SP.userOwnedUninstallBlocked,
+            BlockKind.Ucd to SP.userOwnedUcd,
+            BlockKind.Mdd to SP.userOwnedMdd,
+            BlockKind.UserRestriction to SP.userOwnedRestrictions
+        )
+        val migrated = mutableMapOf<String, MutableMap<String, BlockRecord>>()
+        legacy.forEach { (kind, text) ->
+            val keys = text?.split('\n')?.filter { it.isNotEmpty() } ?: emptyList()
+            if (keys.isNotEmpty()) {
+                migrated[kind.name] = keys.associateWith {
+                    BlockRecord(Actor.Child(), ReleaseRule.ByOwner)
+                }.toMutableMap()
+            }
+        }
+        SP.userOwnedHidden = null
+        SP.userOwnedSuspended = null
+        SP.userOwnedUninstallBlocked = null
+        SP.userOwnedUcd = null
+        SP.userOwnedMdd = null
+        SP.userOwnedRestrictions = null
+        if (migrated.isNotEmpty()) save(migrated)
+        return migrated
+    }
+
+    private fun save(value: Map<String, Map<String, BlockRecord>>) {
+        SP.blockRecords = json.encodeToString(value)
+    }
+
+    fun recordFor(kind: BlockKind, key: String): BlockRecord? = records()[kind.name]?.get(key)
+
+    /** Every key of [kind] that [actor] owns, for showing a profile what is its own. */
+    fun ownedBy(actor: Actor, kind: BlockKind): Set<String> =
+        records()[kind.name].orEmpty().filterValues { it.owner == actor }.keys
+
+    internal fun put(kind: BlockKind, key: String, record: BlockRecord) {
+        val all = records()
+        all.getOrPut(kind.name) { mutableMapOf() }[key] = record
+        save(all)
+    }
+
+    internal fun remove(kind: BlockKind, key: String) {
+        val all = records()
+        val forKind = all[kind.name] ?: return
+        if (forKind.remove(key) == null) return
+        if (forKind.isEmpty()) all.remove(kind.name)
+        save(all)
+    }
+
+    /** Drops every record an automation owns, used when that automation is taken away. */
+    fun releaseAutomation(source: String) {
+        val all = records()
+        var changed = false
+        all.values.forEach { forKind ->
+            val owner = Actor.Automation(source)
+            val gone = forKind.filterValues { it.owner == owner }.keys
+            if (gone.isNotEmpty()) {
+                gone.forEach { forKind.remove(it) }
+                changed = true
+            }
+        }
+        if (changed) {
+            all.entries.removeAll { it.value.isEmpty() }
+            save(all)
         }
     }
 
     /**
-     * Records who owns the blocks on [keys] after they were just set to [blocked].
-     * A block the user profile creates becomes user-owned; anything the admin sets or either side
-     * clears is no longer user-owned - so an admin block always overrides a user one.
-     *
-     * @param byUserProfile whether the change came from the user profile. Changes from outside a
-     * session, such as a launcher shortcut, are not the user profile's and never claim ownership.
+     * Whether any mode switch carries a blanket metered data policy. Such a policy owns the whole
+     * disabled list rather than single entries, which the gateway has to know before it lets a
+     * profile edit any of it.
      */
-    fun record(kind: BlockKind, keys: List<String>, blocked: Boolean, byUserProfile: Boolean) {
-        if (keys.isEmpty()) return
-        val current = get(kind)
-        val updated = if (blocked && byUserProfile) current + keys else current - keys.toSet()
-        if (updated != current) put(kind, updated)
+    var blanketMeteredDataLookup: () -> Boolean = { false }
+    fun blanketMeteredDataInUse(): Boolean = try {
+        blanketMeteredDataLookup()
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
     }
 
-    /**
-     * Records a change made outside a user-profile session - the admin API, a launcher shortcut -
-     * after [key] was set to [blocked]. Nothing is ever claimed for the user profile, and the
-     * record is only cleared once the change really took, so the block belongs to whoever made it.
-     */
-    fun recordExternalChange(kind: BlockKind, key: String, blocked: Boolean) {
-        if (isBlocked(kind, key) != blocked) return
-        record(kind, listOf(key), blocked, byUserProfile = false)
-    }
-
-    /** Whether [key] is blocked right now, used to tell an existing block from a new one */
+    /** Whether [key] is blocked right now, used to confirm a change really took */
     fun isBlocked(kind: BlockKind, key: String): Boolean = try {
         val dpm = Privilege.DPM
         val dar = Privilege.DAR

@@ -32,25 +32,18 @@ class ShortcutsReceiverActivity : Activity() {
                         val state = intent?.getBooleanExtra("state", false)
                         val id = intent?.getStringExtra("restriction")
                         if (state == null || id == null) return
-                        val toggles = (applicationContext as MyApplication).myRepo.getPolicyToggles()
-                        if (PolicyToggleManager.switchControlled(
-                                toggles, BlockKind.UserRestriction, id
-                        )) {
-                            // A mode switch owns this restriction's state. Changing it here would
-                            // fight the switch, and would rewrite ownership on the way past
-                            success = false
-                        } else {
-                            if (state) {
-                                Privilege.DPM.addUserRestriction(Privilege.DAR, id)
-                            } else {
-                                Privilege.DPM.clearUserRestriction(Privilege.DAR, id)
-                            }
-                            // A shortcut runs outside any session and bypasses the app lock, so it
-                            // never claims ownership for the user profile - it only keeps the
-                            // record in step so the restriction does not look user-owned later
-                            BlockOwnership.recordExternalChange(
-                                BlockKind.UserRestriction, id, state
-                            )
+                        // A shortcut bypasses the app lock, so once a password is set it is not
+                        // trusted as the admin: it may tighten a restriction, never lift one, and
+                        // what it sets becomes the admin's to undo
+                        val locked = !SP.lockPasswordHash.isNullOrEmpty()
+                        success = if (locked && !state) false else {
+                            val actor = if (locked) Actor.Automation.Shortcut else Actor.Admin
+                            val release = if (locked) ReleaseRule.AdminOnly else ReleaseRule.ByOwner
+                            PolicyGateway.setBlock(
+                                actor, BlockKind.UserRestriction, id, state, release
+                            ) == null
+                        }
+                        if (success) {
                             ShortcutUtils.updateUserRestrictionShortcut(this, id, !state, false)
                         }
                     }
@@ -82,11 +75,11 @@ class ShortcutsReceiverActivity : Activity() {
                                     id, true, PolicyToggleManager.captureBackup(toggle.policies)
                                 )
                                 persisted = true
-                                PolicyToggleManager.apply(this, toggle.policies, true)
+                                PolicyToggleManager.apply(this, toggle.policies, true, id = id)
                             } else {
                                 // Give up the snapshot only once everything was restored
                                 val restored = PolicyToggleManager.apply(
-                                    this, toggle.policies, false, toggle.backup
+                                    this, toggle.policies, false, toggle.backup, id
                                 )
                                 if (restored) {
                                     repo.setPolicyToggleEnabled(id, false, "")

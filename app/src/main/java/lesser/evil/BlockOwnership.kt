@@ -105,15 +105,10 @@ object BlockOwnership {
     /**
      * Whether any mode switch carries a blanket metered data policy. Such a policy owns the whole
      * disabled list rather than single entries, which the gateway has to know before it lets a
-     * profile edit any of it.
+     * profile edit any of it. Read from storage rather than injected, so a broadcast receiver or
+     * a shortcut gets the same answer as the app.
      */
-    var blanketMeteredDataLookup: () -> Boolean = { false }
-    fun blanketMeteredDataInUse(): Boolean = try {
-        blanketMeteredDataLookup()
-    } catch (e: Exception) {
-        e.printStackTrace()
-        false
-    }
+    fun blanketMeteredDataInUse(): Boolean = SP.blanketMeteredDataPolicy
 
     /** Whether [key] is blocked right now, used to confirm a change really took */
     fun isBlocked(kind: BlockKind, key: String): Boolean = try {

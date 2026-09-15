@@ -35,6 +35,8 @@ class SharedPrefs(context: Context) {
      */
     var legacyPolicyToggleMddBackup by StringSharedPref("policy_toggles.mdd_backup")
     var legacyPolicyToggleVpnBackup by StringSharedPref("policy_toggles.vpn_backup")
+    /** Whether a mode switch carries a blanket metered data policy; kept by MyRepository */
+    var blanketMeteredDataPolicy by BooleanSharedPref("blanket_metered_data_policy")
     /** Who owns every tracked block, as JSON: kind -> key -> record. Written only by the gateway. */
     var blockRecords by StringSharedPref("block_records")
     /**

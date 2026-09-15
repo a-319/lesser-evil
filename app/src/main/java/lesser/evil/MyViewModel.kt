@@ -153,15 +153,6 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     fun exitRestrictedMode() {
         restrictedMode.value = false
     }
-    init {
-        // The gateway has to know whether a switch carries a blanket metered data policy, which
-        // only this ViewModel can answer, without depending on it the other way round
-        BlockOwnership.blanketMeteredDataLookup = {
-            myRepo.getPolicyToggles().any { toggle ->
-                toggle.policies.any { it is TogglePolicy.BlockMeteredData }
-            }
-        }
-    }
     /** Says out loud why the gateway turned a change down */
     private fun report(denial: PolicyGateway.Denial?) {
         application.popToast(

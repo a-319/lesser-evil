@@ -260,7 +260,20 @@ class MyRepository(val dbHelper: MyDbHelper) {
                 )
             }
         }
+        rememberBlanketMeteredData(list)
         return list
+    }
+    /**
+     * Keeps a note of whether any switch carries a blanket metered data policy, because the
+     * gateway has to know it in processes that never build a ViewModel - a broadcast receiver or
+     * a launcher shortcut - and having something inject the answer is the kind of wiring that
+     * only holds while somebody remembers to do it.
+     */
+    private fun rememberBlanketMeteredData(toggles: List<PolicyToggle>) {
+        val present = toggles.any { toggle ->
+            toggle.policies.any { it is TogglePolicy.BlockMeteredData }
+        }
+        if (SP.blanketMeteredDataPolicy != present) SP.blanketMeteredDataPolicy = present
     }
     fun getPolicyToggle(id: Int): PolicyToggle? {
         dbHelper.readableDatabase.rawQuery(
@@ -289,6 +302,7 @@ class MyRepository(val dbHelper: MyDbHelper) {
         } else {
             dbHelper.writableDatabase.update("policy_toggles", cv, "id = ?", arrayOf(id.toString()))
         }
+        getPolicyToggles()
     }
     /** Stores the switch state together with the snapshot to restore when it is turned off */
     fun setPolicyToggleEnabled(id: Int, enabled: Boolean, backup: String) {
@@ -299,5 +313,6 @@ class MyRepository(val dbHelper: MyDbHelper) {
     }
     fun deletePolicyToggle(id: Int) {
         dbHelper.writableDatabase.delete("policy_toggles", "id = ?", arrayOf(id.toString()))
+        getPolicyToggles()
     }
 }

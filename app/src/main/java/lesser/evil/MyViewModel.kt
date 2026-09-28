@@ -147,6 +147,10 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     /** Who this session acts as. Every policy change is made in this name */
     val actor: Actor get() = if (restrictedMode.value) childProfile.value else Actor.Admin
 
+    /** The same identity as a shortcut carries, so a pinned shortcut acts as whoever made it */
+    private val actorProfile: Int
+        get() = (actor as? Actor.Child)?.profileId ?: ShortcutUtils.ADMIN_PROFILE
+
     fun enterRestrictedMode() {
         restrictedMode.value = true
     }
@@ -772,9 +776,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         getPolicyToggles()
     }
     fun createPolicyToggleShortcut(id: Int): Boolean {
-        if (restrictedMode.value) return false
         val toggle = myRepo.getPolicyToggle(id) ?: return false
-        return ShortcutUtils.setPolicyToggleShortcut(application, id, toggle.name, toggle.enabled)
+        // A profile may pin whatever it may flip here, and the shortcut then does the same thing
+        if (restrictedMode.value && !toggle.userAllowed) return false
+        return ShortcutUtils.setPolicyToggleShortcut(
+            application, id, toggle.name, toggle.enabled, actorProfile
+        )
     }
 
     @RequiresApi(24)
@@ -1531,7 +1538,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     fun createUserRestrictionShortcut(id: String): Boolean {
         return ShortcutUtils.setUserRestrictionShortcut(
-            application, id, userRestrictions.value[id] ?: true
+            application, id, userRestrictions.value[id] ?: true, actorProfile
         )
     }
     fun createWorkProfile(options: CreateWorkProfileOptions): Intent {

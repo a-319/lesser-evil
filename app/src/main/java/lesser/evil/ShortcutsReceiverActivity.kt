@@ -8,6 +8,19 @@ import lesser.evil.dpm.UserOperationType
 import lesser.evil.dpm.doUserOperationWithContext
 
 class ShortcutsReceiverActivity : Activity() {
+    /**
+     * Who a shortcut acts as: the profile that pinned it. A child profile needs no password to
+     * enter, so a shortcut acting as one grants nothing that opening the app would not, and it
+     * does the same thing the same button does inside the app. A shortcut the admin pinned is a
+     * different matter - it sits on the launcher with no password in front of it, so while a
+     * password is set it is not trusted with admin rights and acts as a plain shortcut instead.
+     */
+    private fun shortcutActor(): Actor {
+        if (SP.lockPasswordHash.isNullOrEmpty()) return Actor.Admin
+        val profile = intent.getIntExtra("profile", ShortcutUtils.ADMIN_PROFILE)
+        return if (profile >= 0) Actor.Child(profile) else Actor.Automation.Shortcut
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
@@ -32,17 +45,9 @@ class ShortcutsReceiverActivity : Activity() {
                         val state = intent?.getBooleanExtra("state", false)
                         val id = intent?.getStringExtra("restriction")
                         if (state == null || id == null) return
-                        // A shortcut bypasses the app lock, so once a password is set it is not
-                        // trusted as the admin: it may tighten a restriction, never lift one, and
-                        // what it sets becomes the admin's to undo
-                        val locked = !SP.lockPasswordHash.isNullOrEmpty()
-                        success = if (locked && !state) false else {
-                            val actor = if (locked) Actor.Automation.Shortcut else Actor.Admin
-                            val release = if (locked) ReleaseRule.AdminOnly else ReleaseRule.ByOwner
-                            PolicyGateway.setBlock(
-                                actor, BlockKind.UserRestriction, id, state, release
-                            ) == null
-                        }
+                        success = PolicyGateway.setBlock(
+                            shortcutActor(), BlockKind.UserRestriction, id, state
+                        ) == null
                         if (success) {
                             ShortcutUtils.updateUserRestrictionShortcut(this, id, !state, false)
                         }
@@ -58,12 +63,13 @@ class ShortcutsReceiverActivity : Activity() {
                         val id = intent.getIntExtra("id", -1)
                         val repo = (applicationContext as MyApplication).myRepo
                         val toggle = if (id == -1) null else repo.getPolicyToggle(id)
-                        // Shortcuts bypass the app lock, so only switches available to the user
-                        // profile may be flipped this way while a password is set. A switch
-                        // targeting an app lock task mode has lifted is refused too: the
+                        // The same rule the app applies to this actor: a profile other than the
+                        // admin may only flip a switch marked available to it. A switch targeting
+                        // an app lock task mode has lifted is refused either way, since the
                         // restoration at the end of the session would undo the flip anyway
+                        val actor = shortcutActor()
                         success = if (toggle == null ||
-                            (!toggle.userAllowed && !SP.lockPasswordHash.isNullOrEmpty()) ||
+                            (actor !is Actor.Admin && !toggle.userAllowed) ||
                             PolicyToggleManager.touchesLockTaskLift(toggle.policies)) {
                             false
                         } else {

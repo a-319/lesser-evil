@@ -9,6 +9,22 @@ import androidx.core.graphics.drawable.toBitmap
 import lesser.evil.dpm.UserOperationType
 
 object ShortcutUtils {
+    /** Stands for the admin in a shortcut's profile extra; a child profile uses its own id. */
+    const val ADMIN_PROFILE = -1
+
+    /**
+     * The profile a pinned shortcut was created by, so that updating it does not quietly hand it
+     * to whoever happened to make the change. Null when no such shortcut is pinned.
+     */
+    private fun pinnedProfile(context: Context, shortcutId: String): Int? =
+        ShortcutManagerCompat.getShortcuts(context, ShortcutManagerCompat.FLAG_MATCH_PINNED)
+            .find { it.id == shortcutId }
+            ?.intent?.getIntExtra("profile", ADMIN_PROFILE)
+
+    /** The profile that owns a shortcut, as an actor the gateway understands. */
+    fun actorForProfile(profile: Int): Actor =
+        if (profile >= 0) Actor.Child(profile) else Actor.Admin
+
     fun setAllShortcuts(context: Context, enabled: Boolean) {
         if (enabled) {
             setShortcutKey()
@@ -50,7 +66,9 @@ object ShortcutUtils {
             .build()
     }
     /** @param state If true, set the user restriction */
-    fun createUserRestrictionShortcut(context: Context, id: String, state: Boolean): ShortcutInfoCompat {
+    fun createUserRestrictionShortcut(
+        context: Context, id: String, state: Boolean, profile: Int = ADMIN_PROFILE
+    ): ShortcutInfoCompat {
         val restriction = UserRestrictionsRepository.findRestrictionById(id)
         val label = context.getString(if (state) R.string.disable else R.string.enable) + " " +
                 context.getString(restriction.name)
@@ -63,22 +81,22 @@ object ShortcutUtils {
                     .setAction("lesser.evil.action.USER_RESTRICTION")
                     .putExtra("restriction", id)
                     .putExtra("state", state)
+                    .putExtra("profile", profile)
                     .putExtra("key", SP.shortcutKey)
             )
             .build()
     }
-    fun setUserRestrictionShortcut(context: Context, id: String, state: Boolean): Boolean {
-        val shortcut = createUserRestrictionShortcut(context, id, state)
+    fun setUserRestrictionShortcut(
+        context: Context, id: String, state: Boolean, profile: Int = ADMIN_PROFILE
+    ): Boolean {
+        val shortcut = createUserRestrictionShortcut(context, id, state, profile)
         return ShortcutManagerCompat.requestPinShortcut(context, shortcut, null)
     }
     fun updateUserRestrictionShortcut(context: Context, id: String, state: Boolean, checkExist: Boolean) {
-        if (checkExist) {
-            val shortcuts = ShortcutManagerCompat.getShortcuts(
-                context, ShortcutManagerCompat.FLAG_MATCH_PINNED
-            )
-            if (shortcuts.find { it.id == "USER_RESTRICTION-$id" } == null) return
-        }
-        val shortcut = createUserRestrictionShortcut(context, id, state)
+        val profile = pinnedProfile(context, "USER_RESTRICTION-$id")
+        if (checkExist && profile == null) return
+        // Keep the shortcut with the profile that pinned it, whoever is making this change
+        val shortcut = createUserRestrictionShortcut(context, id, state, profile ?: ADMIN_PROFILE)
         ShortcutManagerCompat.updateShortcuts(context, listOf(shortcut))
     }
     fun buildUserOperationShortcut(
@@ -121,7 +139,7 @@ object ShortcutUtils {
         )
     }
     fun createPolicyToggleShortcutInfo(
-        context: Context, id: Int, name: String, enabled: Boolean
+        context: Context, id: Int, name: String, enabled: Boolean, profile: Int = ADMIN_PROFILE
     ): ShortcutInfoCompat {
         setShortcutKey()
         val icon = if (enabled) R.drawable.toggle_on_fill0 else R.drawable.toggle_off_fill0
@@ -132,6 +150,7 @@ object ShortcutUtils {
                 Intent(context, ShortcutsReceiverActivity::class.java)
                     .setAction("lesser.evil.action.POLICY_TOGGLE")
                     .putExtra("id", id)
+                    .putExtra("profile", profile)
                     .putExtra("key", SP.shortcutKey)
             )
             .build()
@@ -160,16 +179,15 @@ object ShortcutUtils {
             )
             .build()
     }
-    fun setPolicyToggleShortcut(context: Context, id: Int, name: String, enabled: Boolean): Boolean {
-        val shortcut = createPolicyToggleShortcutInfo(context, id, name, enabled)
+    fun setPolicyToggleShortcut(
+        context: Context, id: Int, name: String, enabled: Boolean, profile: Int = ADMIN_PROFILE
+    ): Boolean {
+        val shortcut = createPolicyToggleShortcutInfo(context, id, name, enabled, profile)
         return ShortcutManagerCompat.requestPinShortcut(context, shortcut, null)
     }
     fun updatePolicyToggleShortcut(context: Context, id: Int, name: String, enabled: Boolean) {
-        val shortcuts = ShortcutManagerCompat.getShortcuts(
-            context, ShortcutManagerCompat.FLAG_MATCH_PINNED
-        )
-        if (shortcuts.find { it.id == "POLICY_TOGGLE-$id" } == null) return
-        val shortcut = createPolicyToggleShortcutInfo(context, id, name, enabled)
+        val profile = pinnedProfile(context, "POLICY_TOGGLE-$id") ?: return
+        val shortcut = createPolicyToggleShortcutInfo(context, id, name, enabled, profile)
         ShortcutManagerCompat.updateShortcuts(context, listOf(shortcut))
     }
     fun disablePolicyToggleShortcut(context: Context, id: Int) {

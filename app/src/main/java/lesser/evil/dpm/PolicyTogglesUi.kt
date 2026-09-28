@@ -106,8 +106,9 @@ fun PolicyTogglesScreen(
                     Modifier
                         .fillMaxWidth()
                         .combinedClickable(
-                            enabled = !restricted,
-                            onClick = { onEdit(toggle.id) },
+                            // Editing a switch stays with the admin, but any profile that may
+                            // flip one may also pin it, so the shortcut does what the row does
+                            onClick = { if (!restricted) onEdit(toggle.id) },
                             onLongClick = {
                                 if (!onCreateShortcut(toggle.id)) context.popToast(R.string.unsupported)
                             }

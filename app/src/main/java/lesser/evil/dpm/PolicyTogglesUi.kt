@@ -65,6 +65,7 @@ import lesser.evil.adaptiveInsets
 import lesser.evil.parsePackageNames
 import lesser.evil.popToast
 import lesser.evil.showOperationResultToast
+import lesser.evil.ui.DisabledAlpha
 import lesser.evil.ui.FullWidthCheckBoxItem
 import lesser.evil.ui.FullWidthRadioButtonItem
 import lesser.evil.ui.NavIcon
@@ -84,7 +85,6 @@ fun PolicyTogglesScreen(
 ) {
     val context = LocalContext.current
     val allToggles by toggles.collectAsStateWithLifecycle()
-    val list = if (restricted) allToggles.filter { it.userAllowed } else allToggles
     LaunchedEffect(Unit) { getToggles() }
     Scaffold(
         topBar = {
@@ -101,19 +101,24 @@ fun PolicyTogglesScreen(
         contentWindowInsets = adaptiveInsets()
     ) { paddingValues ->
         LazyColumn(Modifier.fillMaxSize().padding(paddingValues)) {
-            items(list, { it.id }) { toggle ->
+            items(allToggles, { it.id }) { toggle ->
+                // A switch the admin kept to itself is shown rather than hidden, so the profile
+                // can see what exists - but greyed, and with nothing to press: no editing, no
+                // flipping, and no pinning a shortcut that would only be turned down
+                val locked = restricted && !toggle.userAllowed
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .combinedClickable(
+                        .then(if (locked) Modifier else Modifier.combinedClickable(
                             // Editing a switch stays with the admin, but any profile that may
                             // flip one may also pin it, so the shortcut does what the row does
                             onClick = { if (!restricted) onEdit(toggle.id) },
                             onLongClick = {
                                 if (!onCreateShortcut(toggle.id)) context.popToast(R.string.unsupported)
                             }
-                        )
-                        .padding(HorizontalPadding, 8.dp),
+                        ))
+                        .padding(HorizontalPadding, 8.dp)
+                        .alpha(if (locked) DisabledAlpha else 1F),
                     Arrangement.SpaceBetween, Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1F)) {
@@ -127,7 +132,8 @@ fun PolicyTogglesScreen(
                     Switch(
                         toggle.enabled,
                         { context.showOperationResultToast(onSwitch(toggle.id, it)) },
-                        Modifier.padding(start = 8.dp)
+                        Modifier.padding(start = 8.dp),
+                        enabled = !locked
                     )
                 }
             }

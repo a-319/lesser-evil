@@ -115,6 +115,22 @@ object PolicyGateway {
         }
     }
 
+    /**
+     * Whether [actor] cannot change [key] away from its current state [blocked]. A screen asks
+     * this before it offers the control at all, so a function someone else turned on is visibly
+     * not this profile's rather than a refusal after the tap. It asks the very [denialFor] the
+     * change itself would go through, so what is greyed out and what is refused cannot drift.
+     */
+    fun lockedFor(actor: Actor, kind: BlockKind, key: String, blocked: Boolean): Boolean =
+        denialFor(actor, kind, key, !blocked) != null
+
+    /**
+     * Whether no key of [kind] is [actor]'s to touch, whatever it is. A blanket policy owns the
+     * whole list rather than single entries, so there is nothing to add to it either.
+     */
+    fun kindLockedFor(actor: Actor, kind: BlockKind): Boolean =
+        actor !is Actor.Admin && blanketMeteredDataHeld(kind)
+
     /** Why [owner]'s block is not this actor's to change, worded for whoever holds it */
     private fun notMine(owner: Actor): Denial =
         if (owner is Actor.Automation) Denial.HeldByAutomation else Denial.OwnedBy(owner)

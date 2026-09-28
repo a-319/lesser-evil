@@ -181,6 +181,19 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         val refused = PolicyGateway.setBlocks(actor, kind, keys, blocked)
         report(refused.values.firstOrNull())
     }
+    /**
+     * Whether this session may not change [key] away from [blocked]. Screens ask before drawing a
+     * control, so a function the admin turned on reaches the user profile greyed out and inert
+     * instead of looking available and failing. The admin is never told no, so nothing is greyed
+     * out for it.
+     */
+    fun blockLocked(kind: BlockKind, key: String, blocked: Boolean): Boolean =
+        PolicyGateway.lockedFor(actor, kind, key, blocked)
+    /** The same question about a user restriction, as a reference a screen can hold */
+    fun restrictionLocked(id: String, state: Boolean): Boolean =
+        blockLocked(BlockKind.UserRestriction, id, state)
+    /** Whether nothing of [kind] may be added to by this session */
+    fun blockKindLocked(kind: BlockKind): Boolean = PolicyGateway.kindLockedFor(actor, kind)
     /** True (and toasts) if the current session may not perform an admin-only operation */
     private fun adminOnly(): Boolean {
         if (restrictedMode.value) {

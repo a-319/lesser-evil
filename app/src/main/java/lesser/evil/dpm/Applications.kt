@@ -109,6 +109,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lesser.evil.AppInfo
 import lesser.evil.AppInstallerActivity
+import lesser.evil.BlockKind
 import lesser.evil.BottomPadding
 import lesser.evil.HorizontalPadding
 import lesser.evil.MyViewModel
@@ -117,6 +118,7 @@ import lesser.evil.R
 import lesser.evil.adaptiveInsets
 import lesser.evil.parsePackageNames
 import lesser.evil.showOperationResultToast
+import lesser.evil.ui.DisabledAlpha
 import lesser.evil.ui.FullWidthRadioButtonItem
 import lesser.evil.ui.FunctionItem
 import lesser.evil.ui.MyLazyScaffold
@@ -138,12 +140,15 @@ val String.isValidPackageName
     get() = Regex("""^(?:[a-zA-Z]\w*\.)+[a-zA-Z]\w*$""").matches(this)
 
 @Composable
-fun LazyItemScope.ApplicationItem(info: AppInfo, onClear: () -> Unit) {
+fun LazyItemScope.ApplicationItem(
+    info: AppInfo, enabled: Boolean = true, onClear: () -> Unit
+) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp)
-            .animateItem(),
+            .animateItem()
+            .alpha(if (enabled) 1F else DisabledAlpha),
         Arrangement.SpaceBetween, Alignment.CenterVertically
     ) {
         Row(Modifier.weight(1F), verticalAlignment = Alignment.CenterVertically) {
@@ -158,7 +163,7 @@ fun LazyItemScope.ApplicationItem(info: AppInfo, onClear: () -> Unit) {
                 Text(info.name, Modifier.alpha(0.8F), style = typography.bodyMedium)
             }
         }
-        IconButton(onClear) {
+        IconButton(onClear, enabled = enabled) {
             Icon(Icons.Default.Clear, null)
         }
     }
@@ -301,27 +306,34 @@ fun ApplicationDetailsScreen(
         FunctionItem(R.string.permissions, icon = R.drawable.shield_fill0) { onNavigate(PermissionsManager(packageName)) }
         if(VERSION.SDK_INT >= 24) SwitchItem(
             R.string.suspend, icon = R.drawable.block_fill0, state = status.suspend,
-            onCheckedChange = { vm.adSetPackageSuspended(packageName, it) }
+            onCheckedChange = { vm.adSetPackageSuspended(packageName, it) },
+            enabled = !vm.blockLocked(BlockKind.Suspended, packageName, status.suspend)
         )
         SwitchItem(
             R.string.hide, icon = R.drawable.visibility_off_fill0,
             state = status.hide,
-            onCheckedChange = { vm.adSetPackageHidden(packageName, it) }
+            onCheckedChange = { vm.adSetPackageHidden(packageName, it) },
+            enabled = !vm.blockLocked(BlockKind.Hidden, packageName, status.hide)
         )
         SwitchItem(
             R.string.block_uninstall, icon = R.drawable.delete_forever_fill0,
             state = status.uninstallBlocked,
-            onCheckedChange = { vm.adSetPackageUb(packageName, it) }
+            onCheckedChange = { vm.adSetPackageUb(packageName, it) },
+            enabled = !vm.blockLocked(
+                BlockKind.UninstallBlocked, packageName, status.uninstallBlocked
+            )
         )
         if(VERSION.SDK_INT >= 30) SwitchItem(
             R.string.disable_user_control, icon = R.drawable.do_not_touch_fill0,
             state = status.userControlDisabled,
-            onCheckedChange = { vm.adSetPackageUcd(packageName, it) }
+            onCheckedChange = { vm.adSetPackageUcd(packageName, it) },
+            enabled = !vm.blockLocked(BlockKind.Ucd, packageName, status.userControlDisabled)
         )
         if(VERSION.SDK_INT >= 28) SwitchItem(
             R.string.disable_metered_data, icon = R.drawable.money_off_fill0,
             state = status.meteredDataDisabled,
-            onCheckedChange = { vm.adSetPackageMdd(packageName, it) }
+            onCheckedChange = { vm.adSetPackageMdd(packageName, it) },
+            enabled = !vm.blockLocked(BlockKind.Mdd, packageName, status.meteredDataDisabled)
         )
         if(privilege.device && VERSION.SDK_INT >= 28) SwitchItem(
             R.string.keep_after_uninstall, icon = R.drawable.delete_fill0,
@@ -806,7 +818,11 @@ fun PackageFunctionScreen(
     title: Int, packagesState: MutableStateFlow<List<AppInfo>>, onGet: () -> Unit,
     onSet: (List<String>, Boolean) -> Unit, onNavigateUp: () -> Unit,
     chosenPackage: Channel<String>, onChoosePackage: () -> Unit,
-    navigateToGroups: () -> Unit, appGroups: StateFlow<List<AppGroup>>, notes: Int? = null
+    navigateToGroups: () -> Unit, appGroups: StateFlow<List<AppGroup>>, notes: Int? = null,
+    /** Whether a listed package is not this profile's to take off the list */
+    locked: (String) -> Boolean = { false },
+    /** Whether nothing may be added to the list at all */
+    addLocked: Boolean = false
 ) {
     val context = LocalContext.current
     val groups by appGroups.collectAsStateWithLifecycle()
@@ -864,7 +880,7 @@ fun PackageFunctionScreen(
     ) { paddingValues ->
         LazyColumn(Modifier.padding(paddingValues)) {
             items(packages, { it.name }) {
-                ApplicationItem(it) {
+                ApplicationItem(it, enabled = !locked(it.name)) {
                     onSet(listOf(it.name), false)
                     coroutine.launch {
                         val result = snackbar.showSnackbar(
@@ -890,7 +906,7 @@ fun PackageFunctionScreen(
                         .fillMaxWidth()
                         .padding(horizontal = HorizontalPadding)
                         .padding(bottom = 10.dp),
-                    packages.none { it.name in inputPackages }
+                    !addLocked && packages.none { it.name in inputPackages }
                 ) {
                     Text(stringResource(R.string.add))
                 }

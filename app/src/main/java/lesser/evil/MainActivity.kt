@@ -560,26 +560,36 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             PackageFunctionScreen(
                 R.string.suspend, vm.suspendedPackages, vm::getSuspendedPackaged,
                 vm::setPackageSuspended, ::navigateUp, vm.chosenPackage, ::choosePackage,
-                ::navigateToAppGroups, vm.appGroups, R.string.info_suspend_app
+                ::navigateToAppGroups, vm.appGroups, R.string.info_suspend_app,
+                locked = { vm.blockLocked(BlockKind.Suspended, it, true) },
+                addLocked = vm.blockKindLocked(BlockKind.Suspended)
             )
         }
         composable<Hide> {
             PackageFunctionScreen(
                 R.string.hide, vm.hiddenPackages, vm::getHiddenPackages, vm::setPackageHidden,
-                ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups, vm.appGroups
+                ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups,
+                vm.appGroups,
+                locked = { vm.blockLocked(BlockKind.Hidden, it, true) },
+                addLocked = vm.blockKindLocked(BlockKind.Hidden)
             )
         }
         composable<BlockUninstall> {
             PackageFunctionScreen(
                 R.string.block_uninstall, vm.ubPackages, vm::getUbPackages, vm::setPackageUb,
-                ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups, vm.appGroups
+                ::navigateUp, vm.chosenPackage, ::choosePackage, ::navigateToAppGroups,
+                vm.appGroups,
+                locked = { vm.blockLocked(BlockKind.UninstallBlocked, it, true) },
+                addLocked = vm.blockKindLocked(BlockKind.UninstallBlocked)
             )
         }
         composable<DisableUserControl> {
             PackageFunctionScreen(
                 R.string.disable_user_control, vm.ucdPackages, vm::getUcdPackages,
                 vm::setPackageUcd, ::navigateUp, vm.chosenPackage, ::choosePackage,
-                ::navigateToAppGroups, vm.appGroups, R.string.info_disable_user_control
+                ::navigateToAppGroups, vm.appGroups, R.string.info_disable_user_control,
+                locked = { vm.blockLocked(BlockKind.Ucd, it, true) },
+                addLocked = vm.blockKindLocked(BlockKind.Ucd)
             )
         }
         composable<PermissionsManager> {
@@ -592,7 +602,9 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             PackageFunctionScreen(
                 R.string.disable_metered_data, vm.mddPackages, vm::getMddPackages,
                 vm::setPackageMdd, ::navigateUp, vm.chosenPackage, ::choosePackage,
-                ::navigateToAppGroups, vm.appGroups
+                ::navigateToAppGroups, vm.appGroups,
+                locked = { vm.blockLocked(BlockKind.Mdd, it, true) },
+                addLocked = vm.blockKindLocked(BlockKind.Mdd)
             )
         }
         composable<ClearAppStorage> {
@@ -684,11 +696,13 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             UserRestrictionScreen(vm::getUserRestrictions, ::navigateUp, ::navigate)
         }
         composable<UserRestrictionEditor> {
-            UserRestrictionEditorScreen(vm.userRestrictions, vm::setUserRestriction, ::navigateUp)
+            UserRestrictionEditorScreen(vm.userRestrictions, vm::setUserRestriction,
+                vm::restrictionLocked, ::navigateUp)
         }
         composable<UserRestrictionOptions> {
             UserRestrictionOptionsScreen(it.toRoute(), vm.userRestrictions,
-                vm::setUserRestriction, vm::createUserRestrictionShortcut, ::navigateUp)
+                vm::setUserRestriction, vm::createUserRestrictionShortcut, vm::restrictionLocked,
+                ::navigateUp)
         }
 
         composable<PolicyToggles> {

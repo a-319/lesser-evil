@@ -58,6 +58,9 @@ import lesser.evil.R
 import lesser.evil.adaptiveInsets
 import lesser.evil.zhCN
 
+/** What the platform fades disabled content to, for the parts that do not fade themselves. */
+const val DisabledAlpha = 0.38F
+
 @Composable
 fun FunctionItem(
     @StringRes title: Int,
@@ -205,12 +208,13 @@ fun SwitchItem(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = onClickBlank != null, onClick = onClickBlank?:{})
+            .clickable(enabled = enabled && onClickBlank != null, onClick = onClickBlank?:{})
             .padding(start = if(padding) 25.dp else 0.dp, end = if(padding) 15.dp else 0.dp, top = 5.dp, bottom = 5.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.align(Alignment.CenterStart)
+            // A disabled switch greys itself; the label beside it has to be told to
+            modifier = Modifier.align(Alignment.CenterStart).alpha(if(enabled) 1F else DisabledAlpha)
         ) {
             if(icon != null) Icon(
                 painter = painterResource(icon),

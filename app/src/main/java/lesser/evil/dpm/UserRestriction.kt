@@ -43,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -60,6 +61,7 @@ import lesser.evil.UserRestrictionsRepository
 import lesser.evil.adaptiveInsets
 import lesser.evil.popToast
 import lesser.evil.showOperationResultToast
+import lesser.evil.ui.DisabledAlpha
 import lesser.evil.ui.FunctionItem
 import lesser.evil.ui.MyLazyScaffold
 import lesser.evil.ui.NavIcon
@@ -145,20 +147,28 @@ data class UserRestrictionOptions(val id: String)
 fun UserRestrictionOptionsScreen(
     args: UserRestrictionOptions, userRestrictions: StateFlow<Map<String, Boolean>>,
     setRestriction: (String, Boolean) -> Boolean, setShortcut: (String) -> Boolean,
-    onNavigateUp: () -> Unit
+    locked: (String, Boolean) -> Boolean, onNavigateUp: () -> Unit
 ) {
     val context = LocalContext.current
     val status by userRestrictions.collectAsStateWithLifecycle()
     val (title, items) = UserRestrictionsRepository.getData(args.id)
     MyLazyScaffold(title, onNavigateUp) {
         items(items) { restriction ->
+            val state = status[restriction.id] == true
+            // A restriction this profile cannot change is inert: no switch, and no long press
+            // either, since a shortcut for it would only be a second way to be turned down
+            val itemLocked = locked(restriction.id, state)
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .combinedClickable(onClick = {}, onLongClick = {
-                        if (!setShortcut(restriction.id)) context.popToast(R.string.unsupported)
-                    })
-                    .padding(15.dp, 6.dp),
+                    .then(if (itemLocked) Modifier else Modifier.combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            if (!setShortcut(restriction.id)) context.popToast(R.string.unsupported)
+                        }
+                    ))
+                    .padding(15.dp, 6.dp)
+                    .alpha(if (itemLocked) DisabledAlpha else 1F),
                 Arrangement.SpaceBetween, Alignment.CenterVertically
             ) {
                 Row(Modifier.weight(1F), verticalAlignment = Alignment.CenterVertically) {
@@ -172,13 +182,14 @@ fun UserRestrictionOptionsScreen(
                     }
                 }
                 Switch(
-                    status[restriction.id] == true,
+                    state,
                     {
                         if (!setRestriction(restriction.id, it)) {
                             context.showOperationResultToast(false)
                         }
                     },
-                    Modifier.padding(start = 8.dp)
+                    Modifier.padding(start = 8.dp),
+                    enabled = !itemLocked
                 )
             }
         }
@@ -195,7 +206,7 @@ fun UserRestrictionOptionsScreen(
 @Composable
 fun UserRestrictionEditorScreen(
     restrictions: StateFlow<Map<String, Boolean>>, setRestriction: (String, Boolean) -> Boolean,
-    onNavigateUp: () -> Unit
+    locked: (String, Boolean) -> Boolean, onNavigateUp: () -> Unit
 ) {
     val context = LocalContext.current
     val map by restrictions.collectAsStateWithLifecycle()
@@ -211,14 +222,17 @@ fun UserRestrictionEditorScreen(
     ) { paddingValues ->
         LazyColumn(Modifier.fillMaxSize().padding(paddingValues)) {
             items(list, { it }) {
+                // Everything listed here is set, so the question is only who may unset it
+                val itemLocked = locked(it, true)
                 Row(
-                    Modifier.fillMaxWidth().padding(HorizontalPadding, 2.dp).animateItem(),
+                    Modifier.fillMaxWidth().padding(HorizontalPadding, 2.dp).animateItem()
+                        .alpha(if (itemLocked) DisabledAlpha else 1F),
                     Arrangement.SpaceBetween, Alignment.CenterVertically
                 ) {
                     Text(it)
                     IconButton({
                         if (!setRestriction(it, false)) context.showOperationResultToast(false)
-                    }) {
+                    }, enabled = !itemLocked) {
                         Icon(Icons.Outlined.Delete, null)
                     }
                 }

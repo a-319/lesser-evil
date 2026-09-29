@@ -120,6 +120,7 @@
     <string name="dhizuku_user_grant_unavailable">On this device the app cannot tell which function a client is asking for, so a grant by the user profile cannot be kept to and every such request is refused. Grant as admin or not at all.</string>
     <string name="dhizuku_user_grant_note">Requests from this app go through the same rules as the buttons in this app: it can block what the user profile may block, and release only what it blocked itself.</string>
     <string name="cannot_modify_admin_grant">Cannot change a grant made by the admin</string>
+    <string name="tap_to_copy">Tap the line above to copy it</string>
     <string name="dhizuku_acts_as">This app acts as</string>
     <string name="as_admin">As admin</string>
     <string name="as_user_profile">As the user profile</string>

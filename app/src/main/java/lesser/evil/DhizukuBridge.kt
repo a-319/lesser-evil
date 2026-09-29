@@ -256,7 +256,8 @@ object DhizukuBridge {
  */
 object DpmTransactions {
     private val names = mutableMapOf<Int, String?>()
-    private var lookup: java.lang.reflect.Method? = null
+    /** Asks the framework what a code is called, however that turned out to be reachable. */
+    private var lookup: ((Int) -> String?)? = null
     private var byConstant: Map<Int, String> = emptyMap()
     /** True once the mapping was actually found, which is the only answer worth keeping. */
     private var looked = false
@@ -275,9 +276,9 @@ object DpmTransactions {
     fun nameOf(code: Int): String? = synchronized(this) {
         look()
         names.getOrPut(code) {
-            val fromLookup = lookup?.let { method ->
+            val fromLookup = lookup?.let { ask ->
                 try {
-                    method.invoke(null, code) as? String
+                    ask(code)
                 } catch (e: Throwable) {
                     null
                 }
@@ -332,24 +333,46 @@ object DpmTransactions {
         Log.d("DpmTransactions", "mapping: $how")
     }
 
-    /** The framework's own code-to-name lookup, from Android 10 on. */
-    private fun findLookup(stub: Class<*>): java.lang.reflect.Method? {
+    /**
+     * The framework's own code-to-name lookup, from Android 10 on, however it can be reached:
+     * plainly where there are no restrictions, then as a member handed over past them, then by
+     * being called through them. Each is tried because they fail for different reasons.
+     */
+    private fun findLookup(stub: Class<*>): ((Int) -> String?)? {
         val int = Int::class.javaPrimitiveType
+        val name = "getDefaultTransactionName"
         try {
-            val plain = stub.getMethod("getDefaultTransactionName", int)
+            val plain = stub.getMethod(name, int)
             note("getMethod", "ok")
-            return plain
+            return { plain.invoke(null, it) as? String }
         } catch (e: Throwable) {
             // Either this version has no such method, or the restrictions hid it. Tell them apart
-            // by asking again in a way the restrictions do not apply to
+            // by asking again in ways the restrictions do not apply to
             note("getMethod", e)
         }
-        return try {
-            val bypassed = HiddenApiBypass.getDeclaredMethod(stub, "getDefaultTransactionName", int)
+        try {
+            val bypassed = HiddenApiBypass.getDeclaredMethod(stub, name, int)
             note("bypassMethod", "ok")
-            bypassed
+            return { bypassed.invoke(null, it) as? String }
         } catch (e: Throwable) {
             note("bypassMethod", e)
+        }
+        return try {
+            // Called rather than handed over. Probed with the first transaction code there is, so
+            // a way of asking that answers nothing is not mistaken for one that works
+            val probe = HiddenApiBypass.invoke(stub, null, name, 1) as? String
+            if (probe == null) {
+                note("bypassInvoke", "answered nothing")
+                null
+            } else {
+                note("bypassInvoke", "ok")
+                val ask: (Int) -> String? = {
+                    HiddenApiBypass.invoke(stub, null, name, it) as? String
+                }
+                ask
+            }
+        } catch (e: Throwable) {
+            note("bypassInvoke", e)
             null
         }
     }

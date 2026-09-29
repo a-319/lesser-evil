@@ -25,13 +25,22 @@ object DhizukuBridge {
     const val DPM_DESCRIPTOR = "android.app.admin.IDevicePolicyManager"
 
     /** How the answer is shaped, so the client's own proxy can still read what it expects. */
-    enum class Reply { Void, Bool, StringArray }
+    enum class Reply { Void, Bool, StringArray, StringList }
 
     /** A client's call, once it is known what it asks for. */
     sealed interface Call {
         /** A tracked block to run through the gateway as the client's actor. */
         data class Block(
             val kind: BlockKind, val keys: List<String>, val blocked: Boolean, val reply: Reply
+        ) : Call
+        /**
+         * A kind whose only way to be changed is to hand over the list it should now hold. What
+         * that asks for is a difference, so it is worked out against the device rather than the
+         * call: the keys that are new are blocked, the ones that fell out are released, and each
+         * side is the actor's to do or not.
+         */
+        data class WholeList(
+            val kind: BlockKind, val keys: List<String>, val reply: Reply
         ) : Call
         /** Changes nothing, so it may go on to the system unaltered. */
         object PassThrough : Call
@@ -50,7 +59,9 @@ object DhizukuBridge {
         /** One key and a flag */
         KeyFlag,
         /** A flag alone, for a state whose key is the function itself */
-        Flag
+        Flag,
+        /** The whole list the kind should hold, with nothing to say which way anything goes */
+        PackageList
     }
 
     private class Op(
@@ -84,7 +95,11 @@ object DhizukuBridge {
         "setMasterVolumeMuted" to
                 Op(BlockKind.DeviceState, Args.Flag, Reply.Void, key = DeviceState.MasterVolume.key),
         "setStatusBarDisabled" to
-                Op(BlockKind.DeviceState, Args.Flag, Reply.Bool, key = DeviceState.StatusBar.key)
+                Op(BlockKind.DeviceState, Args.Flag, Reply.Bool, key = DeviceState.StatusBar.key),
+        // These two have no single-entry form at all: the list is handed over whole, and the one
+        // that answers says which entries it could not carry out - which is what a refusal is
+        "setUserControlDisabledPackages" to Op(BlockKind.Ucd, Args.PackageList, Reply.Void),
+        "setMeteredDataDisabledPackages" to Op(BlockKind.Mdd, Args.PackageList, Reply.StringList)
     )
 
     /**
@@ -115,9 +130,9 @@ object DhizukuBridge {
      * call is meant for the parent profile. Rather than track which version has which, every
      * combination is tried and only the ones that consume the payload exactly are kept.
      */
-    private fun parse(op: Op, data: Parcel): List<Call.Block> {
+    private fun parse(op: Op, data: Parcel): List<Call> {
         val start = data.dataPosition()
-        val found = mutableListOf<Call.Block>()
+        val found = mutableListOf<Call>()
         for (admin in listOf(true, false)) {
             for (caller in listOf(false, true)) {
                 for (tail in 0..1) {
@@ -136,7 +151,7 @@ object DhizukuBridge {
     }
 
     /** One reading, or null if it does not hold together. */
-    private fun read(op: Op, p: Parcel, admin: Boolean, caller: Boolean, tail: Int): Call.Block? {
+    private fun read(op: Op, p: Parcel, admin: Boolean, caller: Boolean, tail: Int): Call? {
         if (admin) {
             // A nullable parcelable is a flag and then, for a ComponentName, two strings
             if (p.readInt() != 0) {
@@ -145,6 +160,15 @@ object DhizukuBridge {
             }
         }
         if (caller) p.readString()
+        // The whole-list form has no flag to read, and an empty list is a real request: it asks
+        // for everything to be released, which for a profile means everything of its own
+        if (op.args == Args.PackageList) {
+            val list = p.createStringArray()?.toList() ?: return null
+            repeat(tail) { if (p.readInt() != 0) return null }
+            if (p.dataAvail() != 0) return null
+            if (list.any { !validKey(op.kind, it) }) return null
+            return Call.WholeList(op.kind, list.distinct(), op.reply)
+        }
         val keys: List<String>
         val blocked: Boolean
         when (op.args) {
@@ -168,6 +192,7 @@ object DhizukuBridge {
                 keys = listOf(op.key ?: return null)
                 blocked = p.readInt() != 0
             }
+            Args.PackageList -> return null
         }
         // A trailing flag is the call being aimed at the parent profile. Reading it as false is
         // the only case that means what this would do, so a set one is left to the admin

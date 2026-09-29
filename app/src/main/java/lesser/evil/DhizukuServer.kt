@@ -134,21 +134,33 @@ class MyDhizukuService(context: Context, admin: ComponentName, client: IDhizukuC
                 super.onRemoteTransact(target, code, data, reply, flags)
             }
             is DhizukuBridge.Call.Block -> {
-                val refused = PolicyGateway.setBlocks(actor, call.kind, call.keys, call.blocked)
-                if (reply != null) {
-                    reply.writeNoException()
-                    when (call.reply) {
-                        DhizukuBridge.Reply.Void -> Unit
-                        DhizukuBridge.Reply.Bool -> reply.writeInt(if (refused.isEmpty()) 1 else 0)
-                        // The real call answers with what it could not carry out, which is exactly
-                        // what a refusal is
-                        DhizukuBridge.Reply.StringArray ->
-                            reply.writeStringArray(refused.keys.toTypedArray())
-                    }
-                }
+                answer(reply, call.reply, PolicyGateway.setBlocks(
+                    actor, call.kind, call.keys, call.blocked
+                ))
+                true
+            }
+            is DhizukuBridge.Call.WholeList -> {
+                answer(reply, call.reply, PolicyGateway.setWholeList(actor, call.kind, call.keys))
                 true
             }
             is DhizukuBridge.Call.Refused -> refuse(reply)
+        }
+    }
+
+    /**
+     * Writes back what the system would have, so the client's own proxy can read it. The calls that
+     * answer at all answer with what they could not carry out, and a refusal is exactly that.
+     */
+    private fun answer(
+        reply: Parcel?, shape: DhizukuBridge.Reply, refused: Map<String, PolicyGateway.Denial>
+    ) {
+        reply ?: return
+        reply.writeNoException()
+        when (shape) {
+            DhizukuBridge.Reply.Void -> Unit
+            DhizukuBridge.Reply.Bool -> reply.writeInt(if (refused.isEmpty()) 1 else 0)
+            DhizukuBridge.Reply.StringArray -> reply.writeStringArray(refused.keys.toTypedArray())
+            DhizukuBridge.Reply.StringList -> reply.writeStringList(refused.keys.toList())
         }
     }
 

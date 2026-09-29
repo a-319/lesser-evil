@@ -203,6 +203,46 @@ object PolicyGateway {
     }
 
     /**
+     * Makes the blocked set of [kind] exactly [keys], for the two kinds the system offers no other
+     * way to change - the list is handed over whole, and what that means is a difference.
+     *
+     * The difference is taken against the device rather than against what the caller believes, so
+     * a key that is already blocked by someone else is not in it and is left alone. Each side of
+     * it is then an ordinary change that the owner of each key may or may not be allowed to make,
+     * which is why this can be offered to a profile at all.
+     *
+     * @return the keys that were refused, with the reason for each.
+     */
+    fun setWholeList(actor: Actor, kind: BlockKind, keys: List<String>): Map<String, Denial> {
+        val current = currentList(kind) ?: return keys.associateWith { Denial.Failed }
+        val wanted = keys.distinct()
+        val refused = mutableMapOf<String, Denial>()
+        refused += setBlocks(actor, kind, wanted - current.toSet(), true)
+        refused += setBlocks(actor, kind, current - wanted.toSet(), false)
+        return refused
+    }
+
+    /** What [kind] holds right now, for the kinds that are read and written as one list. */
+    private fun currentList(kind: BlockKind): List<String>? {
+        val dpm = Privilege.DPM
+        val dar = Privilege.DAR
+        return try {
+            when (kind) {
+                BlockKind.Ucd ->
+                    if (android.os.Build.VERSION.SDK_INT >= 30)
+                        dpm.getUserControlDisabledPackages(dar).distinct() else null
+                BlockKind.Mdd ->
+                    if (android.os.Build.VERSION.SDK_INT >= 28)
+                        dpm.getMeteredDataDisabledPackages(dar).distinct() else null
+                else -> null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
      * A blanket metered data policy rewrites the whole disabled list rather than one entry, so
      * while a switch carries one, every package's metered data state is the switch's to decide.
      */

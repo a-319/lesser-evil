@@ -386,6 +386,11 @@ fun DhizukuServerSettingsScreen(
             // leaving someone to wonder why such a client does nothing
             if (enabled && !DpmTransactions.available()) {
                 Notes(R.string.dhizuku_user_grant_unavailable, HorizontalPadding)
+                // What was tried, so a report of this says which part gave way
+                Text(
+                    DpmTransactions.how, Modifier.padding(HorizontalPadding).alpha(0.7F),
+                    style = typography.bodySmall
+                )
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
         }

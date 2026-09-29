@@ -1,7 +1,9 @@
 package lesser.evil
 
 import android.os.Parcel
+import android.util.Log
 import lesser.evil.dpm.isValidPackageName
+import org.lsposed.hiddenapibypass.HiddenApiBypass
 
 /**
  * Turns a Dhizuku client's raw call on the device policy service into an operation this app can
@@ -243,7 +245,12 @@ object DhizukuBridge {
  *    its own dispatch is written in terms of them. Read the ones this app knows about and the
  *    mapping falls out backwards.
  *
- * Both are reached by reflection over a non-SDK class, which [MyApplication] already exempts.
+ * Both are members of a non-SDK class, so ordinary reflection only reaches them where the
+ * process is exempt from the non-SDK restrictions - and an exemption that did not take is silent,
+ * which is why neither is reached by ordinary reflection alone. Each is looked up plainly first,
+ * for the versions that have no restrictions, and then through [HiddenApiBypass], which hands back
+ * the member without going through the check that would refuse it.
+ *
  * If neither can be had, [nameOf] answers null for everything and the caller refuses: a profile's
  * grant stops working, rather than working on the wrong function.
  */
@@ -252,6 +259,9 @@ object DpmTransactions {
     private var lookup: java.lang.reflect.Method? = null
     private var byConstant: Map<Int, String> = emptyMap()
     private var looked = false
+    /** How the mapping was reached, for saying why it is missing when it is. */
+    var how: String = "not looked for yet"
+        private set
 
     /** Whether the mapping is available at all, which decides if a profile's grant can be kept to. */
     fun available(): Boolean = synchronized(this) {
@@ -283,14 +293,41 @@ object DpmTransactions {
             Class.forName("${DhizukuBridge.DPM_DESCRIPTOR}\$Stub")
         } catch (e: Throwable) {
             e.printStackTrace()
+            how = "the device policy interface could not be loaded: $e"
             return
         }
-        lookup = try {
-            stub.getMethod("getDefaultTransactionName", Int::class.javaPrimitiveType)
+        lookup = findLookup(stub)
+        byConstant = findConstants(stub)
+        how = when {
+            lookup != null && byConstant.isNotEmpty() ->
+                "by name lookup and ${byConstant.size} constants"
+            lookup != null -> "by name lookup"
+            byConstant.isNotEmpty() -> "by ${byConstant.size} constants"
+            else -> "neither the name lookup nor any constant could be reached"
+        }
+        Log.d("DpmTransactions", "mapping: $how")
+    }
+
+    /** The framework's own code-to-name lookup, from Android 10 on. */
+    private fun findLookup(stub: Class<*>): java.lang.reflect.Method? {
+        val int = Int::class.javaPrimitiveType
+        try {
+            return stub.getMethod("getDefaultTransactionName", int)
+        } catch (e: Throwable) {
+            // Either this version has no such method, or the restrictions hid it. Tell them apart
+            // by asking again in a way the restrictions do not apply to
+        }
+        return try {
+            HiddenApiBypass.getDeclaredMethod(stub, "getDefaultTransactionName", int)
         } catch (e: Throwable) {
             null
         }
-        byConstant = DhizukuBridge.knownFunctions.mapNotNull { name ->
+    }
+
+    /** The constant each function this app knows is dispatched by, which every version carries. */
+    private fun findConstants(stub: Class<*>): Map<Int, String> {
+        val wanted = DhizukuBridge.knownFunctions
+        val plain = wanted.mapNotNull { name ->
             try {
                 val field = stub.getDeclaredField("TRANSACTION_$name")
                 field.isAccessible = true
@@ -300,5 +337,17 @@ object DpmTransactions {
                 null
             }
         }.toMap()
+        if (plain.isNotEmpty()) return plain
+        return try {
+            HiddenApiBypass.getStaticFields(stub).mapNotNull { field ->
+                val name = field.name.removePrefix("TRANSACTION_")
+                if (name == field.name || name !in wanted) return@mapNotNull null
+                field.isAccessible = true
+                (field.get(null) as? Int)?.let { it to name }
+            }.toMap()
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            emptyMap()
+        }
     }
 }

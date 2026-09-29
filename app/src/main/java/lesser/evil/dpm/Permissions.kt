@@ -391,6 +391,10 @@ fun DhizukuServerSettingsScreen(
         }
         if (enabled) items(clients) { (client, app) ->
             var expand by remember { mutableStateOf(false) }
+            // A profile's grant can only ever carry the two that ask for a function. Both the
+            // summary row and the list it expands into need this, so it sits above them
+            val available =
+                if (client.actor is Actor.Admin) DhizukuPermissions else DhizukuUserPermissions
             Card(
                 Modifier
                     .fillMaxWidth()
@@ -423,10 +427,6 @@ fun DhizukuServerSettingsScreen(
                             )
                         }
                     }
-                    // A profile's grant can only ever carry the two that ask for a function
-                    val available =
-                        if (client.actor is Actor.Admin) DhizukuPermissions
-                        else DhizukuUserPermissions
                     val ts = when (available.filter { it !in client.permissions }.size) {
                         0 -> ToggleableState.On
                         available.size -> ToggleableState.Off

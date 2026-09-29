@@ -57,7 +57,7 @@ class MyDhizukuService(context: Context, admin: ComponentName, client: IDhizukuC
     private val repo get() = (mContext.applicationContext as MyApplication).myRepo
 
     /** The client that made the call being handled, found by the uid it came from. */
-    private fun client(callingUid: Int): DhizukuClientInfo? {
+    private fun clientFor(callingUid: Int): DhizukuClientInfo? {
         val pm = mContext.packageManager
         val packageInfo = try {
             pm.getPackageInfo(
@@ -80,7 +80,7 @@ class MyDhizukuService(context: Context, admin: ComponentName, client: IDhizukuC
             "get_delegated_scopes", "set_delegated_scopes" -> "delegated_scopes"
             else -> "other"
         }
-        val client = client(callingUid)
+        val client = clientFor(callingUid)
         // A grant made by a profile cannot carry the ones that hand over the identity itself:
         // running a process or a service as this app, or handing out delegated scopes, are not
         // requests that can be checked - they are ways to stop being asked
@@ -100,7 +100,7 @@ class MyDhizukuService(context: Context, admin: ComponentName, client: IDhizukuC
     override fun onRemoteTransact(
         target: IBinder?, code: Int, data: Parcel?, reply: Parcel?, flags: Int
     ): Boolean {
-        val actor = client(Binder.getCallingUid())?.actor
+        val actor = clientFor(Binder.getCallingUid())?.actor
         if (actor == null || actor is Actor.Admin || target == null || data == null) {
             return super.onRemoteTransact(target, code, data, reply, flags)
         }

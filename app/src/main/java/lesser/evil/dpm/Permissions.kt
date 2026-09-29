@@ -102,6 +102,7 @@ import lesser.evil.ui.MyScaffold
 import lesser.evil.ui.MySmallTitleScaffold
 import lesser.evil.ui.NavIcon
 import lesser.evil.ui.Notes
+import lesser.evil.ui.RadioButtonItem
 import lesser.evil.ui.SwitchItem
 import lesser.evil.yesOrNo
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
@@ -453,6 +454,27 @@ fun DhizukuServerSettingsScreen(
                 }
                 AnimatedVisibility(expand, Modifier.padding(8.dp, 0.dp, 8.dp, 8.dp)) {
                     Column {
+                        // Whose name a client acts in is the admin's to change, so answering the
+                        // request from the wrong side of the lock does not mean taking the grant
+                        // away and waiting to be asked again
+                        if (!restricted) {
+                            Text(stringResource(R.string.dhizuku_acts_as), style = typography.bodyMedium)
+                            RadioButtonItem(R.string.as_admin, client.actor is Actor.Admin) {
+                                updateDhizukuClient(client.copy(actor = Actor.Admin))
+                            }
+                            RadioButtonItem(
+                                R.string.as_user_profile, client.actor !is Actor.Admin
+                            ) {
+                                // Drop the ones a profile's grant cannot carry, so what is stored
+                                // is what it can actually do
+                                updateDhizukuClient(client.copy(
+                                    actor = Actor.Child(),
+                                    permissions = client.permissions
+                                        .filter { it in DhizukuUserPermissions }
+                                ))
+                            }
+                            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                        }
                         mapOf(
                             "remote_transact" to "Remote transact", "remote_process" to "Remote process",
                             "user_service" to "User service", "delegated_scopes" to "Delegated scopes",

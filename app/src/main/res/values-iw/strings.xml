@@ -580,6 +580,9 @@
 	<string name="dhizuku_grant_note">כמנהל, האפליקציה תוכל לבצע כל פעולה במכשיר, ונדרשת הסיסמה. כפרופיל משתמש, היא תוכל לבצע רק מה שפרופיל המשתמש יכול לבצע באפליקציה הזו.</string>
 	<string name="dhizuku_user_grant_unavailable">במכשיר הזה האפליקציה לא מצליחה לזהות איזו פונקציה הלקוח מבקש, ולכן אי אפשר לאכוף אישור של פרופיל משתמש וכל בקשה כזו נדחית. אשר כמנהל או בכלל לא.</string>
 	<string name="dhizuku_user_grant_note">בקשות מהאפליקציה הזו עוברות באותם כללים של הכפתורים באפליקציה: היא יכולה לחסום מה שפרופיל המשתמש יכול לחסום, ולשחרר רק את מה שהיא עצמה חסמה.</string>
+	<string name="dhizuku_acts_as">האפליקציה הזו פועלת בשם</string>
+	<string name="as_admin">המנהל</string>
+	<string name="as_user_profile">פרופיל המשתמש</string>
 	<string name="granted_by_admin">אושר כמנהל — גישה מלאה למכשיר</string>
 	<string name="granted_by_user_profile">אושר כפרופיל משתמש — מוגבל למה שפרופיל המשתמש יכול</string>
 	<string name="require_auto_time">דורש זמן אוטומטי</string>

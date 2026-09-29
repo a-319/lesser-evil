@@ -286,6 +286,18 @@ object DpmTransactions {
         }
     }
 
+    /** What each way of reaching it did, so a report of a failure names the part that gave way. */
+    private val tried = mutableListOf<String>()
+
+    private fun note(what: String, outcome: Any?) {
+        val said = when (outcome) {
+            is Throwable -> outcome.javaClass.simpleName +
+                    (outcome.message?.take(60)?.let { ": $it" } ?: "")
+            else -> outcome.toString()
+        }
+        tried += "$what=$said"
+    }
+
     private fun look() {
         if (looked) return
         looked = true
@@ -293,18 +305,20 @@ object DpmTransactions {
             Class.forName("${DhizukuBridge.DPM_DESCRIPTOR}\$Stub")
         } catch (e: Throwable) {
             e.printStackTrace()
-            how = "the device policy interface could not be loaded: $e"
+            note("loadClass", e)
+            how = "the device policy interface could not be loaded [${tried.joinToString("; ")}]"
             return
         }
         lookup = findLookup(stub)
         byConstant = findConstants(stub)
-        how = when {
+        val summary = when {
             lookup != null && byConstant.isNotEmpty() ->
                 "by name lookup and ${byConstant.size} constants"
             lookup != null -> "by name lookup"
             byConstant.isNotEmpty() -> "by ${byConstant.size} constants"
             else -> "neither the name lookup nor any constant could be reached"
         }
+        how = "$summary [api ${android.os.Build.VERSION.SDK_INT}; ${tried.joinToString("; ")}]"
         Log.d("DpmTransactions", "mapping: $how")
     }
 
@@ -312,14 +326,20 @@ object DpmTransactions {
     private fun findLookup(stub: Class<*>): java.lang.reflect.Method? {
         val int = Int::class.javaPrimitiveType
         try {
-            return stub.getMethod("getDefaultTransactionName", int)
+            val plain = stub.getMethod("getDefaultTransactionName", int)
+            note("getMethod", "ok")
+            return plain
         } catch (e: Throwable) {
             // Either this version has no such method, or the restrictions hid it. Tell them apart
             // by asking again in a way the restrictions do not apply to
+            note("getMethod", e)
         }
         return try {
-            HiddenApiBypass.getDeclaredMethod(stub, "getDefaultTransactionName", int)
+            val bypassed = HiddenApiBypass.getDeclaredMethod(stub, "getDefaultTransactionName", int)
+            note("bypassMethod", "ok")
+            bypassed
         } catch (e: Throwable) {
+            note("bypassMethod", e)
             null
         }
     }
@@ -327,6 +347,7 @@ object DpmTransactions {
     /** The constant each function this app knows is dispatched by, which every version carries. */
     private fun findConstants(stub: Class<*>): Map<Int, String> {
         val wanted = DhizukuBridge.knownFunctions
+        var failure: Throwable? = null
         val plain = wanted.mapNotNull { name ->
             try {
                 val field = stub.getDeclaredField("TRANSACTION_$name")
@@ -334,9 +355,12 @@ object DpmTransactions {
                 // A function this version does not have simply has no constant, and stays unknown
                 (field.get(null) as? Int)?.let { it to name }
             } catch (e: Throwable) {
+                failure = e
                 null
             }
         }.toMap()
+        note("getField", if (plain.isNotEmpty()) "${plain.size} of ${wanted.size}"
+            else failure?.let { "${it.javaClass.simpleName}" } ?: "none")
         if (plain.isNotEmpty()) return plain
         return try {
             HiddenApiBypass.getStaticFields(stub).mapNotNull { field ->
@@ -344,9 +368,10 @@ object DpmTransactions {
                 if (name == field.name || name !in wanted) return@mapNotNull null
                 field.isAccessible = true
                 (field.get(null) as? Int)?.let { it to name }
-            }.toMap()
+            }.toMap().also { note("bypassFields", "${it.size} of ${wanted.size}") }
         } catch (e: Throwable) {
             e.printStackTrace()
+            note("bypassFields", e)
             emptyMap()
         }
     }

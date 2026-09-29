@@ -117,7 +117,7 @@
     <string name="allow_as_admin">Allow as admin</string>
     <string name="allow_as_user_profile">Allow as user profile</string>
     <string name="dhizuku_grant_note">As admin, the app can do anything on the device, and the password is needed. As the user profile, it can only do what the user profile can do in this app.</string>
-    <string name="dhizuku_user_grant_unavailable">This Android version does not let the app tell which function a client is asking for, so a grant by the user profile cannot be kept to and every such request is refused. Grant as admin or not at all.</string>
+    <string name="dhizuku_user_grant_unavailable">On this device the app cannot tell which function a client is asking for, so a grant by the user profile cannot be kept to and every such request is refused. Grant as admin or not at all.</string>
     <string name="dhizuku_user_grant_note">Requests from this app go through the same rules as the buttons in this app: it can block what the user profile may block, and release only what it blocked itself.</string>
     <string name="granted_by_admin">Granted as admin — full access to the device</string>
     <string name="granted_by_user_profile">Granted as user profile — limited to what the user profile may do</string>

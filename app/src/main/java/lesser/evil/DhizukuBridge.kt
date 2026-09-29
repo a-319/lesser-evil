@@ -113,6 +113,13 @@ object DhizukuBridge {
         "isStatusBarDisabled", "getUserControlDisabledPackages", "getMeteredDataDisabledPackages"
     )
 
+    /**
+     * Every function this app can do anything with, so their codes can be looked up by name on the
+     * versions that offer no lookup of their own. A getter rather than a stored set, so it cannot
+     * be read before [writes] and [reads] are initialised.
+     */
+    val knownFunctions: Set<String> get() = writes.keys + reads
+
     /** What [name] asks for, read out of [data]; [Call.Refused] whenever that is not certain. */
     fun decode(name: String, data: Parcel): Call {
         if (name in reads) return Call.PassThrough
@@ -219,47 +226,79 @@ object DhizukuBridge {
 }
 
 /**
- * The name the framework itself gives a transaction code on the device policy service.
+ * Which function a transaction code on the device policy service stands for.
  *
  * A code is an ordinal the AIDL compiler hands out in declaration order, so it moves whenever a
- * function is added anywhere above it - a table of codes written today would quietly point at the
- * wrong functions on the next Android version. The generated stub carries the mapping, and asking
- * it is the one way to get an answer that cannot go stale. [MyApplication] already lifts the
- * non-SDK restrictions this needs.
+ * function is added anywhere above it: hiding an application is code 125 on Android 9, 138 on 11
+ * and 157 on 16, and 125 on 16 is setting the default SMS application. A table of codes written
+ * today would therefore not merely stop working on the next version - it would carry out different
+ * functions than the ones asked for. So the code is never the thing this trusts; the name is, and
+ * the name is read off the generated stub itself.
  *
- * When the mapping cannot be had, [nameOf] returns null for everything and the caller refuses: a
- * profile's grant stops working, rather than working on the wrong function.
+ * There are two ways to read it, and they cover every version between them:
+ *
+ *  - From Android 10 on, the stub carries getDefaultTransactionName, a generated lookup from code
+ *    to name. It was added for tracing, not for dispatch, which is why older versions lack it.
+ *  - On every version, the stub carries a TRANSACTION_<function> constant per function, because
+ *    its own dispatch is written in terms of them. Read the ones this app knows about and the
+ *    mapping falls out backwards.
+ *
+ * Both are reached by reflection over a non-SDK class, which [MyApplication] already exempts.
+ * If neither can be had, [nameOf] answers null for everything and the caller refuses: a profile's
+ * grant stops working, rather than working on the wrong function.
  */
 object DpmTransactions {
     private val names = mutableMapOf<Int, String?>()
-    private var resolver: java.lang.reflect.Method? = null
+    private var lookup: java.lang.reflect.Method? = null
+    private var byConstant: Map<Int, String> = emptyMap()
     private var looked = false
 
     /** Whether the mapping is available at all, which decides if a profile's grant can be kept to. */
-    fun available(): Boolean = synchronized(this) { resolve() != null }
+    fun available(): Boolean = synchronized(this) {
+        look()
+        lookup != null || byConstant.isNotEmpty()
+    }
 
     /** The function [code] stands for, or null if that cannot be established. */
     fun nameOf(code: Int): String? = synchronized(this) {
-        val method = resolve() ?: return null
+        look()
         names.getOrPut(code) {
-            try {
-                method.invoke(null, code) as? String
-            } catch (e: Throwable) {
-                null
+            val fromLookup = lookup?.let { method ->
+                try {
+                    method.invoke(null, code) as? String
+                } catch (e: Throwable) {
+                    null
+                }
             }
+            // The constants only cover the functions this app knows, which is all it ever asks
+            // about; anything else is refused either way
+            fromLookup ?: byConstant[code]
         }
     }
 
-    private fun resolve(): java.lang.reflect.Method? {
-        if (looked) return resolver
+    private fun look() {
+        if (looked) return
         looked = true
-        resolver = try {
+        val stub = try {
             Class.forName("${DhizukuBridge.DPM_DESCRIPTOR}\$Stub")
-                .getMethod("getDefaultTransactionName", Int::class.javaPrimitiveType)
         } catch (e: Throwable) {
             e.printStackTrace()
+            return
+        }
+        lookup = try {
+            stub.getMethod("getDefaultTransactionName", Int::class.javaPrimitiveType)
+        } catch (e: Throwable) {
             null
         }
-        return resolver
+        byConstant = DhizukuBridge.knownFunctions.mapNotNull { name ->
+            try {
+                val field = stub.getDeclaredField("TRANSACTION_$name")
+                field.isAccessible = true
+                // A function this version does not have simply has no constant, and stays unknown
+                (field.get(null) as? Int)?.let { it to name }
+            } catch (e: Throwable) {
+                null
+            }
+        }.toMap()
     }
 }

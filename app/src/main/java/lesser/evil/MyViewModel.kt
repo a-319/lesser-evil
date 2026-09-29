@@ -1463,9 +1463,27 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         if (adminOnly()) return
         SP.dhizukuServer = status
     }
-    /** Who a client acts as is the admin's to decide; a profile grants by answering the request */
+    /**
+     * A grant is a block like any other: a profile may make one of its own and take it back, and
+     * an admin's is not its to touch. Checked here as well as greyed on the screen, so a caller
+     * arriving another way is turned down too.
+     */
     fun updateDhizukuClient(info: DhizukuClientInfo) {
-        if (adminOnly()) return
+        if (restrictedMode.value) {
+            val existing = myRepo.getDhizukuClient(info.uid, info.signature)
+            if (existing != null && existing.actor is Actor.Admin &&
+                existing.permissions.isNotEmpty()) {
+                application.popToast(R.string.cannot_modify_admin_grant)
+                return
+            }
+            // And it can only pass on what it has itself: never the admin's name, and never the
+            // permissions that hand over the identity rather than ask for a function
+            if (info.actor is Actor.Admin ||
+                info.permissions.any { it !in DhizukuUserPermissions }) {
+                application.popToast(R.string.permission_denied)
+                return
+            }
+        }
         myRepo.setDhizukuClient(info)
         dhizukuClients.update { list ->
             val ml = list.toMutableList()

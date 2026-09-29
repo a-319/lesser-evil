@@ -397,10 +397,19 @@ fun DhizukuServerSettingsScreen(
         }
         if (enabled) items(clients) { (client, app) ->
             var expand by remember { mutableStateOf(false) }
+            // A grant the admin made is not a profile's to touch; one it made itself, or one that
+            // does not exist yet, is. The same rule as every block, so a profile can pass on the
+            // little it has and take that back again
+            val adminsGrant = client.actor is Actor.Admin && client.permissions.isNotEmpty()
+            val mayEdit = !restricted || !adminsGrant
             // A profile's grant can only ever carry the two that ask for a function. Both the
             // summary row and the list it expands into need this, so it sits above them
-            val available =
-                if (client.actor is Actor.Admin) DhizukuPermissions else DhizukuUserPermissions
+            val available = if (!restricted && client.actor is Actor.Admin) DhizukuPermissions
+            else DhizukuUserPermissions
+            /** Keeps a grant a profile makes in its own name, whatever it started as. */
+            fun update(info: DhizukuClientInfo) = updateDhizukuClient(
+                if (restricted) info.copy(actor = Actor.Child()) else info
+            )
             Card(
                 Modifier
                     .fillMaxWidth()
@@ -441,11 +450,11 @@ fun DhizukuServerSettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TriStateCheckbox(ts, {
                             if (ts == ToggleableState.Off) {
-                                updateDhizukuClient(client.copy(permissions = available))
+                                update(client.copy(permissions = available))
                             } else {
-                                updateDhizukuClient(client.copy(permissions = emptyList()))
+                                update(client.copy(permissions = emptyList()))
                             }
-                        }, enabled = !restricted)
+                        }, enabled = mayEdit)
                         val degrees by animateFloatAsState(if(expand) 180F else 0F)
                         IconButton({ expand = !expand }) {
                             Icon(Icons.Default.ArrowDropDown, null, Modifier.rotate(degrees))
@@ -489,15 +498,16 @@ fun DhizukuServerSettingsScreen(
                             ) {
                                 Text(v)
                                 Checkbox(k in client.permissions, {
-                                    updateDhizukuClient(client.copy(
+                                    update(client.copy(
                                         permissions = client.permissions.run { if (it) plus(k) else minus(k) }
                                     ))
-                                }, enabled = allowed && !restricted)
+                                }, enabled = allowed && mayEdit)
                             }
                         }
                         if (client.actor !is Actor.Admin) {
                             Notes(R.string.dhizuku_user_grant_note)
                         }
+                        if (restricted && adminsGrant) Notes(R.string.cannot_modify_admin_grant)
                     }
                 }
             }

@@ -239,11 +239,19 @@ class DhizukuActivity : ComponentActivity() {
                                     stringResource(R.string.dhizuku_grant_note),
                                     style = typography.bodyMedium
                                 )
-                                if (!DpmTransactions.available()) Text(
-                                    stringResource(R.string.dhizuku_user_grant_unavailable),
-                                    Modifier.padding(top = 8.dp),
-                                    color = colorScheme.error, style = typography.bodyMedium
-                                )
+                                if (!DpmTransactions.available()) {
+                                    Text(
+                                        stringResource(R.string.dhizuku_user_grant_unavailable),
+                                        Modifier.padding(top = 8.dp),
+                                        color = colorScheme.error, style = typography.bodyMedium
+                                    )
+                                    // What was tried, so a report of this names the part that
+                                    // gave way rather than leaving it to be guessed at
+                                    Text(
+                                        DpmTransactions.how, Modifier.padding(top = 4.dp),
+                                        style = typography.bodySmall
+                                    )
+                                }
                             }
                         }
                     },

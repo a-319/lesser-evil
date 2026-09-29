@@ -899,13 +899,19 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         val result = DPM.setStatusBarDisabled(DAR, disabled)
         if (result) systemOptionsStatus.update { it.copy(statusBarDisabled = disabled) }
     }
+    // How the device is administered is the admin's, not a block anyone can own a piece of: there
+    // is nothing here a profile could have set and be entitled to unset. The clock especially -
+    // a profile that can move it, or stop it being set for it, can sit out any limit that ends at
+    // a time. Refused here as well as greyed out on the screen, so no other caller slips past
     @RequiresApi(30)
     fun setAutoTimeEnabled(enabled: Boolean) {
+        if (adminOnly()) return
         DPM.setAutoTimeEnabled(DAR, enabled)
         systemOptionsStatus.update { it.copy(autoTimeEnabled = DPM.getAutoTimeEnabled(DAR)) }
     }
     @RequiresApi(30)
     fun setAutoTimeZoneEnabled(enabled: Boolean) {
+        if (adminOnly()) return
         DPM.setAutoTimeZoneEnabled(DAR, enabled)
         systemOptionsStatus.update {
             it.copy(autoTimeZoneEnabled = DPM.getAutoTimeZoneEnabled(DAR))
@@ -913,6 +919,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @Suppress("DEPRECATION")
     fun setAutoTimeRequired(required: Boolean) {
+        if (adminOnly()) return
         DPM.setAutoTimeRequired(DAR, required)
         systemOptionsStatus.update { it.copy(autoTimeRequired = DPM.autoTimeRequired) }
     }
@@ -924,12 +931,14 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(26)
     fun setBackupServiceEnabled(enabled: Boolean) {
+        if (adminOnly()) return
         DPM.setBackupServiceEnabled(DAR, enabled)
         systemOptionsStatus.update {
             it.copy(backupServiceEnabled = DPM.isBackupServiceEnabled(DAR))
         }
     }
     fun setBtContactSharingDisabled(disabled: Boolean) {
+        if (adminOnly()) return
         DPM.setBluetoothContactSharingDisabled(DAR, disabled)
         systemOptionsStatus.update {
             it.copy(btContactSharingDisabled = DPM.getBluetoothContactSharingDisabled(DAR))
@@ -937,6 +946,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(30)
     fun setCommonCriteriaModeEnabled(enabled: Boolean) {
+        if (adminOnly()) return
         DPM.setCommonCriteriaModeEnabled(DAR, enabled)
         systemOptionsStatus.update {
             it.copy(commonCriteriaMode = DPM.isCommonCriteriaModeEnabled(DAR))
@@ -944,10 +954,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(31)
     fun setUsbSignalEnabled(enabled: Boolean) {
+        if (adminOnly()) return
         DPM.isUsbDataSignalingEnabled = enabled
         systemOptionsStatus.update { it.copy(usbSignalEnabled = DPM.isUsbDataSignalingEnabled) }
     }
     fun setKeyguardDisabled(disabled: Boolean): Boolean {
+        if (adminOnly()) return false
         return DPM.setKeyguardDisabled(DAR, disabled)
     }
     fun lockScreen(evictKey: Boolean) {
@@ -983,6 +995,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(28)
     fun setTime(time: Long, useCurrentTz: Boolean): Boolean {
+        if (adminOnly()) return false
         val offset = if (useCurrentTz) {
             ZonedDateTime.now(ZoneId.systemDefault()).offset.totalSeconds * 1000L
         } else 0L
@@ -990,6 +1003,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(28)
     fun setTimeZone(tz: String): Boolean {
+        if (adminOnly()) return false
         return DPM.setTimeZone(DAR, tz)
     }
     @RequiresApi(36)
@@ -998,6 +1012,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(36)
     fun setAutoTimePolicy(policy: Int) {
+        if (adminOnly()) return
         DPM.autoTimePolicy = policy
     }
     @RequiresApi(36)
@@ -1006,6 +1021,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(36)
     fun setAutoTimeZonePolicy(policy: Int) {
+        if (adminOnly()) return
         DPM.autoTimeZonePolicy = policy
     }
     @RequiresApi(35)
@@ -1028,6 +1044,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(34)
     fun setMtePolicy(policy: Int): Boolean {
+        if (adminOnly()) return false
         return try {
             DPM.mtePolicy = policy
             true
@@ -1263,6 +1280,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
     }
     @RequiresApi(24)
     fun setSecurityLoggingEnabled(enabled: Boolean) {
+        if (adminOnly()) return
         DPM.setSecurityLoggingEnabled(DAR, enabled)
     }
     fun exportSecurityLogs(uri: Uri, callback: () -> Unit) {
@@ -1279,6 +1297,7 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         return myRepo.getSecurityLogsCount().toInt()
     }
     fun deleteSecurityLogs() {
+        if (adminOnly()) return
         myRepo.deleteSecurityLogs()
     }
     var preRebootSecurityLogs = emptyList<SecurityLog.SecurityEvent>()

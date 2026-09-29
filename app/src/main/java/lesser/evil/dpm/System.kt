@@ -349,15 +349,17 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
                 vm::setStatusBarDisabled, R.drawable.notifications_fill0,
                 enabled = !vm.deviceStateLocked(DeviceState.StatusBar, status.statusBarDisabled))
         }
+        // How the device is administered is the admin's: there is nothing here a profile could
+        // have set and be entitled to unset, so it is greyed for one rather than owned by it
         if (privilege.device || privilege.org) {
             if(VERSION.SDK_INT >= 30) {
                 SwitchItem(R.string.auto_time, status.autoTimeEnabled, vm::setAutoTimeEnabled,
-                    R.drawable.schedule_fill0)
+                    R.drawable.schedule_fill0, enabled = !restricted)
                 SwitchItem(R.string.auto_timezone, status.autoTimeZoneEnabled,
-                    vm::setAutoTimeZoneEnabled, R.drawable.globe_fill0)
+                    vm::setAutoTimeZoneEnabled, R.drawable.globe_fill0, enabled = !restricted)
             } else {
                 SwitchItem(R.string.require_auto_time, status.autoTimeRequired,
-                    vm::setAutoTimeRequired, R.drawable.schedule_fill0)
+                    vm::setAutoTimeRequired, R.drawable.schedule_fill0, enabled = !restricted)
             }
         }
         if (!privilege.work) SwitchItem(R.string.master_mute,
@@ -366,21 +368,22 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
         if (VERSION.SDK_INT >= 26) {
             SwitchItem(R.string.backup_service, icon = R.drawable.backup_fill0,
                 state = status.backupServiceEnabled, onCheckedChange = vm::setBackupServiceEnabled,
-                onClickBlank = { dialog = 1 })
+                enabled = !restricted, onClickBlank = { dialog = 1 })
         }
         if (VERSION.SDK_INT >= 24 && privilege.work) {
             SwitchItem(R.string.disable_bt_contact_share, status.btContactSharingDisabled,
-                vm::setBtContactSharingDisabled, R.drawable.account_circle_fill0)
+                vm::setBtContactSharingDisabled, R.drawable.account_circle_fill0,
+                enabled = !restricted)
         }
         if(VERSION.SDK_INT >= 30 && (privilege.device || privilege.org)) {
             SwitchItem(R.string.common_criteria_mode, icon = R.drawable.security_fill0,
                 state = status.commonCriteriaMode,
                 onCheckedChange = vm::setCommonCriteriaModeEnabled,
-                onClickBlank = { dialog = 2 })
+                enabled = !restricted, onClickBlank = { dialog = 2 })
         }
         if (VERSION.SDK_INT >= 31 && (privilege.device || privilege.org) && status.canDisableUsbSignal) {
             SwitchItem(R.string.enable_usb_signal, status.usbSignalEnabled,
-                vm::setUsbSignalEnabled, R.drawable.usb_fill0)
+                vm::setUsbSignalEnabled, R.drawable.usb_fill0, enabled = !restricted)
         }
         if (VERSION.SDK_INT < 34) {
             Row(
@@ -424,7 +427,8 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
 
 @Composable
 fun KeyguardScreen(
-    setKeyguardDisabled: (Boolean) -> Boolean, lock: (Boolean) -> Unit, onNavigateUp: () -> Unit
+    setKeyguardDisabled: (Boolean) -> Boolean, lock: (Boolean) -> Unit, restricted: Boolean,
+    onNavigateUp: () -> Unit
 ) {
     val context = LocalContext.current
     val privilege by Privilege.status.collectAsStateWithLifecycle()
@@ -435,15 +439,19 @@ fun KeyguardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                // Whether the device asks for a password at all is the admin's; locking the
+                // screen below is not, and stays available to every profile
                 Button(
                     onClick = { context.showOperationResultToast(setKeyguardDisabled(true)) },
-                    modifier = Modifier.fillMaxWidth(0.49F)
+                    modifier = Modifier.fillMaxWidth(0.49F),
+                    enabled = !restricted
                 ) {
                     Text(stringResource(R.string.disable))
                 }
                 Button(
                     onClick = { context.showOperationResultToast(setKeyguardDisabled(false)) },
-                    modifier = Modifier.fillMaxWidth(0.96F)
+                    modifier = Modifier.fillMaxWidth(0.96F),
+                    enabled = !restricted
                 ) {
                     Text(stringResource(R.string.enable))
                 }
@@ -554,7 +562,9 @@ fun HardwareMonitorScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(28)
 @Composable
-fun ChangeTimeScreen(setTime: (Long, Boolean) -> Boolean, onNavigateUp: () -> Unit) {
+fun ChangeTimeScreen(
+    setTime: (Long, Boolean) -> Boolean, restricted: Boolean, onNavigateUp: () -> Unit
+) {
     val context = LocalContext.current
     val focusMgr = LocalFocusManager.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -628,7 +638,9 @@ fun ChangeTimeScreen(setTime: (Long, Boolean) -> Boolean, onNavigateUp: () -> Un
                                 context.showOperationResultToast(setTime(timeMillis, useCurrentTz))
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = datePickerState.selectedDateMillis != null
+                            // The clock is the admin's: a profile that can move it can sit out
+                            // any limit that ends at a time
+                            enabled = !restricted && datePickerState.selectedDateMillis != null
                         ) {
                             Text(stringResource(R.string.apply))
                         }
@@ -648,7 +660,7 @@ fun ChangeTimeScreen(setTime: (Long, Boolean) -> Boolean, onNavigateUp: () -> Un
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
-                            enabled = inputTime.toLongOrNull() != null
+                            enabled = !restricted && inputTime.toLongOrNull() != null
                         ) {
                             Text(stringResource(R.string.apply))
                         }
@@ -687,7 +699,9 @@ fun ChangeTimeScreen(setTime: (Long, Boolean) -> Boolean, onNavigateUp: () -> Un
 
 @RequiresApi(28)
 @Composable
-fun ChangeTimeZoneScreen(setTimeZone: (String) -> Boolean, onNavigateUp: () -> Unit) {
+fun ChangeTimeZoneScreen(
+    setTimeZone: (String) -> Boolean, restricted: Boolean, onNavigateUp: () -> Unit
+) {
     val context = LocalContext.current
     val focusMgr = LocalFocusManager.current
     var inputTimezone by rememberSaveable { mutableStateOf("") }
@@ -715,7 +729,7 @@ fun ChangeTimeZoneScreen(setTimeZone: (String) -> Boolean, onNavigateUp: () -> U
                 context.showOperationResultToast(setTimeZone(inputTimezone))
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = inputTimezone.isNotEmpty() && validInput
+            enabled = !restricted && inputTimezone.isNotEmpty() && validInput
         ) {
             Text(stringResource(R.string.apply))
         }
@@ -755,7 +769,7 @@ fun ChangeTimeZoneScreen(setTimeZone: (String) -> Boolean, onNavigateUp: () -> U
 @RequiresApi(36)
 @Composable
 fun AutoTimePolicyScreen(
-    getPolicy: () -> Int, setPolicy: (Int) -> Unit, onNavigateUp: () -> Unit
+    getPolicy: () -> Int, setPolicy: (Int) -> Unit, restricted: Boolean, onNavigateUp: () -> Unit
 ) = MyScaffold(R.string.auto_time_policy, onNavigateUp, 0.dp) {
     val context = LocalContext.current
     var policy by rememberSaveable { mutableIntStateOf(getPolicy()) }
@@ -775,7 +789,8 @@ fun AutoTimePolicyScreen(
         },
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = HorizontalPadding)
+            .padding(horizontal = HorizontalPadding),
+        enabled = !restricted
     ) {
         Text(stringResource(R.string.apply))
     }
@@ -786,7 +801,7 @@ fun AutoTimePolicyScreen(
 @RequiresApi(36)
 @Composable
 fun AutoTimeZonePolicyScreen(
-    getPolicy: () -> Int, setPolicy: (Int) -> Unit, onNavigateUp: () -> Unit
+    getPolicy: () -> Int, setPolicy: (Int) -> Unit, restricted: Boolean, onNavigateUp: () -> Unit
 ) = MyScaffold(R.string.auto_timezone_policy, onNavigateUp, 0.dp) {
     val context = LocalContext.current
     var policy by rememberSaveable { mutableIntStateOf(getPolicy()) }
@@ -804,7 +819,7 @@ fun AutoTimeZonePolicyScreen(
         context.showOperationResultToast(true)
     }, Modifier
         .fillMaxWidth()
-        .padding(horizontal = HorizontalPadding)) {
+        .padding(horizontal = HorizontalPadding), enabled = !restricted) {
         Text(stringResource(R.string.apply))
     }
 }
@@ -1059,7 +1074,8 @@ fun PermissionPolicyScreen(
 @RequiresApi(34)
 @Composable
 fun MtePolicyScreen(
-    getPolicy: () -> Int, setPolicy: (Int) -> Boolean, onNavigateUp: () -> Unit
+    getPolicy: () -> Int, setPolicy: (Int) -> Boolean, restricted: Boolean,
+    onNavigateUp: () -> Unit
 ) {
     var policy by rememberSaveable { mutableIntStateOf(getPolicy()) }
     MyScaffold(R.string.mte_policy, onNavigateUp, 0.dp) {
@@ -1074,7 +1090,8 @@ fun MtePolicyScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp, horizontal = HorizontalPadding)
+                .padding(vertical = 4.dp, horizontal = HorizontalPadding),
+            enabled = !restricted
         ) {
             Text(stringResource(R.string.apply))
         }
@@ -1725,7 +1742,7 @@ fun CaCertScreen(
 fun SecurityLoggingScreen(
     getEnabled: () -> Boolean, setEnabled: (Boolean) -> Unit, exportLogs: (Uri, () -> Unit) -> Unit,
     getCount: () -> Int, deleteLogs: () -> Unit, getPRLogs: () -> Boolean,
-    exportPRLogs: (Uri, () -> Unit) -> Unit, onNavigateUp: () -> Unit
+    exportPRLogs: (Uri, () -> Unit) -> Unit, restricted: Boolean, onNavigateUp: () -> Unit
 ) {
     val context = LocalContext.current
     var enabled by rememberSaveable { mutableStateOf(getEnabled()) }
@@ -1755,11 +1772,14 @@ fun SecurityLoggingScreen(
         }
     }
     MyScaffold(R.string.security_logging, onNavigateUp, 0.dp) {
+        // Whether the device logs, and wiping what it logged, are the admin's; reading the logs
+        // is left alone, since they are a record of the profile that is asking for them
         SwitchItem(
             R.string.enable, enabled, {
                 setEnabled(it)
                 enabled = it
-            }
+            },
+            enabled = !restricted
         )
         Text(
             stringResource(R.string.n_logs_in_total, logsCount),
@@ -1777,7 +1797,8 @@ fun SecurityLoggingScreen(
         }
         if (logsCount > 0) FilledTonalButton(
             { dialog = true },
-            Modifier.fillMaxWidth().padding(HorizontalPadding, 4.dp)
+            Modifier.fillMaxWidth().padding(HorizontalPadding, 4.dp),
+            enabled = !restricted
         ) {
             Text(stringResource(R.string.delete_logs))
         }

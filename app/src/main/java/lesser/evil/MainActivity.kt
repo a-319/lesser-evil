@@ -380,20 +380,23 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         composable<SystemManager> { SystemManagerScreen(vm, ::navigateUp, ::navigate) }
         composable<SystemOptions> { SystemOptionsScreen(vm, ::navigateUp) }
         composable<Keyguard> {
-            KeyguardScreen(vm::setKeyguardDisabled, vm::lockScreen, ::navigateUp)
+            KeyguardScreen(vm::setKeyguardDisabled, vm::lockScreen, restricted, ::navigateUp)
         }
         composable<HardwareMonitor> {
             HardwareMonitorScreen(vm.hardwareProperties, vm::getHardwareProperties,
                 vm::setHpRefreshInterval, ::navigateUp)
         }
-        composable<ChangeTime> { ChangeTimeScreen(vm::setTime, ::navigateUp) }
-        composable<ChangeTimeZone> { ChangeTimeZoneScreen(vm::setTimeZone, ::navigateUp) }
+        composable<ChangeTime> { ChangeTimeScreen(vm::setTime, restricted, ::navigateUp) }
+        composable<ChangeTimeZone> {
+            ChangeTimeZoneScreen(vm::setTimeZone, restricted, ::navigateUp)
+        }
         composable<AutoTimePolicy> {
-            AutoTimePolicyScreen(vm::getAutoTimePolicy, vm::setAutoTimePolicy, ::navigateUp)
+            AutoTimePolicyScreen(vm::getAutoTimePolicy, vm::setAutoTimePolicy, restricted,
+                ::navigateUp)
         }
         composable<AutoTimeZonePolicy> {
             AutoTimeZonePolicyScreen(vm::getAutoTimeZonePolicy, vm::setAutoTimeZonePolicy,
-                ::navigateUp)
+                restricted, ::navigateUp)
         }
         //composable<> { KeyPairs(::navigateUp) }
         composable<ContentProtectionPolicy> {
@@ -404,7 +407,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
             PermissionPolicyScreen(vm::getPermissionPolicy, vm::setPermissionPolicy, ::navigateUp)
         }
         composable<MtePolicy> {
-            MtePolicyScreen(vm::getMtePolicy, vm::setMtePolicy, ::navigateUp)
+            MtePolicyScreen(vm::getMtePolicy, vm::setMtePolicy, restricted, ::navigateUp)
         }
         composable<NearbyStreamingPolicy> {
             NearbyStreamingPolicyScreen(vm::getNsAppPolicy, vm::setNsAppPolicy,
@@ -427,7 +430,8 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         composable<SecurityLogging> {
             SecurityLoggingScreen(vm::getSecurityLoggingEnabled, vm::setSecurityLoggingEnabled,
                 vm::exportSecurityLogs, vm::getSecurityLogsCount, vm::deleteSecurityLogs,
-                vm::getPreRebootSecurityLogs, vm::exportPreRebootSecurityLogs, ::navigateUp)
+                vm::getPreRebootSecurityLogs, vm::exportPreRebootSecurityLogs, restricted,
+                ::navigateUp)
         }
         composable<DisableAccountManagement> {
             DisableAccountManagementScreen(vm.mdAccountTypes, vm::getMdAccountTypes,

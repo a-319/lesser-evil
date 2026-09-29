@@ -258,7 +258,9 @@ object DpmTransactions {
     private val names = mutableMapOf<Int, String?>()
     private var lookup: java.lang.reflect.Method? = null
     private var byConstant: Map<Int, String> = emptyMap()
+    /** True once the mapping was actually found, which is the only answer worth keeping. */
     private var looked = false
+    private var attempts = 0
     /** How the mapping was reached, for saying why it is missing when it is. */
     var how: String = "not looked for yet"
         private set
@@ -299,8 +301,14 @@ object DpmTransactions {
     }
 
     private fun look() {
-        if (looked) return
-        looked = true
+        // Only a success is remembered. What this depends on is set up at startup and asked for
+        // from a screen, so an answer taken before that was ready would otherwise stick for the
+        // life of the process and say the mapping is missing when it is not. A few tries at a
+        // class load and a handful of field reads costs nothing; being wrong about it costs the
+        // whole feature
+        if (looked || attempts >= 3) return
+        attempts++
+        tried.clear()
         val stub = try {
             Class.forName("${DhizukuBridge.DPM_DESCRIPTOR}\$Stub")
         } catch (e: Throwable) {
@@ -318,7 +326,9 @@ object DpmTransactions {
             byConstant.isNotEmpty() -> "by ${byConstant.size} constants"
             else -> "neither the name lookup nor any constant could be reached"
         }
-        how = "$summary [api ${android.os.Build.VERSION.SDK_INT}; ${tried.joinToString("; ")}]"
+        looked = lookup != null || byConstant.isNotEmpty()
+        how = "$summary [api ${android.os.Build.VERSION.SDK_INT}, try $attempts; " +
+                "${tried.joinToString("; ")}]"
         Log.d("DpmTransactions", "mapping: $how")
     }
 

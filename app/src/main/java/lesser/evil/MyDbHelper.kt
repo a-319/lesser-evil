@@ -4,7 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class MyDbHelper(context: Context): SQLiteOpenHelper(context, "data", null, 7) {
+class MyDbHelper(context: Context): SQLiteOpenHelper(context, "data", null, 8) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(DHIZUKU_CLIENTS_TABLE)
         db.execSQL(SECURITY_LOGS_TABLE)
@@ -31,10 +31,15 @@ class MyDbHelper(context: Context): SQLiteOpenHelper(context, "data", null, 7) {
         if (oldVersion in 5..6) {
             db.execSQL("ALTER TABLE policy_toggles ADD COLUMN backup TEXT DEFAULT ''")
         }
+        if (oldVersion < 8) {
+            // Empty reads as the admin, which every grant made before this was: granting one has
+            // always asked for the password when there is one
+            db.execSQL("ALTER TABLE dhizuku_clients ADD COLUMN actor TEXT DEFAULT ''")
+        }
     }
     companion object {
         const val DHIZUKU_CLIENTS_TABLE = "CREATE TABLE dhizuku_clients (uid INTEGER PRIMARY KEY," +
-                "signature TEXT, permissions TEXT)"
+                "signature TEXT, permissions TEXT, actor TEXT DEFAULT '')"
         const val SECURITY_LOGS_TABLE = "CREATE TABLE security_logs (id INTEGER, tag INTEGER," +
                 "level INTEGER, time INTEGER, data TEXT)"
         const val NETWORK_LOGS_TABLE = "CREATE TABLE network_logs (id INTEGER, package INTEGER," +

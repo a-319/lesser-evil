@@ -80,10 +80,13 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import lesser.evil.Actor
 import lesser.evil.AppInfo
 import lesser.evil.BottomPadding
 import lesser.evil.DhizukuClientInfo
 import lesser.evil.DhizukuPermissions
+import lesser.evil.DhizukuUserPermissions
+import lesser.evil.DpmTransactions
 import lesser.evil.HorizontalPadding
 import lesser.evil.MyViewModel
 import lesser.evil.Privilege
@@ -92,6 +95,7 @@ import lesser.evil.Settings
 import lesser.evil.adaptiveInsets
 import lesser.evil.showOperationResultToast
 import lesser.evil.ui.CircularProgressDialog
+import lesser.evil.ui.DisabledAlpha
 import lesser.evil.ui.InfoItem
 import lesser.evil.ui.MyLazyScaffold
 import lesser.evil.ui.MyScaffold
@@ -365,7 +369,8 @@ const val ACTIVATE_DEVICE_OWNER_COMMAND = "dpm set-device-owner lesser.evil/.Rec
 fun DhizukuServerSettingsScreen(
     dhizukuClients: StateFlow<List<Pair<DhizukuClientInfo, AppInfo>>>,
     getDhizukuClients: () -> Unit, updateDhizukuClient: (DhizukuClientInfo) -> Unit,
-    getServerEnabled: () -> Boolean, setServerEnabled: (Boolean) -> Unit, onNavigateUp: () -> Unit
+    getServerEnabled: () -> Boolean, setServerEnabled: (Boolean) -> Unit, restricted: Boolean,
+    onNavigateUp: () -> Unit
 ) {
     var enabled by rememberSaveable { mutableStateOf(getServerEnabled()) }
     val clients by dhizukuClients.collectAsStateWithLifecycle()
@@ -375,7 +380,13 @@ fun DhizukuServerSettingsScreen(
             SwitchItem(R.string.enable, enabled, {
                 setServerEnabled(it)
                 enabled = it
-            })
+            }, enabled = !restricted)
+            // A grant by the user profile is kept to by reading each call the client makes, which
+            // needs the system's own name for it. Say so when that cannot be had, rather than
+            // leaving someone to wonder why such a client does nothing
+            if (enabled && !DpmTransactions.available()) {
+                Notes(R.string.dhizuku_user_grant_unavailable, HorizontalPadding)
+            }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
         }
         if (enabled) items(clients) { (client, app) ->
@@ -399,21 +410,36 @@ fun DhizukuServerSettingsScreen(
                         Column {
                             Text(app.label, style = typography.titleMedium)
                             Text(app.name, Modifier.alpha(0.7F), style = typography.bodyMedium)
+                            // Which profile granted this is what decides how far it reaches, so
+                            // it is the first thing to say about a client
+                            if (client.permissions.isNotEmpty()) Text(
+                                stringResource(
+                                    if (client.actor is Actor.Admin) R.string.granted_by_admin
+                                    else R.string.granted_by_user_profile
+                                ),
+                                style = typography.bodyMedium,
+                                color = if (client.actor is Actor.Admin) colorScheme.error
+                                else colorScheme.primary
+                            )
                         }
                     }
-                    val ts = when (DhizukuPermissions.filter { it !in client.permissions }.size) {
+                    // A profile's grant can only ever carry the two that ask for a function
+                    val available =
+                        if (client.actor is Actor.Admin) DhizukuPermissions
+                        else DhizukuUserPermissions
+                    val ts = when (available.filter { it !in client.permissions }.size) {
                         0 -> ToggleableState.On
-                        DhizukuPermissions.size -> ToggleableState.Off
+                        available.size -> ToggleableState.Off
                         else -> ToggleableState.Indeterminate
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TriStateCheckbox(ts, {
                             if (ts == ToggleableState.Off) {
-                                updateDhizukuClient(client.copy(permissions = DhizukuPermissions))
+                                updateDhizukuClient(client.copy(permissions = available))
                             } else {
                                 updateDhizukuClient(client.copy(permissions = emptyList()))
                             }
-                        })
+                        }, enabled = !restricted)
                         val degrees by animateFloatAsState(if(expand) 180F else 0F)
                         IconButton({ expand = !expand }) {
                             Icon(Icons.Default.ArrowDropDown, null, Modifier.rotate(degrees))
@@ -427,17 +453,23 @@ fun DhizukuServerSettingsScreen(
                             "user_service" to "User service", "delegated_scopes" to "Delegated scopes",
                             "other" to "Other"
                         ).forEach { (k, v) ->
+                            // The three a profile cannot have are shown greyed rather than hidden,
+                            // so it is clear that they exist and why this client cannot have them
+                            val allowed = k in available
                             Row(
-                                Modifier.fillMaxWidth(), Arrangement.SpaceBetween,
-                                Alignment.CenterVertically
+                                Modifier.fillMaxWidth().alpha(if (allowed) 1F else DisabledAlpha),
+                                Arrangement.SpaceBetween, Alignment.CenterVertically
                             ) {
                                 Text(v)
                                 Checkbox(k in client.permissions, {
                                     updateDhizukuClient(client.copy(
                                         permissions = client.permissions.run { if (it) plus(k) else minus(k) }
                                     ))
-                                })
+                                }, enabled = allowed && !restricted)
                             }
+                        }
+                        if (client.actor !is Actor.Admin) {
+                            Notes(R.string.dhizuku_user_grant_note)
                         }
                     }
                 }

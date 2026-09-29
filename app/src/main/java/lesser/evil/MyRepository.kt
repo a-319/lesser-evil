@@ -19,32 +19,52 @@ import kotlinx.serialization.json.Json
 import java.io.OutputStream
 
 class MyRepository(val dbHelper: MyDbHelper) {
+    private val actorJson = Json { ignoreUnknownKeys = true }
+
+    /** An empty column is a grant from before actors were recorded, and those were all the admin's */
+    private fun readActor(stored: String?): Actor =
+        if (stored.isNullOrEmpty()) Actor.Admin else try {
+            actorJson.decodeFromString<Actor>(stored)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Actor.Admin
+        }
+
     fun getDhizukuClients(): List<DhizukuClientInfo> {
         val list = mutableListOf<DhizukuClientInfo>()
-        dbHelper.readableDatabase.rawQuery("SELECT * FROM dhizuku_clients", null).use { cursor ->
+        dbHelper.readableDatabase.rawQuery(
+            "SELECT uid, signature, permissions, actor FROM dhizuku_clients", null
+        ).use { cursor ->
             while (cursor.moveToNext()) {
                 list += DhizukuClientInfo(
                     cursor.getInt(0), cursor.getString(1),
-                    cursor.getString(2).split(",").filter { it.isNotEmpty() }
+                    cursor.getString(2).split(",").filter { it.isNotEmpty() },
+                    readActor(cursor.getStringOrNull(3))
                 )
             }
         }
         return list
     }
-    fun checkDhizukuClientPermission(uid: Int, signature: String?, permission: String): Boolean {
+    /** The client registered for [uid], or null when this caller was never granted anything. */
+    fun getDhizukuClient(uid: Int, signature: String?): DhizukuClientInfo? {
         val cursor = if (signature == null) {
             dbHelper.readableDatabase.rawQuery(
-                "SELECT permissions FROM dhizuku_clients WHERE uid = $uid AND signature IS NULL",
+                "SELECT permissions, actor FROM dhizuku_clients " +
+                        "WHERE uid = $uid AND signature IS NULL",
                 null
             )
         } else {
             dbHelper.readableDatabase.rawQuery(
-                "SELECT permissions FROM dhizuku_clients WHERE uid = $uid AND signature = ?",
+                "SELECT permissions, actor FROM dhizuku_clients WHERE uid = $uid AND signature = ?",
                 arrayOf(signature)
             )
         }
         return cursor.use {
-            it.moveToNext() && permission in it.getString(0).split(",")
+            if (!it.moveToNext()) return null
+            DhizukuClientInfo(
+                uid, signature, it.getString(0).split(",").filter { p -> p.isNotEmpty() },
+                readActor(it.getStringOrNull(1))
+            )
         }
     }
     fun setDhizukuClient(info: DhizukuClientInfo) {
@@ -52,6 +72,7 @@ class MyRepository(val dbHelper: MyDbHelper) {
         cv.put("uid", info.uid)
         cv.put("signature", info.signature)
         cv.put("permissions", info.permissions.joinToString(","))
+        cv.put("actor", actorJson.encodeToString<Actor>(info.actor))
         dbHelper.writableDatabase.insertWithOnConflict("dhizuku_clients", null, cv,
             SQLiteDatabase.CONFLICT_REPLACE)
     }

@@ -350,6 +350,7 @@ fun Home(vm: MyViewModel, onLock: () -> Unit) {
         composable<DhizukuServerSettings> {
             DhizukuServerSettingsScreen(vm.dhizukuClients, vm::getDhizukuClients,
                 vm::updateDhizukuClient, vm::getDhizukuServerEnabled, vm::setDhizukuServerEnabled,
+                restricted,
                 ::navigateUp)
         }
 

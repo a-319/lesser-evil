@@ -1460,9 +1460,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         return SP.dhizukuServer
     }
     fun setDhizukuServerEnabled(status: Boolean) {
+        if (adminOnly()) return
         SP.dhizukuServer = status
     }
+    /** Who a client acts as is the admin's to decide; a profile grants by answering the request */
     fun updateDhizukuClient(info: DhizukuClientInfo) {
+        if (adminOnly()) return
         myRepo.setDhizukuClient(info)
         dhizukuClients.update { list ->
             val ml = list.toMutableList()

@@ -122,6 +122,16 @@ object BlockOwnership {
             BlockKind.Mdd -> VERSION.SDK_INT >= 28 && key in dpm.getMeteredDataDisabledPackages(dar)
             BlockKind.UserRestriction ->
                 VERSION.SDK_INT >= 24 && dpm.getUserRestrictions(dar).getBoolean(key)
+            // Read the same way the screens read it: whether the state is in force at all, by
+            // whichever admin, not only whether this app is the one asking for it
+            BlockKind.DeviceState -> when (DeviceState.of(key)) {
+                DeviceState.Camera -> dpm.getCameraDisabled(null)
+                DeviceState.ScreenCapture -> dpm.getScreenCaptureDisabled(null)
+                // Only readable from 34 on, which is why only from there is it owned
+                DeviceState.StatusBar -> VERSION.SDK_INT >= 34 && dpm.isStatusBarDisabled
+                DeviceState.MasterVolume -> dpm.isMasterVolumeMuted(dar)
+                null -> false
+            }
         }
     } catch (e: Exception) {
         e.printStackTrace()

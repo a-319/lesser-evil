@@ -235,17 +235,21 @@ fun SwitchItem(
 
 @Composable
 fun SwitchItem(
-    title: Int, state: Boolean, onCheckedChange: (Boolean) -> Unit, icon: Int? = null
+    title: Int, state: Boolean, onCheckedChange: (Boolean) -> Unit, icon: Int? = null,
+    enabled: Boolean = true
 ) {
     Row(
         Modifier.fillMaxWidth().padding(25.dp, 5.dp, 15.dp, 5.dp),
         Arrangement.SpaceBetween, Alignment.CenterVertically
     ) {
-        Row(Modifier.weight(1F), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1F).alpha(if (enabled) 1F else DisabledAlpha),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             if (icon != null) Icon(painterResource(icon), null, Modifier.padding(end = 20.dp))
             Text(stringResource(title), style = typography.titleLarge)
         }
-        Switch(state, onCheckedChange, Modifier.padding(start = 10.dp))
+        Switch(state, onCheckedChange, Modifier.padding(start = 10.dp), enabled = enabled)
     }
 }
 

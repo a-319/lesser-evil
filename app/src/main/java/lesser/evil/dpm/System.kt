@@ -108,6 +108,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lesser.evil.AppInfo
 import lesser.evil.BottomPadding
+import lesser.evil.DeviceState
 import lesser.evil.HorizontalPadding
 import lesser.evil.LockTaskProfile
 import lesser.evil.LockTaskUtils
@@ -332,15 +333,21 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
     val privilege by Privilege.status.collectAsStateWithLifecycle()
     var dialog by rememberSaveable { mutableIntStateOf(0) }
     val status by vm.systemOptionsStatus.collectAsStateWithLifecycle()
+    val restricted by vm.restrictedMode.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.getSystemOptionsStatus() }
     MyScaffold(R.string.options, onNavigateUp, 0.dp) {
         SwitchItem(R.string.disable_cam, status.cameraDisabled, vm::setCameraDisabled,
-            R.drawable.no_photography_fill0)
+            R.drawable.no_photography_fill0,
+            enabled = !vm.deviceStateLocked(DeviceState.Camera, status.cameraDisabled))
         SwitchItem(R.string.disable_screen_capture, status.screenCaptureDisabled,
-            vm::setScreenCaptureDisabled, R.drawable.screenshot_fill0)
+            vm::setScreenCaptureDisabled, R.drawable.screenshot_fill0,
+            enabled = !vm.deviceStateLocked(
+                DeviceState.ScreenCapture, status.screenCaptureDisabled
+            ))
         if (VERSION.SDK_INT >= 34 && privilege.run { device || (profile && affiliated) }) {
             SwitchItem(R.string.disable_status_bar, status.statusBarDisabled,
-                vm::setStatusBarDisabled, R.drawable.notifications_fill0)
+                vm::setStatusBarDisabled, R.drawable.notifications_fill0,
+                enabled = !vm.deviceStateLocked(DeviceState.StatusBar, status.statusBarDisabled))
         }
         if (privilege.device || privilege.org) {
             if(VERSION.SDK_INT >= 30) {
@@ -354,7 +361,8 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
             }
         }
         if (!privilege.work) SwitchItem(R.string.master_mute,
-            status.masterVolumeMuted, vm::setMasterVolumeMuted, R.drawable.volume_off_fill0)
+            status.masterVolumeMuted, vm::setMasterVolumeMuted, R.drawable.volume_off_fill0,
+            enabled = !vm.deviceStateLocked(DeviceState.MasterVolume, status.masterVolumeMuted))
         if (VERSION.SDK_INT >= 26) {
             SwitchItem(R.string.backup_service, icon = R.drawable.backup_fill0,
                 state = status.backupServiceEnabled, onCheckedChange = vm::setBackupServiceEnabled,
@@ -380,14 +388,16 @@ fun SystemOptionsScreen(vm: MyViewModel, onNavigateUp: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(stringResource(R.string.status_bar), style = typography.titleMedium)
+                // Before 34 the status bar's state cannot be read, so it cannot be owned; it
+                // stays the admin's, and the user profile sees that rather than being refused
                 Button({
                     vm.setStatusBarDisabled(true)
-                }, Modifier.padding(horizontal = 4.dp)) {
+                }, Modifier.padding(horizontal = 4.dp), enabled = !restricted) {
                     Text(stringResource(R.string.disable))
                 }
                 Button({
                     vm.setStatusBarDisabled(false)
-                }) {
+                }, enabled = !restricted) {
                     Text(stringResource(R.string.enable))
                 }
             }

@@ -4,7 +4,28 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** A blocking function whose blocks carry an owner. */
-enum class BlockKind { Hidden, Suspended, UninstallBlocked, Ucd, Mdd, UserRestriction }
+enum class BlockKind { Hidden, Suspended, UninstallBlocked, Ucd, Mdd, UserRestriction, DeviceState }
+
+/**
+ * A device-wide state that is a block like any other: it has no package or restriction to key it
+ * by, so it is keyed by name instead. Turning one of these on used to be untracked, which made it
+ * the one way left to undo what the admin had set - a child could re-enable a camera the parent
+ * had disabled, from the app or from the launcher shortcut. Owned like everything else, the same
+ * rule applies: whoever turned it on may turn it off, and nobody else.
+ *
+ * [key] is stored, so it may not change; the name of the entry may.
+ */
+enum class DeviceState(val key: String) {
+    Camera("camera"),
+    ScreenCapture("screen_capture"),
+    StatusBar("status_bar"),
+    MasterVolume("master_volume");
+
+    companion object {
+        /** Null for a key this build does not know, which is left alone rather than guessed at. */
+        fun of(key: String): DeviceState? = entries.find { it.key == key }
+    }
+}
 
 /** Who made a change. Every change to a tracked block has to name one. */
 @Serializable
@@ -211,6 +232,15 @@ object PolicyGateway {
             }
             BlockKind.UserRestriction -> keys.forEach {
                 if (blocked) dpm.addUserRestriction(dar, it) else dpm.clearUserRestriction(dar, it)
+            }
+            BlockKind.DeviceState -> keys.forEach { key ->
+                when (DeviceState.of(key)) {
+                    DeviceState.Camera -> dpm.setCameraDisabled(dar, blocked)
+                    DeviceState.ScreenCapture -> dpm.setScreenCaptureDisabled(dar, blocked)
+                    DeviceState.StatusBar -> dpm.setStatusBarDisabled(dar, blocked)
+                    DeviceState.MasterVolume -> dpm.setMasterVolumeMuted(dar, blocked)
+                    null -> Unit
+                }
             }
         }
     }

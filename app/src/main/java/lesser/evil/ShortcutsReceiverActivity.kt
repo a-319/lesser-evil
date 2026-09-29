@@ -31,15 +31,24 @@ class ShortcutsReceiverActivity : Activity() {
                 var success = true
                 when (action) {
                     "LOCK" -> Privilege.DPM.lockNow()
+                    // The camera and the volume are owned like any other block, so a tap here is
+                    // the same operation as the switch in the app and is turned down the same way
                     "DISABLE_CAMERA" -> {
-                        val state = Privilege.DPM.getCameraDisabled(Privilege.DAR)
-                        Privilege.DPM.setCameraDisabled(Privilege.DAR, !state)
-                        ShortcutUtils.setShortcut(this, MyShortcut.DisableCamera, state)
+                        val state = Privilege.DPM.getCameraDisabled(null)
+                        success = PolicyGateway.setBlock(
+                            shortcutActor(), BlockKind.DeviceState, DeviceState.Camera.key, !state
+                        ) == null
+                        if (success) {
+                            ShortcutUtils.setShortcut(this, MyShortcut.DisableCamera, state)
+                        }
                     }
                     "MUTE" -> {
                         val state = Privilege.DPM.isMasterVolumeMuted(Privilege.DAR)
-                        Privilege.DPM.setMasterVolumeMuted(Privilege.DAR, !state)
-                        ShortcutUtils.setShortcut(this, MyShortcut.Mute, state)
+                        success = PolicyGateway.setBlock(
+                            shortcutActor(), BlockKind.DeviceState,
+                            DeviceState.MasterVolume.key, !state
+                        ) == null
+                        if (success) ShortcutUtils.setShortcut(this, MyShortcut.Mute, state)
                     }
                     "USER_RESTRICTION" -> {
                         val state = intent?.getBooleanExtra("state", false)

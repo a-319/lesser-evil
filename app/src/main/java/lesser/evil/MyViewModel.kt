@@ -194,6 +194,12 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         blockLocked(BlockKind.UserRestriction, id, state)
     /** Whether nothing of [kind] may be added to by this session */
     fun blockKindLocked(kind: BlockKind): Boolean = PolicyGateway.kindLockedFor(actor, kind)
+    /** Sets a device-wide state as this session, saying why if it was refused */
+    private fun setDeviceState(state: DeviceState, blocked: Boolean): Boolean =
+        setBlock(BlockKind.DeviceState, state.key, blocked)
+    /** Whether this session may not change [state] away from [blocked] */
+    fun deviceStateLocked(state: DeviceState, blocked: Boolean): Boolean =
+        blockLocked(BlockKind.DeviceState, state.key, blocked)
     /** True (and toasts) if the current session may not perform an admin-only operation */
     private fun adminOnly(): Boolean {
         if (restrictedMode.value) {
@@ -869,17 +875,27 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         )
     }
     fun setCameraDisabled(disabled: Boolean) {
-        DPM.setCameraDisabled(DAR, disabled)
-        ShortcutUtils.setShortcut(application, MyShortcut.DisableCamera, !disabled)
-        systemOptionsStatus.update { it.copy(cameraDisabled = DPM.getCameraDisabled(null)) }
+        setDeviceState(DeviceState.Camera, disabled)
+        val state = DPM.getCameraDisabled(null)
+        ShortcutUtils.setShortcut(application, MyShortcut.DisableCamera, !state)
+        systemOptionsStatus.update { it.copy(cameraDisabled = state) }
     }
     fun setScreenCaptureDisabled(disabled: Boolean) {
-        DPM.setScreenCaptureDisabled(DAR, disabled)
+        setDeviceState(DeviceState.ScreenCapture, disabled)
         systemOptionsStatus.update {
             it.copy(screenCaptureDisabled = DPM.getScreenCaptureDisabled(null))
         }
     }
     fun setStatusBarDisabled(disabled: Boolean) {
+        // The state is only readable from 34 on, and a block that cannot be read cannot be owned
+        // either - the gateway confirms every change against the device. Below that it stays the
+        // admin's, which is the same answer ownership would give for a block nobody recorded
+        if (VERSION.SDK_INT >= 34) {
+            if (!setDeviceState(DeviceState.StatusBar, disabled)) return
+            systemOptionsStatus.update { it.copy(statusBarDisabled = DPM.isStatusBarDisabled) }
+            return
+        }
+        if (adminOnly()) return
         val result = DPM.setStatusBarDisabled(DAR, disabled)
         if (result) systemOptionsStatus.update { it.copy(statusBarDisabled = disabled) }
     }
@@ -901,9 +917,10 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         systemOptionsStatus.update { it.copy(autoTimeRequired = DPM.autoTimeRequired) }
     }
     fun setMasterVolumeMuted(muted: Boolean) {
-        DPM.setMasterVolumeMuted(DAR, muted)
-        ShortcutUtils.setShortcut(application, MyShortcut.Mute, !muted)
-        systemOptionsStatus.update { it.copy(masterVolumeMuted = DPM.isMasterVolumeMuted(DAR)) }
+        setDeviceState(DeviceState.MasterVolume, muted)
+        val state = DPM.isMasterVolumeMuted(DAR)
+        ShortcutUtils.setShortcut(application, MyShortcut.Mute, !state)
+        systemOptionsStatus.update { it.copy(masterVolumeMuted = state) }
     }
     @RequiresApi(26)
     fun setBackupServiceEnabled(enabled: Boolean) {

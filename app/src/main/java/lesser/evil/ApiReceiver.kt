@@ -48,24 +48,16 @@ class ApiReceiver: BroadcastReceiver() {
                     }
                     "LOCK" -> { Privilege.DPM.lockNow() }
                     "REBOOT" -> { Privilege.DPM.reboot(Privilege.DAR) }
-                    "SET_CAMERA_DISABLED" -> {
-                        Privilege.DPM.setCameraDisabled(Privilege.DAR, true)
-                    }
-                    "SET_CAMERA_ENABLED" -> {
-                        Privilege.DPM.setCameraDisabled(Privilege.DAR, false)
-                    }
+                    "SET_CAMERA_DISABLED" -> setDeviceState(DeviceState.Camera, true)
+                    "SET_CAMERA_ENABLED" -> setDeviceState(DeviceState.Camera, false)
                     "SET_USB_DISABLED" -> {
                         Privilege.DPM.isUsbDataSignalingEnabled = false
                     }
                     "SET_USB_ENABLED" -> {
                         Privilege.DPM.isUsbDataSignalingEnabled = true
                     }
-                    "SET_SCREEN_CAPTURE_DISABLED" -> {
-                        Privilege.DPM.setScreenCaptureDisabled(Privilege.DAR, true)
-                    }
-                    "SET_SCREEN_CAPTURE_ENABLED" -> {
-                        Privilege.DPM.setScreenCaptureDisabled(Privilege.DAR, false)
-                    }
+                    "SET_SCREEN_CAPTURE_DISABLED" -> setDeviceState(DeviceState.ScreenCapture, true)
+                    "SET_SCREEN_CAPTURE_ENABLED" -> setDeviceState(DeviceState.ScreenCapture, false)
                     else -> {
                         log += "\nInvalid action"
                     }
@@ -92,6 +84,9 @@ class ApiReceiver: BroadcastReceiver() {
     private fun setRestriction(restriction: String?, set: Boolean) {
         if (restriction.isNullOrEmpty()) return
         PolicyGateway.setBlock(Actor.Admin, BlockKind.UserRestriction, restriction, set)
+    }
+    private fun setDeviceState(state: DeviceState, blocked: Boolean) {
+        PolicyGateway.setBlock(Actor.Admin, BlockKind.DeviceState, state.key, blocked)
     }
     companion object {
         private const val TAG = "API"

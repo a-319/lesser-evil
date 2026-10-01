@@ -29,6 +29,23 @@ jobs:
     - name: Build Release APK
       run: ./gradlew assembleRelease
 
+    - name: Check the framework stubs are not packaged
+      run: |
+        # :framework-stubs declares classes this app does not own, under the framework's own
+        # package names, so that app code can name them at compile time. It is compileOnly for a
+        # reason: a packaged copy is a class the shrinker may rename or merge, and then the app
+        # asks the real framework class for a member only the copy ever had - which is how
+        # Class.forName on IDevicePolicyManager$Stub once died with NoSuchFieldError on a field
+        # called "a". Whether the module is on the runtime classpath is what decides whether it
+        # is dexed, so Gradle is asked that directly rather than the APK being taken on trust.
+        ./gradlew -q :app:dependencies --configuration releaseRuntimeClasspath \
+          > "$RUNNER_TEMP/release-runtime-deps.txt"
+        if grep -q "framework-stubs" "$RUNNER_TEMP/release-runtime-deps.txt"; then
+          echo "::error::framework-stubs is on the release runtime classpath, so it reaches the APK. It has to stay compileOnly."
+          exit 1
+        fi
+        echo "framework-stubs is not on the release runtime classpath"
+
     - name: Sign APK
       uses: r0adkll/sign-android-release@v1
       id: sign_app

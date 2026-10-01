@@ -87,6 +87,8 @@ gradle.taskGraph.whenReady {
 }
 
 dependencies {
+    // Hidden framework interfaces: on the compile classpath only, never packaged.
+    compileOnly(project(":framework-stubs"))
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui.tooling.preview)

@@ -4,11 +4,11 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.os.IInterface;
 
-import androidx.annotation.Keep;
-
-@Keep
+/**
+ * Compile-time declaration of the framework's hidden interface. This module is consumed with
+ * compileOnly, so this class is not packaged: the real one loads from the boot class loader.
+ */
 public interface IPackageInstaller extends IInterface {
-    @Keep
     abstract class Stub extends Binder implements IPackageInstaller {
         public static IPackageInstaller asInterface(IBinder obj) {
             throw new UnsupportedOperationException();

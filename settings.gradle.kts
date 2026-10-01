@@ -16,4 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "OwnDroid"
 include(":app")
+include(":framework-stubs")
  

@@ -21,6 +21,10 @@
 # hide the original source file name.
 # -renamesourcefileattribute SourceFile
 
+# Hidden framework interfaces, declared in :framework-stubs and absent from android.jar.
+-dontwarn android.app.admin.IDevicePolicyManager*
+-dontwarn android.content.pm.IPackageInstaller*
+
 -dontwarn android.app.ActivityThread
 -dontwarn android.app.ContextImpl
 -dontwarn android.app.LoadedApk

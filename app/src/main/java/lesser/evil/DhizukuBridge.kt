@@ -262,9 +262,8 @@ object DpmTransactions {
     /** True once the mapping was actually found, which is the only answer worth keeping. */
     private var looked = false
     private var attempts = 0
-    /** How the mapping was reached, for saying why it is missing when it is. */
-    var how: String = "not looked for yet"
-        private set
+    /** How the mapping was reached, or why it was not. Written to the log, nowhere else. */
+    private var how: String = "not looked for yet"
 
     /** Whether the mapping is available at all, which decides if a profile's grant can be kept to. */
     fun available(): Boolean = synchronized(this) {

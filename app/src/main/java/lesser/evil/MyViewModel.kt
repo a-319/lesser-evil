@@ -1366,7 +1366,16 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         }
     }
     @RequiresApi(28)
+    /**
+     * Which mode the app works in decides what every other screen is able to do at all, and this
+     * one hands the ownership itself over, so it is the admin's. The callback is still answered,
+     * or the screen is left waiting on a result that never comes.
+     */
     fun activateDoByDhizuku(callback: (Boolean, String?) -> Unit) {
+        if (adminOnly()) {
+            callback(false, null)
+            return
+        }
         DPM.transferOwnership(DAR, MyAdminComponent, null)
         SP.dhizuku = false
         Privilege.initialize(application)
@@ -1374,6 +1383,10 @@ class MyViewModel(application: Application): AndroidViewModel(application) {
         callback(true, null)
     }
     fun activateDhizukuMode(callback: (Boolean, String?) -> Unit) {
+        if (adminOnly()) {
+            callback(false, null)
+            return
+        }
         fun onSucceed() {
             SP.dhizuku = true
             Privilege.initialize(application)

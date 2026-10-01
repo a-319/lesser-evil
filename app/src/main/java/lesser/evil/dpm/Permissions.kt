@@ -94,7 +94,6 @@ import lesser.evil.R
 import lesser.evil.Settings
 import lesser.evil.adaptiveInsets
 import lesser.evil.showOperationResultToast
-import lesser.evil.writeClipBoard
 import lesser.evil.ui.CircularProgressDialog
 import lesser.evil.ui.DisabledAlpha
 import lesser.evil.ui.InfoItem
@@ -388,22 +387,6 @@ fun DhizukuServerSettingsScreen(
             // leaving someone to wonder why such a client does nothing
             if (enabled && !DpmTransactions.available()) {
                 Notes(R.string.dhizuku_user_grant_unavailable, HorizontalPadding)
-                // What was tried, so a report of this says which part gave way. Copied on a tap,
-                // since it is a line of English detail nobody should have to transcribe
-                val context = LocalContext.current
-                Text(
-                    DpmTransactions.how,
-                    Modifier
-                        .padding(horizontal = HorizontalPadding)
-                        .padding(top = 8.dp)
-                        .clickable {
-                            context.showOperationResultToast(
-                                writeClipBoard(context, DpmTransactions.how)
-                            )
-                        },
-                    color = colorScheme.error, style = typography.bodySmall
-                )
-                Notes(R.string.tap_to_copy, HorizontalPadding)
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
         }

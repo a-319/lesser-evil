@@ -828,11 +828,12 @@ private fun HomeScreen(restricted: Boolean, onNavigate: (Any) -> Unit, onLock: (
                     ))
                 },
                 actions = {
+                    // Leaving the user profile is one more thing to do here, not something to do
+                    // instead of reaching the working modes
                     if (restricted) {
                         IconButton(onLock) { Icon(painterResource(R.drawable.lock_fill0), null) }
-                    } else {
-                        IconButton({ onNavigate(WorkModes(true)) }) { Icon(painterResource(R.drawable.security_fill0), null) }
                     }
+                    IconButton({ onNavigate(WorkModes(true)) }) { Icon(painterResource(R.drawable.security_fill0), null) }
                     IconButton({ onNavigate(Settings) }) { Icon(Icons.Default.Settings, null) }
                 },
                 scrollBehavior = sb

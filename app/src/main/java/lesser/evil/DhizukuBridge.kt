@@ -295,7 +295,7 @@ object DpmTransactions {
     private fun note(what: String, outcome: Any?) {
         val said = when (outcome) {
             is Throwable -> outcome.javaClass.simpleName +
-                    (outcome.message?.take(60)?.let { ": $it" } ?: "")
+                    (outcome.message?.take(160)?.let { ": $it" } ?: "")
             else -> outcome.toString()
         }
         tried += "$what=$said"
@@ -310,12 +310,11 @@ object DpmTransactions {
         if (looked || attempts >= 3) return
         attempts++
         tried.clear()
-        val stub = try {
-            Class.forName("${DhizukuBridge.DPM_DESCRIPTOR}\$Stub")
-        } catch (e: Throwable) {
-            e.printStackTrace()
-            note("loadClass", e)
-            how = "the device policy interface could not be loaded [${tried.joinToString("; ")}]"
+        val stub = loadStub()
+        if (stub == null) {
+            how = "the device policy interface could not be loaded " +
+                    "[api ${android.os.Build.VERSION.SDK_INT}, try $attempts; " +
+                    "${tried.joinToString("; ")}]"
             return
         }
         lookup = findLookup(stub)
@@ -331,6 +330,37 @@ object DpmTransactions {
         how = "$summary [api ${android.os.Build.VERSION.SDK_INT}, try $attempts; " +
                 "${tried.joinToString("; ")}]"
         Log.d("DpmTransactions", "mapping: $how")
+    }
+
+    /**
+     * The framework's own interface, which is not the only one by that name in this app.
+     *
+     * This app carries a declaration of android.app.admin.IDevicePolicyManager of its own, so that
+     * the Dhizuku path can name Stub.asInterface at compile time. Asking for the class the
+     * ordinary way can therefore reach that copy - or whatever the release build's shrinker made
+     * of its members - rather than the real one, and a member that was renamed to fit the app
+     * leaves a field the framework has never heard of. The boot class loader holds only the
+     * framework's, so it is asked first, and the ordinary way is kept as a fallback for a build
+     * that carries no copy at all.
+     */
+    private fun loadStub(): Class<*>? {
+        val name = "${DhizukuBridge.DPM_DESCRIPTOR}\$Stub"
+        try {
+            val fromBoot = Class.forName(name, false, null)
+            note("bootLoader", "ok")
+            return fromBoot
+        } catch (e: Throwable) {
+            note("bootLoader", e)
+        }
+        return try {
+            val own = Class.forName(name)
+            note("loadClass", "ok")
+            own
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            note("loadClass", e)
+            null
+        }
     }
 
     /**

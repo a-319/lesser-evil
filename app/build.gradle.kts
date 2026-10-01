@@ -87,6 +87,11 @@ gradle.taskGraph.whenReady {
 }
 
 dependencies {
+    // Declarations of hidden framework interfaces, for naming them at compile time only. They
+    // carry the framework's own package names, so packaging them would ship a shadow of classes
+    // this app does not own - and a shrinker renaming or merging a member of such a copy is what
+    // once left the real class unreachable at runtime.
+    compileOnly(project(":framework-stubs"))
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui.tooling.preview)

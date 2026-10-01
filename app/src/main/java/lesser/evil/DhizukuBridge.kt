@@ -332,15 +332,14 @@ object DpmTransactions {
     }
 
     /**
-     * The framework's own interface, which is not the only one by that name in this app.
+     * The framework's own interface, asked of the boot class loader, which holds nothing else.
      *
-     * This app carries a declaration of android.app.admin.IDevicePolicyManager of its own, so that
-     * the Dhizuku path can name Stub.asInterface at compile time. Asking for the class the
-     * ordinary way can therefore reach that copy - or whatever the release build's shrinker made
-     * of its members - rather than the real one, and a member that was renamed to fit the app
-     * leaves a field the framework has never heard of. The boot class loader holds only the
-     * framework's, so it is asked first, and the ordinary way is kept as a fallback for a build
-     * that carries no copy at all.
+     * The declaration this app compiles against lives in :framework-stubs and is not packaged, so
+     * the ordinary lookup would find the framework's too. Asking the boot class loader is still
+     * the right way round: it says which class is wanted rather than relying on nothing else by
+     * that name having been packaged, which is a thing a later change could undo quietly - and
+     * did, for a while, when the declaration was part of the app and a shrinker renamed a member
+     * of it.
      */
     private fun loadStub(): Class<*>? {
         val name = "${DhizukuBridge.DPM_DESCRIPTOR}\$Stub"

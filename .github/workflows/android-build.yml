@@ -38,13 +38,20 @@ jobs:
         # Class.forName on IDevicePolicyManager$Stub once died with NoSuchFieldError on a field
         # called "a". Whether the module is on the runtime classpath is what decides whether it
         # is dexed, so Gradle is asked that directly rather than the APK being taken on trust.
-        ./gradlew -q :app:dependencies --configuration releaseRuntimeClasspath \
-          > "$RUNNER_TEMP/release-runtime-deps.txt"
-        if grep -q "framework-stubs" "$RUNNER_TEMP/release-runtime-deps.txt"; then
+        deps="$RUNNER_TEMP/release-runtime-deps.txt"
+        ./gradlew -q :app:dependencies --configuration releaseRuntimeClasspath > "$deps"
+        # A query that answered nothing would pass the test below for the wrong reason, so what
+        # came back has to look like the tree that was asked for before it is read for an absence
+        if ! grep -q "releaseRuntimeClasspath" "$deps"; then
+          echo "::error::the release runtime classpath could not be read, so nothing was checked"
+          cat "$deps"
+          exit 1
+        fi
+        if grep -q "framework-stubs" "$deps"; then
           echo "::error::framework-stubs is on the release runtime classpath, so it reaches the APK. It has to stay compileOnly."
           exit 1
         fi
-        echo "framework-stubs is not on the release runtime classpath"
+        echo "Read $(wc -l < "$deps") lines of release runtime classpath; framework-stubs is not among them"
 
     - name: Sign APK
       uses: r0adkll/sign-android-release@v1
